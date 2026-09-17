@@ -1,0 +1,967 @@
+import React, { useState, useEffect, useMemo } from 'react';
+import { 
+  Sparkles, 
+  Truck, 
+  Phone, 
+  ShieldCheck, 
+  Clock, 
+  Filter, 
+  Check, 
+  ChevronRight, 
+  Award, 
+  Package, 
+  HelpCircle,
+  MapPin,
+  HeartHandshake,
+  LogOut
+} from 'lucide-react';
+import { 
+  PRODUCTS, 
+  CATEGORIES, 
+  DAILY_DEALS, 
+  LOYALTY_TIERS, 
+  STORE_CONFIG, 
+  formatMNT 
+} from './data/storeData';
+import { Product, CartItem, LoyaltyTier, ComboPack, OrderDetails } from './types';
+import { Header } from './components/Header';
+import { DailyDealBanner } from './components/DailyDealBanner';
+import { ProductCard } from './components/ProductCard';
+import { CombosSection } from './components/CombosSection';
+import { CartDrawer } from './components/CartDrawer';
+import { CheckoutModal } from './components/CheckoutModal';
+import { LoyaltyModal } from './components/LoyaltyModal';
+import { ProductDetailModal } from './components/ProductDetailModal';
+import { AdminPanel } from './components/AdminPanel';
+import { AdminLoginModal } from './components/AdminLoginModal';
+import { ProductFormModal } from './components/ProductFormModal';
+
+export default function App() {
+  // Today's day of week (0 = Sunday, 1 = Monday, ...)
+  const [selectedDay, setSelectedDay] = useState<number>(() => {
+    return new Date().getDay();
+  });
+
+  // Products state (persisted in localStorage)
+  const [products, setProducts] = useState<Product[]>(() => {
+    try {
+      const saved = localStorage.getItem('usk_products_list');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
+        }
+      }
+      return PRODUCTS;
+    } catch {
+      return PRODUCTS;
+    }
+  });
+
+  // Orders state (persisted in localStorage)
+  const [orders, setOrders] = useState<OrderDetails[]>(() => {
+    try {
+      const saved = localStorage.getItem('usk_orders_list');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  // Admin states
+  const [isAdminOpen, setIsAdminOpen] = useState(false);
+  const [isAdminLoginOpen, setIsAdminLoginOpen] = useState(false);
+  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState<boolean>(() => {
+    try {
+      return sessionStorage.getItem('usk_admin_auth') === 'true';
+    } catch {
+      return false;
+    }
+  });
+  const [adminPin, setAdminPin] = useState<string>(() => {
+    try {
+      return localStorage.getItem('usk_admin_pin') || '1234';
+    } catch {
+      return '1234';
+    }
+  });
+  const [directEditProduct, setDirectEditProduct] = useState<Product | null>(null);
+  const [isDirectFormOpen, setIsDirectFormOpen] = useState(false);
+
+  // Cart state persisted in localStorage
+  const [cart, setCart] = useState<CartItem[]>(() => {
+    try {
+      const saved = localStorage.getItem('gobi_mart_cart');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  // Active Loyalty Tier
+  const [activeLoyalty, setActiveLoyalty] = useState<LoyaltyTier | null>(() => {
+    try {
+      const saved = localStorage.getItem('gobi_mart_loyalty');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  // Search & Filters
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('all');
+  const [selectedOrigin, setSelectedOrigin] = useState<'ALL' | 'KR' | 'US'>('ALL');
+  const [showDealsOnly, setShowDealsOnly] = useState(false);
+
+  // Modals & Drawers
+  const [isCartOpen, setIsCartOpen] = useState(false);
+  const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
+  const [isLoyaltyOpen, setIsLoyaltyOpen] = useState(false);
+  const [detailProduct, setDetailProduct] = useState<Product | null>(null);
+
+  // Toast message
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Sync cart to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem('gobi_mart_cart', JSON.stringify(cart));
+    } catch {
+      // ignore storage errors
+    }
+  }, [cart]);
+
+  // Sync loyalty to localStorage
+  useEffect(() => {
+    try {
+      if (activeLoyalty) {
+        localStorage.setItem('gobi_mart_loyalty', JSON.stringify(activeLoyalty));
+      } else {
+        localStorage.removeItem('gobi_mart_loyalty');
+      }
+    } catch {
+      // ignore storage errors
+    }
+  }, [activeLoyalty]);
+
+  // Sync products to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem('usk_products_list', JSON.stringify(products));
+    } catch {
+      // ignore storage errors
+    }
+  }, [products]);
+
+  // Sync orders to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem('usk_orders_list', JSON.stringify(orders));
+    } catch {
+      // ignore storage errors
+    }
+  }, [orders]);
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => {
+      setToastMessage((prev) => (prev === msg ? null : prev));
+    }, 2800);
+  };
+
+  // Admin Action Handlers
+  const handleOpenAdmin = () => {
+    if (isAdminAuthenticated) {
+      setIsAdminOpen(true);
+    } else {
+      setIsAdminLoginOpen(true);
+    }
+  };
+
+  const handleAdminLoginSuccess = () => {
+    setIsAdminAuthenticated(true);
+    try {
+      sessionStorage.setItem('usk_admin_auth', 'true');
+    } catch {
+      // ignore
+    }
+    setIsAdminLoginOpen(false);
+    setIsAdminOpen(true);
+    showToast('Админ системд амжилттай нэвтэрлээ!');
+  };
+
+  const handleSaveProduct = (product: Product) => {
+    setProducts((prev) => {
+      const exists = prev.some((p) => p.id === product.id);
+      if (exists) {
+        return prev.map((p) => (p.id === product.id ? product : p));
+      } else {
+        return [product, ...prev];
+      }
+    });
+    showToast(`"${product.name}" барааны мэдээлэл хадгалагдлаа!`);
+  };
+
+  const handleDeleteProduct = (productId: string) => {
+    setProducts((prev) => prev.filter((p) => p.id !== productId));
+    showToast('Бараа амжилттай устгагдлаа');
+  };
+
+  const handleToggleStock = (productId: string) => {
+    setProducts((prev) =>
+      prev.map((p) => {
+        if (p.id === productId) {
+          const nextStock = !p.in_stock;
+          showToast(nextStock ? `"${p.name}" бэлэн төлөвт шилжлээ` : `"${p.name}" дууссан төлөвт шилжлээ`);
+          return { ...p, in_stock: nextStock };
+        }
+        return p;
+      })
+    );
+  };
+
+  const handleUpdateOrderStatus = (orderId: string, status: 'new' | 'confirmed' | 'shipping' | 'delivered' | 'cancelled') => {
+    setOrders((prev) =>
+      prev.map((o) => (o.orderId === orderId ? { ...o, status } : o))
+    );
+    showToast(`Захиалга #${orderId} төлөв шинэчлэгдлээ`);
+  };
+
+  const handleResetProducts = () => {
+    setProducts(PRODUCTS);
+    try {
+      localStorage.removeItem('usk_products_list');
+    } catch {
+      // ignore
+    }
+    showToast('Каталог анхдагч 24 бараагаар сэргээгдлээ');
+  };
+
+  const handleChangePin = (newPin: string) => {
+    setAdminPin(newPin);
+    try {
+      localStorage.setItem('usk_admin_pin', newPin);
+    } catch {
+      // ignore
+    }
+    showToast('ПИН код шинэчлэгдлээ');
+  };
+
+  const handleAdminLogout = () => {
+    setIsAdminAuthenticated(false);
+    setIsAdminOpen(false);
+    try {
+      sessionStorage.removeItem('usk_admin_auth');
+    } catch {
+      // ignore
+    }
+    showToast('Админ горимоос гарлаа. Хэрэглэгчийн цэвэр харагдац идэвхжлээ.');
+  };
+
+  // Discreet Admin Trigger 1: Check URL ?admin=true or ?admin=login
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('admin') === 'true' || params.get('admin') === 'login') {
+        if (!isAdminAuthenticated) {
+          setIsAdminLoginOpen(true);
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }, [isAdminAuthenticated]);
+
+  // Discreet Admin Trigger 2: Keyboard shortcut Ctrl + Shift + A (or Cmd + Shift + A)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'A' || e.key === 'a')) {
+        e.preventDefault();
+        if (isAdminAuthenticated) {
+          setIsAdminOpen((prev) => !prev);
+        } else {
+          setIsAdminLoginOpen(true);
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isAdminAuthenticated]);
+
+  // Daily deal calculation helper
+  const currentDeal = DAILY_DEALS[selectedDay.toString()] || DAILY_DEALS["1"];
+
+  const getProductPricing = (product: Product) => {
+    const isDealActive = product.day_deal === selectedDay || currentDeal?.category === product.category;
+    const discountPercent = isDealActive ? (currentDeal?.discount_percent || 10) : 0;
+    const finalPrice = discountPercent > 0 
+      ? Math.round(product.price * (1 - discountPercent / 100))
+      : product.price;
+
+    return {
+      price: finalPrice,
+      originalPrice: product.price,
+      discountPercent,
+      isDealActive
+    };
+  };
+
+  // Add Product to Cart
+  const handleAddToCart = (product: Product, quantity = 1) => {
+    const pricing = getProductPricing(product);
+    
+    setCart((prevCart) => {
+      const existingIndex = prevCart.findIndex((i) => i.id === product.id);
+      if (existingIndex > -1) {
+        const next = [...prevCart];
+        next[existingIndex] = {
+          ...next[existingIndex],
+          quantity: next[existingIndex].quantity + quantity,
+          price: pricing.price,
+          originalPrice: pricing.originalPrice
+        };
+        return next;
+      } else {
+        const newItem: CartItem = {
+          type: 'product',
+          id: product.id,
+          name: product.name,
+          price: pricing.price,
+          originalPrice: pricing.originalPrice,
+          image: product.image,
+          weight: product.weight,
+          quantity,
+          appliedDiscountPct: pricing.discountPercent,
+          origin: product.origin,
+          flag: product.flag
+        };
+        return [...prevCart, newItem];
+      }
+    });
+
+    showToast(`"${product.name}" сагсанд нэмэгдлээ!`);
+  };
+
+  // Add Combo to Cart
+  const handleAddComboToCart = (combo: ComboPack) => {
+    // Check if Sunday (day 0) combo day adds extra 20% discount
+    const isSundayComboDeal = selectedDay === 0;
+    const finalPrice = isSundayComboDeal
+      ? Math.round(combo.price * 0.8)
+      : combo.price;
+
+    setCart((prevCart) => {
+      const existingIndex = prevCart.findIndex((i) => i.id === combo.id);
+      if (existingIndex > -1) {
+        const next = [...prevCart];
+        next[existingIndex] = {
+          ...next[existingIndex],
+          quantity: next[existingIndex].quantity + 1,
+          price: finalPrice
+        };
+        return next;
+      } else {
+        const newItem: CartItem = {
+          type: 'combo',
+          id: combo.id,
+          name: combo.name,
+          price: finalPrice,
+          originalPrice: combo.orig_price,
+          image: combo.image,
+          quantity: 1,
+          appliedDiscountPct: Math.round(((combo.orig_price - finalPrice) / combo.orig_price) * 100)
+        };
+        return [...prevCart, newItem];
+      }
+    });
+
+    showToast(`"${combo.name}" багц сагсанд нэмэгдлээ!`);
+  };
+
+  const handleUpdateQuantity = (id: string, quantity: number) => {
+    if (quantity <= 0) {
+      handleRemoveItem(id);
+    } else {
+      setCart((prev) =>
+        prev.map((item) => (item.id === id ? { ...item, quantity } : item))
+      );
+    }
+  };
+
+  const handleRemoveItem = (id: string) => {
+    setCart((prev) => prev.filter((item) => item.id !== id));
+  };
+
+  const handleClearCart = () => {
+    setCart([]);
+  };
+
+  // Cart Calculations
+  const cartCount = cart.reduce((cnt, item) => cnt + item.quantity, 0);
+  const cartOriginalSubtotal = cart.reduce((sum, item) => sum + item.originalPrice * item.quantity, 0);
+  const cartCurrentPriceTotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const dailyDiscountTotal = Math.max(0, cartOriginalSubtotal - cartCurrentPriceTotal);
+
+  // Filtered Products
+  const filteredProducts = useMemo(() => {
+    return products.filter((product) => {
+      // Search filter
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase().trim();
+        const matchTitle = product.name.toLowerCase().includes(q);
+        const matchDesc = product.description.toLowerCase().includes(q);
+        const matchCategory = product.category_name.toLowerCase().includes(q);
+        const matchCountry = product.country.toLowerCase().includes(q);
+        if (!matchTitle && !matchDesc && !matchCategory && !matchCountry) {
+          return false;
+        }
+      }
+
+      // Category filter
+      if (selectedCategory !== 'all' && product.category !== selectedCategory) {
+        return false;
+      }
+
+      // Origin filter
+      if (selectedOrigin !== 'ALL' && product.origin !== selectedOrigin) {
+        return false;
+      }
+
+      // Deal only filter
+      if (showDealsOnly) {
+        const isDeal = product.day_deal === selectedDay || currentDeal.category === product.category;
+        if (!isDeal) return false;
+      }
+
+      return true;
+    });
+  }, [products, searchQuery, selectedCategory, selectedOrigin, showDealsOnly, selectedDay, currentDeal]);
+
+  return (
+    <div className="min-h-screen bg-stone-50 flex flex-col font-sans selection:bg-rose-500 selection:text-white">
+      {/* Admin Mode Floating Top Strip */}
+      {isAdminAuthenticated && (
+        <div className="bg-stone-900 text-white px-4 py-2 text-xs border-b border-rose-500/30">
+          <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span className="font-bold text-rose-400">Админ горим нээлттэй:</span>
+              <span className="text-stone-300 hidden sm:inline">Барааны зураг оруулах, үнэ болон бэлэн эсэхийг удирдах боломжтой</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                id="admin-quick-add-strip-btn"
+                onClick={() => {
+                  setDirectEditProduct(null);
+                  setIsDirectFormOpen(true);
+                }}
+                className="bg-rose-600 hover:bg-rose-700 text-white px-3 py-1 rounded-lg font-bold text-[11px] flex items-center gap-1 shadow-xs cursor-pointer transition-all"
+              >
+                <span>+ Шинэ бараа оруулах</span>
+              </button>
+              <button
+                id="admin-open-panel-strip-btn"
+                onClick={() => setIsAdminOpen(true)}
+                className="bg-stone-800 hover:bg-stone-700 text-stone-200 px-3 py-1 rounded-lg font-bold text-[11px] border border-stone-700 cursor-pointer transition-all"
+              >
+                Админ удирдлага
+              </button>
+              <button
+                id="admin-logout-strip-btn"
+                onClick={handleAdminLogout}
+                className="bg-stone-800 hover:bg-rose-900/60 text-stone-300 hover:text-rose-200 px-2.5 py-1 rounded-lg text-[11px] font-semibold border border-stone-700 cursor-pointer transition-all flex items-center gap-1"
+                title="Админаас гарах"
+              >
+                <LogOut className="w-3 h-3 text-rose-400" />
+                <span>Гарах</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* App Header */}
+      <Header
+        searchQuery={searchQuery}
+        setSearchQuery={setSearchQuery}
+        cartCount={cartCount}
+        cartTotal={cartCurrentPriceTotal}
+        onOpenCart={() => setIsCartOpen(true)}
+        onOpenLoyalty={() => setIsLoyaltyOpen(true)}
+        onOpenAdmin={handleOpenAdmin}
+        onLogoutAdmin={handleAdminLogout}
+        isAdminActive={isAdminAuthenticated}
+        activeLoyalty={activeLoyalty}
+        selectedDay={selectedDay}
+        setSelectedDay={setSelectedDay}
+        dailyDealTitle={currentDeal.title}
+      />
+
+      {/* Main Content Area */}
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 py-6 space-y-8">
+        {/* Daily Deal Hero Banner */}
+        <DailyDealBanner
+          selectedDay={selectedDay}
+          onFilterDealCategory={(cat) => {
+            if (cat === 'all') {
+              setSelectedCategory('all');
+            } else {
+              setSelectedCategory(cat);
+            }
+            setShowDealsOnly(true);
+          }}
+        />
+
+        {/* Curated Combos Section */}
+        <CombosSection
+          onAddComboToCart={handleAddComboToCart}
+          onOpenProductDetail={(productId) => {
+            const found = products.find((p) => p.id === productId);
+            if (found) setDetailProduct(found);
+          }}
+        />
+
+        {/* Catalog Control Section: Categories, Country Origin Tabs, Filters */}
+        <section id="catalog-section" className="space-y-4 pt-4 border-t border-stone-200">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            <div>
+              <h2 className="text-xl sm:text-2xl font-black text-stone-900 tracking-tight flex items-center gap-2">
+                <span>Барааны Каталог</span>
+                <span className="text-xs font-bold text-stone-600 bg-stone-200 px-2 py-0.5 rounded-full">
+                  {filteredProducts.length} бараа
+                </span>
+              </h2>
+              <p className="text-xs sm:text-sm text-stone-600">
+                АНУ болон БНСУ-ын үйлдвэрийн албан ёсны лацтай бүтээгдэхүүнүүд
+              </p>
+            </div>
+
+            {/* Origin & Deal Toggles */}
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Origin filter tabs */}
+              <div className="bg-stone-200/80 p-1 rounded-xl flex items-center text-xs font-bold text-stone-700">
+                <button
+                  onClick={() => setSelectedOrigin('ALL')}
+                  className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                    selectedOrigin === 'ALL'
+                      ? 'bg-white text-stone-900 shadow-xs'
+                      : 'hover:text-stone-900'
+                  }`}
+                >
+                  Бүгд
+                </button>
+                <button
+                  onClick={() => setSelectedOrigin('KR')}
+                  className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1 cursor-pointer ${
+                    selectedOrigin === 'KR'
+                      ? 'bg-white text-stone-900 shadow-xs'
+                      : 'hover:text-stone-900'
+                  }`}
+                >
+                  <span>🇰🇷</span>
+                  <span>БНСУ</span>
+                </button>
+                <button
+                  onClick={() => setSelectedOrigin('US')}
+                  className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1 cursor-pointer ${
+                    selectedOrigin === 'US'
+                      ? 'bg-white text-stone-900 shadow-xs'
+                      : 'hover:text-stone-900'
+                  }`}
+                >
+                  <span>🇺🇸</span>
+                  <span>АНУ</span>
+                </button>
+              </div>
+
+              {/* Show Deals Only toggle */}
+              <button
+                onClick={() => setShowDealsOnly(!showDealsOnly)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all flex items-center gap-1.5 cursor-pointer ${
+                  showDealsOnly
+                    ? 'bg-rose-600 text-white border-rose-600 shadow-xs'
+                    : 'bg-white text-stone-700 border-stone-200 hover:bg-stone-100'
+                }`}
+              >
+                <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                <span>Зөвхөн хямдралтай</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Category Chips Bar */}
+          <div className="flex items-center gap-2 overflow-x-auto pb-2 no-scrollbar">
+            {CATEGORIES.map((cat) => {
+              const isSelected = selectedCategory === cat.id;
+              return (
+                <button
+                  key={cat.id}
+                  onClick={() => {
+                    setSelectedCategory(cat.id);
+                  }}
+                  className={`px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer flex items-center gap-1.5 ${
+                    isSelected
+                      ? 'bg-stone-900 text-white shadow-md shadow-stone-900/15 scale-[1.02]'
+                      : 'bg-white text-stone-600 border border-stone-200/80 hover:bg-stone-100 hover:text-stone-900'
+                  }`}
+                >
+                  <span>{cat.name}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Active Filter Pills (if any) */}
+          {(selectedCategory !== 'all' || selectedOrigin !== 'ALL' || showDealsOnly || searchQuery) && (
+            <div className="flex flex-wrap items-center gap-2 pt-1 text-xs">
+              <span className="text-stone-500 font-medium">Шүүлтүүрүүд:</span>
+
+              {searchQuery && (
+                <span className="bg-rose-50 text-rose-700 border border-rose-200 px-2.5 py-0.5 rounded-full font-medium flex items-center gap-1">
+                  Хайлт: "{searchQuery}"
+                  <button onClick={() => setSearchQuery('')} className="hover:text-rose-900 font-bold ml-1">×</button>
+                </span>
+              )}
+
+              {selectedCategory !== 'all' && (
+                <span className="bg-stone-200 text-stone-800 px-2.5 py-0.5 rounded-full font-medium flex items-center gap-1">
+                  Ангилал: {CATEGORIES.find((c) => c.id === selectedCategory)?.name}
+                  <button onClick={() => setSelectedCategory('all')} className="hover:text-black font-bold ml-1">×</button>
+                </span>
+              )}
+
+              {selectedOrigin !== 'ALL' && (
+                <span className="bg-stone-200 text-stone-800 px-2.5 py-0.5 rounded-full font-medium flex items-center gap-1">
+                  Улс: {selectedOrigin === 'KR' ? '🇰🇷 БНСУ' : '🇺🇸 АНУ'}
+                  <button onClick={() => setSelectedOrigin('ALL')} className="hover:text-black font-bold ml-1">×</button>
+                </span>
+              )}
+
+              {showDealsOnly && (
+                <span className="bg-rose-100 text-rose-800 px-2.5 py-0.5 rounded-full font-medium flex items-center gap-1">
+                  Зөвхөн хямдрал
+                  <button onClick={() => setShowDealsOnly(false)} className="hover:text-black font-bold ml-1">×</button>
+                </span>
+              )}
+
+              <button
+                onClick={() => {
+                  setSelectedCategory('all');
+                  setSelectedOrigin('ALL');
+                  setShowDealsOnly(false);
+                  setSearchQuery('');
+                }}
+                className="text-stone-500 hover:text-stone-800 underline font-semibold ml-2 cursor-pointer"
+              >
+                Бүгдийг арилгах
+              </button>
+            </div>
+          )}
+
+          {/* Product Grid */}
+          {filteredProducts.length === 0 ? (
+            <div className="bg-white rounded-3xl p-12 text-center border border-stone-200 shadow-xs space-y-3">
+              <div className="w-16 h-16 rounded-2xl bg-stone-100 flex items-center justify-center mx-auto text-stone-400">
+                <Filter className="w-8 h-8" />
+              </div>
+              <h3 className="text-lg font-black text-stone-800">
+                Таны хайлтад тохирох бараа олдсонгүй
+              </h3>
+              <p className="text-xs text-stone-500 max-w-sm mx-auto">
+                Хайлтын үгээ өөрчлөх эсвэл шүүлтүүрийг цэвэрлэж үзнэ үү.
+              </p>
+              <button
+                onClick={() => {
+                  setSearchQuery('');
+                  setSelectedCategory('all');
+                  setSelectedOrigin('ALL');
+                  setShowDealsOnly(false);
+                }}
+                className="px-4 py-2 bg-stone-900 text-white rounded-xl text-xs font-bold hover:bg-stone-800 transition-colors cursor-pointer"
+              >
+                Бүх барааг харах
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
+              {filteredProducts.map((product) => {
+                const cartItem = cart.find((i) => i.id === product.id);
+                const quantity = cartItem ? cartItem.quantity : 0;
+
+                return (
+                  <ProductCard
+                    key={product.id}
+                    product={product}
+                    selectedDay={selectedDay}
+                    cartQuantity={quantity}
+                    onAddToCart={handleAddToCart}
+                    onUpdateQuantity={handleUpdateQuantity}
+                    onOpenDetail={(prod) => setDetailProduct(prod)}
+                    isAdmin={isAdminAuthenticated}
+                    onEditProduct={(prod) => {
+                      setDirectEditProduct(prod);
+                      setIsDirectFormOpen(true);
+                    }}
+                  />
+                );
+              })}
+            </div>
+          )}
+        </section>
+
+        {/* Benefits & Trust Strip */}
+        <section className="bg-white rounded-3xl border border-stone-200/90 p-6 sm:p-8 shadow-xs">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="flex items-start gap-3.5">
+              <div className="w-11 h-11 rounded-2xl bg-amber-500/10 text-amber-600 flex items-center justify-center shrink-0 border border-amber-500/20">
+                <Truck className="w-5 h-5" />
+              </div>
+              <div>
+                <h4 className="font-extrabold text-stone-900 text-sm">Түргэн Шуурхай Хүргэлт</h4>
+                <p className="text-xs text-stone-500 mt-0.5 leading-relaxed">
+                  {formatMNT(STORE_CONFIG.free_delivery_threshold)}-өөс дээш үнэгүй. Өмнөговь болон УБ хотод 1-2 цагт.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3.5">
+              <div className="w-11 h-11 rounded-2xl bg-rose-500/10 text-rose-600 flex items-center justify-center shrink-0 border border-rose-500/20">
+                <ShieldCheck className="w-5 h-5" />
+              </div>
+              <div>
+                <h4 className="font-extrabold text-stone-900 text-sm">100% Баталгаат Импорт</h4>
+                <p className="text-xs text-stone-500 mt-0.5 leading-relaxed">
+                  АНУ, БНСУ-аас агаарын тээврээр шууд ирсэн шинэ үйлдвэрлэлийн бараа.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3.5">
+              <div className="w-11 h-11 rounded-2xl bg-indigo-500/10 text-indigo-600 flex items-center justify-center shrink-0 border border-indigo-500/20">
+                <Award className="w-5 h-5" />
+              </div>
+              <div>
+                <h4 className="font-extrabold text-stone-900 text-sm">Лояалти Хөнгөлөлт</h4>
+                <p className="text-xs text-stone-500 mt-0.5 leading-relaxed">
+                  Хүрэл, Мөнгөн, Алтан гишүүдэд 2-5% байнгын хөнгөлөлт, бэлэг, ваучер.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3.5">
+              <div className="w-11 h-11 rounded-2xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center shrink-0 border border-emerald-500/20">
+                <Phone className="w-5 h-5" />
+              </div>
+              <div>
+                <h4 className="font-extrabold text-stone-900 text-sm">Хэрэглэгчийн Тусламж</h4>
+                <p className="text-xs text-stone-500 mt-0.5 leading-relaxed">
+                  Өдөр бүр 09:00 - 22:00 цагийн хооронд лавлах утас: <strong>{STORE_CONFIG.phone}</strong>
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      {/* Footer */}
+      <footer className="bg-stone-900 text-stone-400 text-xs py-10 mt-12 border-t border-stone-800">
+        <div className="max-w-7xl mx-auto px-4 space-y-8">
+          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 pb-8 border-b border-stone-800">
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-rose-600 to-amber-500 text-white font-black flex items-center justify-center text-xs tracking-tight">
+                  US&K
+                </div>
+                <span className="font-black text-white text-lg tracking-tight">US&K Family Mart</span>
+              </div>
+              <p className="text-stone-400 text-xs max-w-md">
+                АНУ болон БНСУ-ын дээд зэрэглэлийн чанартай хүнс, рамен, хүүхдийн живх, өргөн хэрэглээ, амин дэмийг шуурхай хүргэх цахим дэлгүүр.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-4 text-xs text-stone-300">
+              <button
+                onClick={() => setIsLoyaltyOpen(true)}
+                className="hover:text-amber-400 transition-colors cursor-pointer"
+              >
+                Гишүүнчлэлийн хөтөлбөр
+              </button>
+              <span>•</span>
+              <span className="text-stone-400">{STORE_CONFIG.location}</span>
+              <span>•</span>
+              <a href={`tel:${STORE_CONFIG.phone}`} className="text-amber-400 font-bold hover:underline">
+                Утас: {STORE_CONFIG.phone}
+              </a>
+              {isAdminAuthenticated && (
+                <>
+                  <span>•</span>
+                  <button
+                    id="footer-admin-panel-btn"
+                    onClick={handleOpenAdmin}
+                    className="hover:text-rose-400 text-rose-300 font-bold transition-colors cursor-pointer flex items-center gap-1"
+                  >
+                    <ShieldCheck className="w-3.5 h-3.5" />
+                    <span>Админ Удирдлага</span>
+                  </button>
+                  <span>•</span>
+                  <button
+                    id="footer-admin-logout-btn"
+                    onClick={handleAdminLogout}
+                    className="hover:text-rose-400 text-stone-400 transition-colors cursor-pointer"
+                    title="Админаас гарах"
+                  >
+                    Гарах
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-stone-500 text-[11px]">
+            <div className="flex items-center gap-2">
+              <p>© 2026 US&K Family Mart. Бүх эрх хуулиар хамгаалагдсан.</p>
+              {/* Discreet staff login trigger for shop manager */}
+              <button
+                id="footer-discreet-admin-btn"
+                onClick={handleOpenAdmin}
+                className="text-stone-700 hover:text-stone-400 transition-colors p-1 rounded-sm cursor-pointer"
+                title="Ажилтны нэвтрэх (Ctrl+Shift+A)"
+              >
+                <ShieldCheck className="w-3 h-3" />
+              </button>
+            </div>
+            <p className="flex items-center gap-1.5 text-stone-400">
+              <span>🇲🇳 Улаанбаатар & Өмнөговь бүс нутгийн шуурхай хүргэлт</span>
+            </p>
+          </div>
+        </div>
+      </footer>
+
+      {/* Drawers & Modals */}
+      <CartDrawer
+        isOpen={isCartOpen}
+        onClose={() => setIsCartOpen(false)}
+        items={cart}
+        onUpdateQuantity={handleUpdateQuantity}
+        onRemoveItem={handleRemoveItem}
+        onClearCart={handleClearCart}
+        onProceedToCheckout={() => {
+          setIsCartOpen(false);
+          setIsCheckoutOpen(true);
+        }}
+        activeLoyalty={activeLoyalty}
+        dailyDiscountTotal={dailyDiscountTotal}
+      />
+
+      <CheckoutModal
+        isOpen={isCheckoutOpen}
+        onClose={() => setIsCheckoutOpen(false)}
+        items={cart}
+        activeLoyalty={activeLoyalty}
+        dailyDiscountTotal={dailyDiscountTotal}
+        onOrderSuccess={(order) => {
+          const newOrder: OrderDetails = {
+            ...order,
+            status: 'new'
+          };
+          setOrders((prev) => [newOrder, ...prev]);
+          setCart([]);
+          showToast(`Захиалга #${order.orderId} амжилттай бүртгэгдлээ!`);
+        }}
+      />
+
+      <LoyaltyModal
+        isOpen={isLoyaltyOpen}
+        onClose={() => setIsLoyaltyOpen(false)}
+        activeLoyalty={activeLoyalty}
+        onSelectTier={(tier) => {
+          setActiveLoyalty(tier);
+          if (tier) {
+            showToast(`${tier.name} идэвхжлээ (${tier.discount_pct}% хөнгөлөлт)!`);
+          } else {
+            showToast('Энгийн горим руу шилжлээ');
+          }
+        }}
+      />
+
+      <ProductDetailModal
+        product={detailProduct}
+        onClose={() => setDetailProduct(null)}
+        selectedDay={selectedDay}
+        onAddToCart={(prod, qty) => {
+          handleAddToCart(prod, qty);
+        }}
+      />
+
+      {/* Admin Panel Full Screen Dashboard */}
+      {isAdminOpen && (
+        <AdminPanel
+          products={products}
+          orders={orders}
+          onSaveProduct={handleSaveProduct}
+          onDeleteProduct={handleDeleteProduct}
+          onToggleStock={handleToggleStock}
+          onUpdateOrderStatus={handleUpdateOrderStatus}
+          onResetProducts={handleResetProducts}
+          onClose={() => setIsAdminOpen(false)}
+          onLogout={handleAdminLogout}
+          adminPin={adminPin}
+          onChangePin={handleChangePin}
+        />
+      )}
+
+      {/* Admin Login Modal */}
+      <AdminLoginModal
+        isOpen={isAdminLoginOpen}
+        onClose={() => setIsAdminLoginOpen(false)}
+        onLoginSuccess={handleAdminLoginSuccess}
+        currentPin={adminPin}
+      />
+
+      {/* Direct Product Form Modal (for quick edit from catalog cards) */}
+      <ProductFormModal
+        isOpen={isDirectFormOpen}
+        onClose={() => {
+          setIsDirectFormOpen(false);
+          setDirectEditProduct(null);
+        }}
+        productToEdit={directEditProduct}
+        onSave={(updated) => {
+          handleSaveProduct(updated);
+          setIsDirectFormOpen(false);
+          setDirectEditProduct(null);
+        }}
+      />
+
+      {/* Floating Bottom Cart Bar for Mobile when items exist */}
+      {cartCount > 0 && !isCartOpen && !isCheckoutOpen && (
+        <div className="sm:hidden fixed bottom-4 left-4 right-4 z-30">
+          <button
+            onClick={() => setIsCartOpen(true)}
+            className="w-full bg-stone-900 hover:bg-stone-800 text-white py-3.5 px-5 rounded-2xl shadow-xl flex items-center justify-between cursor-pointer border border-stone-700 active:scale-[0.98] transition-transform"
+          >
+            <div className="flex items-center gap-2.5">
+              <div className="relative">
+                <Truck className="w-5 h-5 text-amber-400" />
+                <span className="absolute -top-2 -right-2 bg-rose-600 text-white text-[10px] font-black rounded-full w-4 h-4 flex items-center justify-center">
+                  {cartCount}
+                </span>
+              </div>
+              <span className="font-bold text-xs text-stone-200">Сагс үзэх ({cartCount} бараа)</span>
+            </div>
+            <span className="font-black text-sm text-amber-400">{formatMNT(cartCurrentPriceTotal)}</span>
+          </button>
+        </div>
+      )}
+
+      {/* Toast Notification */}
+      {toastMessage && (
+        <div className="fixed bottom-6 right-6 z-50 bg-stone-900/95 backdrop-blur-md text-white px-4 py-3 rounded-2xl shadow-2xl border border-stone-700 flex items-center gap-2.5 text-xs font-semibold animate-in fade-in slide-in-from-bottom-3 duration-300">
+          <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+          <span>{toastMessage}</span>
+        </div>
+      )}
+    </div>
+  );
+}
