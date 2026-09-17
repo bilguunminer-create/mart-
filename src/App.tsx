@@ -40,6 +40,8 @@ import { AdminLoginModal } from './components/AdminLoginModal';
 import { ProductFormModal } from './components/ProductFormModal';
 import { UserProfileModal } from './components/UserProfileModal';
 import { GoogleFormsModal } from './components/GoogleFormsModal';
+import { StoreHeroBanner } from './components/StoreHeroBanner';
+import { BeeEmblemLogo } from './components/BeeEmblemLogo';
 
 export default function App() {
   // Today's day of week (0 = Sunday, 1 = Monday, ...)
@@ -383,7 +385,11 @@ export default function App() {
   const currentDeal = DAILY_DEALS[selectedDay.toString()] || DAILY_DEALS["1"];
 
   const getProductPricing = (product: Product) => {
-    const isDealActive = product.day_deal === selectedDay || currentDeal?.category === product.category;
+    const isDealActive = product.day_deal !== -1 && (
+      product.day_deal !== undefined
+        ? product.day_deal === selectedDay
+        : currentDeal?.category === product.category
+    );
     const discountPercent = isDealActive ? (currentDeal?.discount_percent || 10) : 0;
     const finalPrice = discountPercent > 0 
       ? Math.round(product.price * (1 - discountPercent / 100))
@@ -520,7 +526,11 @@ export default function App() {
 
       // Deal only filter
       if (showDealsOnly) {
-        const isDeal = product.day_deal === selectedDay || currentDeal.category === product.category;
+        const isDeal = product.day_deal !== -1 && (
+          product.day_deal !== undefined
+            ? product.day_deal === selectedDay
+            : currentDeal.category === product.category
+        );
         if (!isDeal) return false;
       }
 
@@ -606,6 +616,14 @@ export default function App() {
 
       {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 py-6 space-y-8">
+        {/* Official Store Banner: US&K Family Mart Даланзадгад хот */}
+        <StoreHeroBanner
+          onExploreClick={() => {
+            const el = document.getElementById('products-grid-section');
+            if (el) el.scrollIntoView({ behavior: 'smooth' });
+          }}
+        />
+
         {/* Daily Deal Hero Banner */}
         <DailyDealBanner
           selectedDay={selectedDay}
@@ -948,11 +966,12 @@ export default function App() {
         <div className="max-w-7xl mx-auto px-4 space-y-8">
           <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 pb-8 border-b border-stone-800">
             <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-rose-600 to-amber-500 text-white font-black flex items-center justify-center text-xs tracking-tight">
-                  US&K
+              <div className="flex items-center gap-3">
+                <BeeEmblemLogo size={38} className="w-9 h-9 shrink-0" />
+                <div>
+                  <span className="font-black text-white text-lg tracking-tight block">US&K Family Mart</span>
+                  <span className="text-[10px] text-amber-400 font-bold uppercase tracking-wider">Даланзадгад хот • 09:00 - 20:00</span>
                 </div>
-                <span className="font-black text-white text-lg tracking-tight">US&K Family Mart</span>
               </div>
               <p className="text-stone-400 text-xs max-w-md">
                 АНУ болон БНСУ-ын дээд зэрэглэлийн чанартай хүнс, рамен, хүүхдийн живх, өргөн хэрэглээ, амин дэмийг шуурхай хүргэх цахим дэлгүүр.

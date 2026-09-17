@@ -1,7 +1,8 @@
 import React, { useRef } from 'react';
-import { ShoppingBag, Search, Sparkles, Truck, Phone, Award, ShieldCheck, LogOut, User } from 'lucide-react';
+import { ShoppingBag, Search, Sparkles, Truck, Phone, Award, ShieldCheck, LogOut, User, MapPin } from 'lucide-react';
 import { STORE_CONFIG, formatMNT } from '../data/storeData';
 import { LoyaltyTier, UserProfile } from '../types';
+import { BeeEmblemLogo } from './BeeEmblemLogo';
 
 interface HeaderProps {
   searchQuery: string;
@@ -137,19 +138,22 @@ export const Header: React.FC<HeaderProps> = ({
             className="flex items-center gap-3 cursor-pointer select-none group"
             title="US&K Family Mart"
           >
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-rose-600 via-rose-500 to-amber-500 flex items-center justify-center text-white font-black text-xs tracking-tight shadow-md shadow-rose-600/20 px-1 text-center leading-none group-hover:scale-105 transition-transform">
-              US&K
+            <div className="relative group-hover:scale-105 transition-transform shrink-0">
+              <BeeEmblemLogo size={46} className="w-11 h-11" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="font-extrabold text-lg sm:text-xl tracking-tight text-stone-900 leading-none">
-                  US&K Family Mart
+                <h1 className="font-black text-lg sm:text-xl tracking-tight text-stone-900 leading-none flex items-center gap-1.5">
+                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-600 via-amber-700 to-stone-900 font-serif font-black">
+                    US&K
+                  </span>
+                  <span className="text-stone-900 font-sans font-extrabold">Family Mart</span>
                 </h1>
-                <span className="px-1.5 py-0.5 rounded-sm bg-rose-100 text-rose-700 text-[10px] font-bold tracking-wider uppercase">
-                  MART
+                <span className="px-1.5 py-0.5 rounded-sm bg-amber-100 text-amber-800 text-[10px] font-bold tracking-wider uppercase border border-amber-300/40">
+                  ДАЛАНЗАДГАД
                 </span>
               </div>
-              <p className="text-[11px] text-stone-500 font-medium">АНУ & БНСУ Баталгаат Бараа • Түргэн Хүргэлт</p>
+              <p className="text-[11px] text-stone-500 font-medium">АНУ & БНСУ Баталгаат Бараа • 09:00 - 20:00</p>
             </div>
           </div>
 

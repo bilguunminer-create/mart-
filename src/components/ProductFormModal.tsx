@@ -57,7 +57,10 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
         : (productToEdit.in_stock ? 18 : 0);
       setStockQuantity(initialStock);
       setInStock(productToEdit.in_stock && initialStock > 0);
-      setDayDeal(productToEdit.day_deal || 1);
+      const initialDayDeal = (productToEdit.day_deal !== undefined && productToEdit.day_deal !== null)
+        ? productToEdit.day_deal
+        : -1;
+      setDayDeal(initialDayDeal);
       setRating(productToEdit.rating || 4.8);
       setUseUrlMode(!productToEdit.image.startsWith('data:'));
     } else {
@@ -74,7 +77,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       setDescription('');
       setStockQuantity(20);
       setInStock(true);
-      setDayDeal(1);
+      setDayDeal(-1); // Default to no day deal (none)
       setRating(4.9);
       setUseUrlMode(false);
     }
@@ -113,16 +116,35 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) {
+    const cleanName = name.trim();
+    if (!cleanName) {
       setFormError('Барааны нэрийг оруулна уу.');
       return;
     }
-    if (price <= 0) {
-      setFormError('Барааны үнийг зөв оруулна уу.');
+    if (cleanName.length > 200) {
+      setFormError('Барааны нэр хэт урт байна (дээд тал нь 200 тэмдэгт).');
       return;
     }
-    if (!image.trim()) {
+
+    const cleanPrice = Number(price);
+    if (isNaN(cleanPrice) || cleanPrice <= 0 || cleanPrice > 100000000) {
+      setFormError('Барааны үнийг зөв оруулна уу (1₮ - 100,000,000₮ хооронд).');
+      return;
+    }
+
+    const cleanImage = image.trim();
+    if (!cleanImage) {
       setFormError('Барааны зургийг оруулна уу (файлаар эсвэл линкээр).');
+      return;
+    }
+
+    // Security check: block javascript: and dangerous schemas
+    if (
+      cleanImage.toLowerCase().startsWith('javascript:') ||
+      cleanImage.toLowerCase().startsWith('vbscript:') ||
+      cleanImage.toLowerCase().startsWith('data:text/html')
+    ) {
+      setFormError('Аюулгүй байдлын үүднээс буруу эсвэл сэжигтэй линк оруулахыг хориглоно.');
       return;
     }
 
@@ -131,25 +153,26 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
 
     const finalStock = Math.max(0, Math.floor(Number(stockQuantity) || 0));
     const finalInStock = inStock && finalStock > 0;
+    const cleanDayDeal = dayDeal === -1 ? -1 : (Number(dayDeal) >= 0 && Number(dayDeal) <= 6 ? Number(dayDeal) : -1);
 
     const savedProduct: Product = {
       id: productToEdit ? productToEdit.id : `PROD-${Date.now().toString().slice(-6)}`,
-      name: name.trim(),
+      name: cleanName,
       category,
       category_name: categoryName,
       origin,
       country: origin === 'KR' ? 'БНСУ' : 'АНУ',
       flag: origin === 'KR' ? '🇰🇷' : '🇺🇸',
-      price: Number(price),
-      weight: weight.trim() || '1ш',
-      badge: badge.trim(),
+      price: cleanPrice,
+      weight: weight.trim().slice(0, 50) || '1ш',
+      badge: badge.trim().slice(0, 30),
       badge_color: badgeColor,
-      image: image.trim(),
-      description: description.trim() || `${name} - Чанартай баталгаат импортын бүтээгдэхүүн.`,
+      image: cleanImage,
+      description: description.trim().slice(0, 2000) || `${cleanName} - Чанартай баталгаат импортын бүтээгдэхүүн.`,
       in_stock: finalInStock,
       stock_quantity: finalStock,
-      rating: Number(rating) || 4.8,
-      day_deal: Number(dayDeal)
+      rating: Math.min(5, Math.max(1, Number(rating) || 4.8)),
+      day_deal: cleanDayDeal
     };
 
     onSave(savedProduct);
@@ -428,8 +451,9 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
               <select
                 value={dayDeal}
                 onChange={(e) => setDayDeal(Number(e.target.value))}
-                className="w-full px-3.5 py-2 text-xs border border-stone-300 rounded-xl focus:outline-none focus:border-rose-500 bg-white"
+                className="w-full px-3.5 py-2 text-xs border border-stone-300 rounded-xl focus:outline-none focus:border-rose-500 bg-white font-medium"
               >
+                <option value={-1}>🚫 Гараг сонгохгүй (Өдрийн тусгай хямдралд хамаарахгүй)</option>
                 <option value={1}>Даваа гараг (Рамен & Бэлэн хоол -15%)</option>
                 <option value={2}>Мягмар гараг (Кофе, Цай, Ундаа -15%)</option>
                 <option value={3}>Лхагва гараг (Амттан & Чипс -10%)</option>

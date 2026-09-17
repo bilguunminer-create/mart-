@@ -5,8 +5,8 @@ export const STORE_CONFIG = {
   free_delivery_threshold: 100000,
   delivery_fee: 3000,
   phone: "7700-1122",
-  work_hours: "09:00 - 22:00 (Өдөр бүр)",
-  location: "Улаанбаатар & Өмнөговь орон нутгийн шуурхай хүргэлт"
+  work_hours: "09:00 - 20:00 (Өдөр бүр)",
+  location: "Даланзадгад хот, Өмнөговь аймаг"
 };
 
 export const PRODUCTS: Product[] = [

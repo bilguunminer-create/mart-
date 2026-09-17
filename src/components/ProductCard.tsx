@@ -25,8 +25,12 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   onEditProduct
 }) => {
   const currentDeal = DAILY_DEALS[selectedDay.toString()];
-  // Check if this product is part of today's deal
-  const isDealActive = product.day_deal === selectedDay || currentDeal?.category === product.category;
+  // Check if this product is part of today's deal (respects day_deal === -1 for no deal)
+  const isDealActive = product.day_deal !== -1 && (
+    product.day_deal !== undefined 
+      ? product.day_deal === selectedDay 
+      : currentDeal?.category === product.category
+  );
   const discountPercent = isDealActive ? (currentDeal?.discount_percent || 10) : 0;
   
   const finalPrice = discountPercent > 0 

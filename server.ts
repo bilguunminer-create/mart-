@@ -1,5 +1,6 @@
 import express from "express";
 import path from "path";
+import fs from "fs";
 import { createServer as createViteServer } from "vite";
 import nodemailer, { type Transporter } from "nodemailer";
 
@@ -45,7 +46,44 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
-  app.use(express.json());
+  app.use(express.json({ limit: "25mb" }));
+  app.use(express.urlencoded({ extended: true, limit: "25mb" }));
+
+  // Serve uploaded public assets if any
+  const publicAssetsDir = path.join(process.cwd(), "public", "assets");
+  if (!fs.existsSync(publicAssetsDir)) {
+    fs.mkdirSync(publicAssetsDir, { recursive: true });
+  }
+  app.use("/assets", express.static(publicAssetsDir));
+
+  // Upload or update store branding (exact custom logo or banner)
+  app.post("/api/upload-branding", (req, res) => {
+    try {
+      const { type, dataBase64 } = req.body;
+      if (!type || !dataBase64) {
+        return res.status(400).json({ error: "Зургийн төрөл болон өгөгдөл шаардлагатай." });
+      }
+
+      // Extract base64 image data
+      const matches = dataBase64.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+      if (!matches || matches.length !== 3) {
+        return res.status(400).json({ error: "Хүчинтэй base64 зураг биш байна." });
+      }
+
+      const ext = matches[1].includes("png") ? "png" : "jpg";
+      const buffer = Buffer.from(matches[2], "base64");
+      const filename = `${type}_custom.${ext}`;
+      const filePath = path.join(publicAssetsDir, filename);
+
+      fs.writeFileSync(filePath, buffer);
+      const publicUrl = `/assets/${filename}?t=${Date.now()}`;
+
+      return res.json({ success: true, url: publicUrl });
+    } catch (err: any) {
+      console.error("[Branding Upload Error]:", err);
+      return res.status(500).json({ error: err.message || "Зураг хадгалахад алдаа гарлаа." });
+    }
+  });
 
   // Health check
   app.get("/api/health", (req, res) => {

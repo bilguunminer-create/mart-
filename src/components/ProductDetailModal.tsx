@@ -22,7 +22,11 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   if (!product) return null;
 
   const currentDeal = DAILY_DEALS[selectedDay.toString()];
-  const isDealActive = product.day_deal === selectedDay || currentDeal?.category === product.category;
+  const isDealActive = product.day_deal !== -1 && (
+    product.day_deal !== undefined 
+      ? product.day_deal === selectedDay 
+      : currentDeal?.category === product.category
+  );
   const discountPercent = isDealActive ? (currentDeal?.discount_percent || 10) : 0;
   
   const finalPrice = discountPercent > 0 

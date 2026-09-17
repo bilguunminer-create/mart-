@@ -115,9 +115,24 @@ export const LoyaltyRulesModal: React.FC<LoyaltyRulesModalProps> = ({
   };
 
   const handleSaveAll = () => {
-    saveStoredLoyaltyTiers(editedTiers);
-    saveStoredCashbackPct(editedCashback);
-    onSave(editedTiers, editedCashback);
+    // Security bounds & validation for numbers
+    const sanitizedTiers = editedTiers.map((t) => {
+      const validThreshold = Math.max(0, Math.min(500000000, Math.floor(Number(t.threshold) || 0)));
+      const validDiscountPct = Math.max(0, Math.min(90, Math.round(Number(t.discount_pct) || 0)));
+      return {
+        ...t,
+        threshold: validThreshold,
+        discount_pct: validDiscountPct,
+        range: `Нийт ${formatMNT(validThreshold)} худалдан авалтаас`,
+        admin_gift: (t.admin_gift || '').trim().slice(0, 100),
+        benefits: (t.benefits || []).map((b) => b.trim().slice(0, 150)).filter(Boolean)
+      };
+    });
+    const sanitizedCashback = Math.max(0, Math.min(50, Math.round(Number(editedCashback) || 0)));
+
+    saveStoredLoyaltyTiers(sanitizedTiers);
+    saveStoredCashbackPct(sanitizedCashback);
+    onSave(sanitizedTiers, sanitizedCashback);
     setSaveSuccess(true);
     setTimeout(() => {
       setSaveSuccess(false);
