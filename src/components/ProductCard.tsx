@@ -33,9 +33,16 @@ export const ProductCard: React.FC<ProductCardProps> = ({
     ? Math.round(product.price * (1 - discountPercent / 100))
     : product.price;
 
+  const availableStock = product.stock_quantity !== undefined 
+    ? product.stock_quantity 
+    : (product.in_stock ? 18 : 0);
+  const isOutOfStock = !product.in_stock || availableStock <= 0;
+  const isLowStock = !isOutOfStock && availableStock <= 5;
+  const isMaxInCart = cartQuantity >= availableStock;
+
   return (
     <div className={`group relative flex flex-col bg-white rounded-2xl border transition-all duration-300 ${
-      !product.in_stock 
+      isOutOfStock 
         ? 'border-stone-200 opacity-80' 
         : 'border-stone-200/90 hover:shadow-xl hover:border-rose-300'
     }`}>
@@ -46,7 +53,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           alt={product.name}
           referrerPolicy="no-referrer"
           className={`w-full h-full object-cover transition-transform duration-500 ${
-            product.in_stock ? 'group-hover:scale-105' : 'grayscale'
+            !isOutOfStock ? 'group-hover:scale-105' : 'grayscale'
           }`}
           loading="lazy"
         />
@@ -59,17 +66,21 @@ export const ProductCard: React.FC<ProductCardProps> = ({
             </span>
           )}
 
-          {isDealActive && product.in_stock && (
+          {isDealActive && !isOutOfStock && (
             <span className="bg-rose-600 text-white text-[10px] sm:text-xs font-black px-2 py-0.5 rounded-md shadow-xs animate-pulse">
               -{discountPercent}% Онцгой
             </span>
           )}
 
-          {!product.in_stock && (
-            <span className="bg-stone-800 text-amber-300 text-[10px] sm:text-xs font-bold px-2 py-0.5 rounded-md shadow-xs">
+          {isOutOfStock ? (
+            <span className="bg-stone-900 text-rose-300 text-[10px] sm:text-xs font-bold px-2 py-0.5 rounded-md shadow-xs">
               Түр дууссан
             </span>
-          )}
+          ) : isLowStock ? (
+            <span className="bg-amber-600 text-white text-[10px] sm:text-xs font-black px-2 py-0.5 rounded-md shadow-xs animate-pulse">
+              Цөөн: {availableStock}ш
+            </span>
+          ) : null}
         </div>
 
         {/* Origin Flag Badge & Admin Edit Button */}
@@ -148,19 +159,23 @@ export const ProductCard: React.FC<ProductCardProps> = ({
               </div>
             </div>
 
-            {product.in_stock ? (
-              <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                Үлдэгдэлтэй
+            {isOutOfStock ? (
+              <span className="text-[10px] font-bold text-rose-800 bg-rose-50 px-2 py-0.5 rounded-full border border-rose-200">
+                Дууссан
+              </span>
+            ) : isLowStock ? (
+              <span className="text-[10px] font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-300">
+                Үлдэгдэл {availableStock} ш
               </span>
             ) : (
-              <span className="text-[10px] font-semibold text-amber-800 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
-                Түр дууссан
+              <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                Үлдэгдэл {availableStock} ш
               </span>
             )}
           </div>
 
           {/* Cart Quantity or Add Button */}
-          {!product.in_stock ? (
+          {isOutOfStock ? (
             <button
               disabled
               className="w-full flex items-center justify-center gap-1.5 bg-stone-100 text-stone-400 font-semibold text-xs py-2 px-3 rounded-xl cursor-not-allowed border border-stone-200"
@@ -176,10 +191,21 @@ export const ProductCard: React.FC<ProductCardProps> = ({
               >
                 <Minus className="w-3.5 h-3.5" />
               </button>
-              <span className="font-bold text-sm px-2 text-amber-400">{cartQuantity}</span>
+              <div className="text-center">
+                <span className="font-bold text-sm px-2 text-amber-400">{cartQuantity}</span>
+                {isMaxInCart && (
+                  <span className="block text-[9px] text-amber-300 font-medium leading-none">Дээд хязгаар</span>
+                )}
+              </div>
               <button
+                disabled={isMaxInCart}
                 onClick={() => onUpdateQuantity(product.id, cartQuantity + 1)}
-                className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-stone-800 transition-colors cursor-pointer text-white"
+                className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${
+                  isMaxInCart 
+                    ? 'text-stone-600 cursor-not-allowed opacity-50' 
+                    : 'text-white hover:bg-stone-800 cursor-pointer'
+                }`}
+                title={isMaxInCart ? 'Үлдэгдэлд хүрсэн байна' : 'Нэмэх'}
                 aria-label="Нэмэх"
               >
                 <Plus className="w-3.5 h-3.5" />

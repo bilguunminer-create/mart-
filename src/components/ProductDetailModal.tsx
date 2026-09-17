@@ -29,8 +29,16 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
     ? Math.round(product.price * (1 - discountPercent / 100))
     : product.price;
 
+  const availableStock = product.stock_quantity !== undefined 
+    ? product.stock_quantity 
+    : (product.in_stock ? 18 : 0);
+  const isOutOfStock = !product.in_stock || availableStock <= 0;
+  const isLowStock = !isOutOfStock && availableStock <= 5;
+
   const handleAdd = () => {
-    onAddToCart(product, quantity);
+    if (isOutOfStock) return;
+    const safeQty = Math.min(quantity, availableStock);
+    onAddToCart(product, safeQty);
     setAddedAnimation(true);
     setTimeout(() => {
       setAddedAnimation(false);
@@ -97,9 +105,19 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 <span className="font-black text-stone-900 text-sm">{product.rating}</span>
               </div>
               <span className="text-stone-300">•</span>
-              <span className="text-xs text-emerald-700 font-semibold bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
-                Бэлэн байгаа (Агуулахад)
-              </span>
+              {isOutOfStock ? (
+                <span className="text-xs text-rose-700 font-bold bg-rose-50 px-2.5 py-0.5 rounded-md border border-rose-200">
+                  🚫 Агуулахад дууссан (0 ш)
+                </span>
+              ) : isLowStock ? (
+                <span className="text-xs text-amber-800 font-bold bg-amber-50 px-2.5 py-0.5 rounded-md border border-amber-300 animate-pulse">
+                  ⚠️ Үлдэгдэл цөөн: {availableStock} ширхэг
+                </span>
+              ) : (
+                <span className="text-xs text-emerald-700 font-semibold bg-emerald-50 px-2.5 py-0.5 rounded-md border border-emerald-200">
+                  Бэлэн байгаа ({availableStock} ширхэг)
+                </span>
+              )}
             </div>
           </div>
 
@@ -136,44 +154,61 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 
             <div className="flex items-center gap-3">
               {/* Quantity Picker */}
-              <div className="flex items-center bg-stone-100 border border-stone-200 rounded-xl p-1">
-                <button
-                  type="button"
-                  onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                  className="w-8 h-8 flex items-center justify-center text-stone-700 hover:bg-white rounded-lg transition-colors cursor-pointer"
-                >
-                  <Minus className="w-3.5 h-3.5" />
-                </button>
-                <span className="w-8 text-center font-bold text-stone-900 text-sm">
-                  {quantity}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setQuantity(quantity + 1)}
-                  className="w-8 h-8 flex items-center justify-center text-stone-700 hover:bg-white rounded-lg transition-colors cursor-pointer"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                </button>
-              </div>
+              {!isOutOfStock && (
+                <div className="flex items-center bg-stone-100 border border-stone-200 rounded-xl p-1">
+                  <button
+                    type="button"
+                    onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                    className="w-8 h-8 flex items-center justify-center text-stone-700 hover:bg-white rounded-lg transition-colors cursor-pointer"
+                  >
+                    <Minus className="w-3.5 h-3.5" />
+                  </button>
+                  <span className="w-8 text-center font-bold text-stone-900 text-sm">
+                    {quantity}
+                  </span>
+                  <button
+                    type="button"
+                    disabled={quantity >= availableStock}
+                    onClick={() => setQuantity(Math.min(availableStock, quantity + 1))}
+                    className={`w-8 h-8 flex items-center justify-center rounded-lg transition-colors ${
+                      quantity >= availableStock 
+                        ? 'text-stone-300 cursor-not-allowed' 
+                        : 'text-stone-700 hover:bg-white cursor-pointer'
+                    }`}
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )}
 
               {/* Add Button */}
-              <button
-                type="button"
-                onClick={handleAdd}
-                className="flex-1 sm:flex-initial flex items-center justify-center gap-2 bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-500 hover:to-amber-500 text-white font-extrabold px-6 py-3 rounded-xl shadow-lg shadow-rose-600/30 transition-all active:scale-95 cursor-pointer min-w-[140px]"
-              >
-                {addedAnimation ? (
-                  <>
-                    <Check className="w-4 h-4" />
-                    <span>Сагсаллаа!</span>
-                  </>
-                ) : (
-                  <>
-                    <ShoppingBag className="w-4 h-4" />
-                    <span>Сагслах ({formatMNT(finalPrice * quantity)})</span>
-                  </>
-                )}
-              </button>
+              {isOutOfStock ? (
+                <button
+                  type="button"
+                  disabled
+                  className="flex-1 sm:flex-initial flex items-center justify-center gap-2 bg-stone-200 text-stone-500 font-bold px-6 py-3 rounded-xl cursor-not-allowed min-w-[140px]"
+                >
+                  <span>Бараа түр дууссан</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleAdd}
+                  className="flex-1 sm:flex-initial flex items-center justify-center gap-2 bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-500 hover:to-amber-500 text-white font-extrabold px-6 py-3 rounded-xl shadow-lg shadow-rose-600/30 transition-all active:scale-95 cursor-pointer min-w-[140px]"
+                >
+                  {addedAnimation ? (
+                    <>
+                      <Check className="w-4 h-4" />
+                      <span>Сагсаллаа!</span>
+                    </>
+                  ) : (
+                    <>
+                      <ShoppingBag className="w-4 h-4" />
+                      <span>Сагслах ({formatMNT(finalPrice * quantity)})</span>
+                    </>
+                  )}
+                </button>
+              )}
             </div>
           </div>
         </div>

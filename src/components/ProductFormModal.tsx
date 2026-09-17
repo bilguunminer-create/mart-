@@ -27,6 +27,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   const [image, setImage] = useState('');
   const [description, setDescription] = useState('');
   const [inStock, setInStock] = useState(true);
+  const [stockQuantity, setStockQuantity] = useState<number>(18);
   const [dayDeal, setDayDeal] = useState<number>(1);
   const [rating, setRating] = useState<number>(4.8);
 
@@ -51,7 +52,11 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       setImage(productToEdit.image);
       setImageUrlInput(productToEdit.image);
       setDescription(productToEdit.description);
-      setInStock(productToEdit.in_stock);
+      const initialStock = productToEdit.stock_quantity !== undefined 
+        ? productToEdit.stock_quantity 
+        : (productToEdit.in_stock ? 18 : 0);
+      setStockQuantity(initialStock);
+      setInStock(productToEdit.in_stock && initialStock > 0);
       setDayDeal(productToEdit.day_deal || 1);
       setRating(productToEdit.rating || 4.8);
       setUseUrlMode(!productToEdit.image.startsWith('data:'));
@@ -67,6 +72,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       setImage('');
       setImageUrlInput('');
       setDescription('');
+      setStockQuantity(20);
       setInStock(true);
       setDayDeal(1);
       setRating(4.9);
@@ -123,6 +129,9 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
     const selectedCategoryObj = CATEGORIES.find(c => c.id === category);
     const categoryName = selectedCategoryObj ? selectedCategoryObj.name : 'Өргөн хэрэглээ';
 
+    const finalStock = Math.max(0, Math.floor(Number(stockQuantity) || 0));
+    const finalInStock = inStock && finalStock > 0;
+
     const savedProduct: Product = {
       id: productToEdit ? productToEdit.id : `PROD-${Date.now().toString().slice(-6)}`,
       name: name.trim(),
@@ -137,7 +146,8 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       badge_color: badgeColor,
       image: image.trim(),
       description: description.trim() || `${name} - Чанартай баталгаат импортын бүтээгдэхүүн.`,
-      in_stock: inStock,
+      in_stock: finalInStock,
+      stock_quantity: finalStock,
       rating: Number(rating) || 4.8,
       day_deal: Number(dayDeal)
     };
@@ -445,23 +455,128 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
             />
           </div>
 
-          {/* In Stock toggle */}
-          <div className="flex items-center justify-between p-3.5 bg-stone-50 rounded-2xl border border-stone-200">
-            <div>
-              <span className="text-xs font-bold text-stone-800 block">Дэлгүүрт бэлэн байгаа эсэх</span>
-              <span className="text-[11px] text-stone-500">
-                Хэрэв унтраавал хэрэглэгчдэд "Дууссан" төлөвтэй харагдана
-              </span>
+          {/* Inventory Stock Count & In Stock Status */}
+          <div className="p-4 bg-stone-50 rounded-2xl border border-stone-200 space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-stone-200">
+              <div>
+                <span className="text-xs font-bold text-stone-800 flex items-center gap-1.5">
+                  <span>📦</span> Агуулахын бодит үлдэгдэл (Тоо ширхэг)
+                </span>
+                <span className="text-[11px] text-stone-500 block">
+                  Захиалга хийгдэх бүрт энэ тоо автоматаар хасагдана
+                </span>
+              </div>
+
+              <div className="flex items-center gap-1.5">
+                {stockQuantity <= 0 ? (
+                  <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-rose-100 text-rose-700 border border-rose-200">
+                    Үлдэгдэл 0 (Дууссан)
+                  </span>
+                ) : stockQuantity <= 5 ? (
+                  <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-amber-100 text-amber-800 border border-amber-300 animate-pulse">
+                    ⚠️ Үлдэгдэл цөөн ({stockQuantity}ш)
+                  </span>
+                ) : (
+                  <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 border border-emerald-200">
+                    Бэлэн ({stockQuantity}ш)
+                  </span>
+                )}
+              </div>
             </div>
-            <label className="relative inline-flex items-center cursor-pointer">
-              <input
-                type="checkbox"
-                checked={inStock}
-                onChange={(e) => setInStock(e.target.checked)}
-                className="sr-only peer"
-              />
-              <div className="w-11 h-6 bg-stone-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-stone-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
-            </label>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="relative flex-1 min-w-[120px]">
+                <input
+                  type="number"
+                  min={0}
+                  step={1}
+                  value={stockQuantity}
+                  onChange={(e) => {
+                    const val = Math.max(0, parseInt(e.target.value, 10) || 0);
+                    setStockQuantity(val);
+                    if (val > 0) setInStock(true);
+                    else setInStock(false);
+                  }}
+                  className="w-full px-3.5 py-2 text-sm font-black border border-stone-300 rounded-xl focus:outline-none focus:border-rose-500 bg-white"
+                  placeholder="Үлдэгдлийн тоо"
+                />
+                <span className="absolute right-3 top-2.5 text-xs text-stone-400 font-bold">
+                  ширхэг
+                </span>
+              </div>
+
+              {/* Quick stock adjustment chips */}
+              <div className="flex items-center gap-1 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const next = stockQuantity + 5;
+                    setStockQuantity(next);
+                    if (next > 0) setInStock(true);
+                  }}
+                  className="px-2.5 py-1.5 bg-white hover:bg-stone-100 border border-stone-200 rounded-lg text-xs font-bold text-stone-700 cursor-pointer transition-colors"
+                >
+                  +5
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const next = stockQuantity + 10;
+                    setStockQuantity(next);
+                    if (next > 0) setInStock(true);
+                  }}
+                  className="px-2.5 py-1.5 bg-white hover:bg-stone-100 border border-stone-200 rounded-lg text-xs font-bold text-stone-700 cursor-pointer transition-colors"
+                >
+                  +10
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const next = stockQuantity + 25;
+                    setStockQuantity(next);
+                    if (next > 0) setInStock(true);
+                  }}
+                  className="px-2.5 py-1.5 bg-white hover:bg-stone-100 border border-stone-200 rounded-lg text-xs font-bold text-stone-700 cursor-pointer transition-colors"
+                >
+                  +25
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStockQuantity(0);
+                    setInStock(false);
+                  }}
+                  className="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-lg text-xs font-bold text-rose-700 cursor-pointer transition-colors"
+                >
+                  Дууссан (0)
+                </button>
+              </div>
+            </div>
+
+            {/* In Stock toggle */}
+            <div className="flex items-center justify-between pt-2 border-t border-stone-200/60">
+              <div>
+                <span className="text-xs font-bold text-stone-800 block">Дэлгүүрт борлуулах эсэх</span>
+                <span className="text-[11px] text-stone-500">
+                  Хэрэв унтраавал үлдэгдэлтэй байсан ч "Түр дууссан" харагдана
+                </span>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={inStock && stockQuantity > 0}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setInStock(checked);
+                    if (checked && stockQuantity === 0) {
+                      setStockQuantity(10);
+                    }
+                  }}
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-stone-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-stone-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
+              </label>
+            </div>
           </div>
 
           {/* Action buttons */}

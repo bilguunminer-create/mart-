@@ -690,6 +690,93 @@ export const LOYALTY_TIERS: LoyaltyTier[] = [
   }
 ];
 
+export const getStoredLoyaltyTiers = (): LoyaltyTier[] => {
+  try {
+    const saved = localStorage.getItem('usk_loyalty_tiers_config');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
+      }
+    }
+  } catch {
+    // fallback
+  }
+  return LOYALTY_TIERS;
+};
+
+export const saveStoredLoyaltyTiers = (tiers: LoyaltyTier[]): void => {
+  try {
+    localStorage.setItem('usk_loyalty_tiers_config', JSON.stringify(tiers));
+    window.dispatchEvent(new CustomEvent('usk_loyalty_config_updated', { detail: { tiers } }));
+  } catch (err) {
+    console.error('Failed to save loyalty tiers', err);
+  }
+};
+
+export const resetStoredLoyaltyTiers = (): LoyaltyTier[] => {
+  try {
+    localStorage.removeItem('usk_loyalty_tiers_config');
+    localStorage.removeItem('usk_loyalty_cashback_pct');
+    window.dispatchEvent(new CustomEvent('usk_loyalty_config_updated', { detail: { tiers: LOYALTY_TIERS } }));
+  } catch (err) {
+    console.error('Failed to reset loyalty tiers', err);
+  }
+  return LOYALTY_TIERS;
+};
+
+export const getStoredCashbackPct = (): number => {
+  try {
+    const saved = localStorage.getItem('usk_loyalty_cashback_pct');
+    if (saved !== null) {
+      const val = parseFloat(saved);
+      if (!isNaN(val) && val >= 0) return val;
+    }
+  } catch {
+    // fallback
+  }
+  return 1; // Default 1%
+};
+
+export const saveStoredCashbackPct = (pct: number): void => {
+  try {
+    localStorage.setItem('usk_loyalty_cashback_pct', String(pct));
+    window.dispatchEvent(new CustomEvent('usk_loyalty_config_updated', { detail: { cashbackPct: pct } }));
+  } catch (err) {
+    console.error('Failed to save cashback pct', err);
+  }
+};
+
+export const calculateLoyaltyTierBySpent = (totalSpent: number, tiers?: LoyaltyTier[]): LoyaltyTier | null => {
+  const currentTiers = tiers || getStoredLoyaltyTiers();
+  // Sort descending by threshold
+  const sorted = [...currentTiers].sort((a, b) => b.threshold - a.threshold);
+  for (const tier of sorted) {
+    if (totalSpent >= tier.threshold) {
+      return tier;
+    }
+  }
+  return null;
+};
+
+export const normalizeProductWithStock = (p: Product): Product => {
+  let stock = p.stock_quantity;
+  if (stock === undefined || stock === null) {
+    // Default initial stock: 18 if in_stock, 0 if out of stock
+    stock = p.in_stock ? 18 : 0;
+  }
+  const cleanStock = Math.max(0, Math.floor(stock));
+  return {
+    ...p,
+    stock_quantity: cleanStock,
+    in_stock: cleanStock > 0 && p.in_stock !== false
+  };
+};
+
+export const normalizeProductsList = (list: Product[]): Product[] => {
+  return list.map(normalizeProductWithStock);
+};
+
 export const COMBOS: ComboPack[] = [
   {
     id: "COMBO-01",

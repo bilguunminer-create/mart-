@@ -1,7 +1,7 @@
 import React, { useRef } from 'react';
-import { ShoppingBag, Search, Sparkles, Truck, Phone, Award, ShieldCheck, LogOut } from 'lucide-react';
+import { ShoppingBag, Search, Sparkles, Truck, Phone, Award, ShieldCheck, LogOut, User } from 'lucide-react';
 import { STORE_CONFIG, formatMNT } from '../data/storeData';
-import { LoyaltyTier } from '../types';
+import { LoyaltyTier, UserProfile } from '../types';
 
 interface HeaderProps {
   searchQuery: string;
@@ -10,6 +10,9 @@ interface HeaderProps {
   cartTotal: number;
   onOpenCart: () => void;
   onOpenLoyalty: () => void;
+  onOpenProfile?: () => void;
+  user?: UserProfile | null;
+  onOpenForms?: () => void;
   onOpenAdmin: () => void;
   onLogoutAdmin?: () => void;
   isAdminActive?: boolean;
@@ -26,6 +29,9 @@ export const Header: React.FC<HeaderProps> = ({
   cartTotal,
   onOpenCart,
   onOpenLoyalty,
+  onOpenProfile,
+  user,
+  onOpenForms,
   onOpenAdmin,
   onLogoutAdmin,
   isAdminActive,
@@ -80,9 +86,14 @@ export const Header: React.FC<HeaderProps> = ({
             <button
               onClick={onOpenLoyalty}
               className="flex items-center gap-1 hover:text-amber-300 transition-colors text-xs cursor-pointer"
+              title={user ? 'Лояалти зэрэглэл & оноо харах' : 'Лояалти хөтөлбөр - И-мэйл хаягаараа үнэгүй нэвтэрч харна уу'}
             >
               <Award className="w-3.5 h-3.5 text-amber-400" />
-              <span>{activeLoyalty ? activeLoyalty.name : 'Лояалти гишүүнчлэл'}</span>
+              <span>
+                {user 
+                  ? (activeLoyalty ? `${activeLoyalty.name} (${activeLoyalty.discount_pct}%)` : 'Лояалти гишүүнчлэл') 
+                  : 'Лояалти (Нэвтрэх)'}
+              </span>
             </button>
             <span className="text-stone-500">|</span>
             <a href={`tel:${STORE_CONFIG.phone}`} className="flex items-center gap-1 hover:text-white transition-colors">
@@ -166,18 +177,81 @@ export const Header: React.FC<HeaderProps> = ({
 
           {/* Action Buttons */}
           <div className="flex items-center gap-2 sm:gap-3">
-            {/* Loyalty tier badge if selected */}
+            {/* Loyalty tier badge */}
             <button
+              id="header-loyalty-btn"
               onClick={onOpenLoyalty}
-              className={`hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
-                activeLoyalty
-                  ? `${activeLoyalty.bg_color} ${activeLoyalty.text_color} border-amber-300/60`
-                  : 'bg-stone-50 text-stone-700 border-stone-200 hover:bg-stone-100'
+              className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
+                user && activeLoyalty
+                  ? `${activeLoyalty.bg_color} ${activeLoyalty.text_color} border-amber-300/60 shadow-2xs`
+                  : user
+                  ? 'bg-amber-50 text-amber-900 border-amber-200 hover:bg-amber-100/70'
+                  : 'bg-stone-50 text-stone-700 border-stone-200 hover:bg-amber-50 hover:border-amber-300 hover:text-amber-900'
               }`}
+              title={
+                user 
+                  ? (activeLoyalty ? `${activeLoyalty.name} (${activeLoyalty.discount_pct}% хөнгөлөлттэй)` : 'Лояалти гишүүнчлэл') 
+                  : 'Лояалти Гишүүнчлэлийн Хөтөлбөр - И-мэйл хаягаараа нэвтэрсний дараа харагдана'
+              }
             >
               <Award className="w-3.5 h-3.5 text-amber-500" />
-              <span>{activeLoyalty ? activeLoyalty.badge : 'Хөнгөлөлтийн карт'}</span>
+              {user ? (
+                <>
+                  <span className="hidden sm:inline">
+                    {activeLoyalty ? `${activeLoyalty.badge} (${activeLoyalty.discount_pct}%)` : 'Лояалти (0%)'}
+                  </span>
+                  <span className="sm:hidden">
+                    {activeLoyalty ? `${activeLoyalty.discount_pct}%` : 'Лояалти'}
+                  </span>
+                </>
+              ) : (
+                <>
+                  <span className="hidden sm:inline">Лояалти (Нэвтрэх)</span>
+                  <span className="sm:hidden">Лояалти</span>
+                </>
+              )}
             </button>
+
+            {/* User Profile & Security Button */}
+            {onOpenProfile && (
+              <button
+                id="user-profile-trigger-btn"
+                onClick={onOpenProfile}
+                className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-semibold bg-white border border-stone-200 hover:border-emerald-300 hover:bg-emerald-50/60 text-stone-700 hover:text-emerald-800 shadow-2xs transition-all cursor-pointer"
+                title="Хэрэглэгчийн бүртгэл & Аюулгүй байдал, нууцлал"
+              >
+                <div className="relative">
+                  <User className="w-3.5 h-3.5 text-stone-600" />
+                  {user && (
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 absolute -top-0.5 -right-0.5 ring-1 ring-white" />
+                  )}
+                </div>
+                <span className="hidden sm:inline">
+                  {user ? user.name : 'Бүртгэл'}
+                </span>
+                <span className="sm:hidden text-[11px] font-bold">
+                  {user ? user.name.slice(0, 4) : 'Профайл'}
+                </span>
+              </button>
+            )}
+
+            {/* Google Forms Integration Button */}
+            {onOpenForms && (
+              <button
+                id="google-forms-trigger-btn"
+                onClick={onOpenForms}
+                className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-semibold bg-white border border-stone-200 hover:border-purple-300 hover:bg-purple-50/60 text-stone-700 hover:text-purple-800 shadow-2xs transition-all cursor-pointer"
+                title="Google Forms - Санал асуулга & Судалгаа"
+              >
+                <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <rect width="40" height="40" rx="8" fill="#7248B9"/>
+                  <path d="M14 12H26C27.1 12 28 12.9 28 14V26C28 27.1 27.1 28 26 28H14C12.9 28 12 27.1 12 26V14C12 12.9 12.9 12 14 12Z" fill="white"/>
+                  <path d="M16 16H24M16 20H24M16 24H21" stroke="#7248B9" strokeWidth="2" strokeLinecap="round"/>
+                </svg>
+                <span className="hidden sm:inline">Санал асуулга</span>
+                <span className="sm:hidden text-[11px] font-bold">Forms</span>
+              </button>
+            )}
 
             {/* Admin Center Button ONLY visible when logged in as admin */}
             {isAdminActive && (

@@ -13,6 +13,7 @@ export interface Product {
   image: string;
   description: string;
   in_stock: boolean;
+  stock_quantity?: number;
   rating: number;
   day_deal: number;
 }
@@ -61,6 +62,7 @@ export interface CartItem {
   image: string;
   weight?: string;
   quantity: number;
+  stock_quantity?: number;
   appliedDiscountPct?: number;
   origin?: 'KR' | 'US';
   flag?: string;
@@ -70,6 +72,7 @@ export interface OrderDetails {
   orderId: string;
   customerName: string;
   phone: string;
+  email?: string;
   address: string;
   district: string;
   notes: string;
@@ -82,4 +85,17 @@ export interface OrderDetails {
   total: number;
   date: string;
   status?: 'new' | 'confirmed' | 'shipping' | 'delivered' | 'cancelled';
+}
+
+export interface UserProfile {
+  id: string;
+  name: string;
+  email: string;
+  phone?: string;
+  loginMethod?: 'email';
+  address?: string;
+  district?: string;
+  createdAt: string;
+  isVerified: boolean;
+  privacyMasking: boolean;
 }

@@ -148,6 +148,11 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                           </span>
                         )}
                       </div>
+                      {item.stock_quantity !== undefined && item.quantity >= item.stock_quantity && (
+                        <span className="text-[10px] text-amber-700 font-semibold block mt-0.5">
+                          Дээд үлдэгдэл: {item.stock_quantity}ш
+                        </span>
+                      )}
                     </div>
 
                     {/* Quantity Controls */}
@@ -163,8 +168,14 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                           {item.quantity}
                         </span>
                         <button
+                          disabled={item.stock_quantity !== undefined && item.quantity >= item.stock_quantity}
                           onClick={() => onUpdateQuantity(item.id, item.quantity + 1)}
-                          className="w-6 h-6 flex items-center justify-center text-stone-600 hover:text-stone-900 hover:bg-white rounded transition-colors cursor-pointer"
+                          className={`w-6 h-6 flex items-center justify-center rounded transition-colors ${
+                            item.stock_quantity !== undefined && item.quantity >= item.stock_quantity
+                              ? 'text-stone-300 cursor-not-allowed'
+                              : 'text-stone-600 hover:text-stone-900 hover:bg-white cursor-pointer'
+                          }`}
+                          title={item.stock_quantity !== undefined && item.quantity >= item.stock_quantity ? 'Агуулахын дээд үлдэгдэлд хүрсэн' : 'Нэмэх'}
                         >
                           <Plus className="w-3 h-3" />
                         </button>

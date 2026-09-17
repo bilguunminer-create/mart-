@@ -21,9 +21,12 @@ import {
   DAILY_DEALS, 
   LOYALTY_TIERS, 
   STORE_CONFIG, 
-  formatMNT 
+  formatMNT,
+  getStoredLoyaltyTiers,
+  getStoredCashbackPct,
+  calculateLoyaltyTierBySpent
 } from './data/storeData';
-import { Product, CartItem, LoyaltyTier, ComboPack, OrderDetails } from './types';
+import { Product, CartItem, LoyaltyTier, ComboPack, OrderDetails, UserProfile } from './types';
 import { Header } from './components/Header';
 import { DailyDealBanner } from './components/DailyDealBanner';
 import { ProductCard } from './components/ProductCard';
@@ -35,6 +38,8 @@ import { ProductDetailModal } from './components/ProductDetailModal';
 import { AdminPanel } from './components/AdminPanel';
 import { AdminLoginModal } from './components/AdminLoginModal';
 import { ProductFormModal } from './components/ProductFormModal';
+import { UserProfileModal } from './components/UserProfileModal';
+import { GoogleFormsModal } from './components/GoogleFormsModal';
 
 export default function App() {
   // Today's day of week (0 = Sunday, 1 = Monday, ...)
@@ -98,15 +103,74 @@ export default function App() {
     }
   });
 
-  // Active Loyalty Tier
-  const [activeLoyalty, setActiveLoyalty] = useState<LoyaltyTier | null>(() => {
+  // Current logged in user profile (phone authentication)
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(() => {
     try {
-      const saved = localStorage.getItem('gobi_mart_loyalty');
+      const saved = localStorage.getItem('usk_current_user');
       return saved ? JSON.parse(saved) : null;
     } catch {
       return null;
     }
   });
+
+  // Current user's normalized phone number and email
+  const userPhoneClean = currentUser?.phone ? currentUser.phone.replace(/\D/g, '').slice(-8) : '';
+  const userEmailClean = currentUser?.email ? currentUser.email.trim().toLowerCase() : '';
+
+  // Filter orders strictly for current logged-in user's phone number or email
+  const userOrders = useMemo(() => {
+    if (!userPhoneClean && !userEmailClean) return [];
+    return orders.filter((o) => {
+      const matchPhone = userPhoneClean && o.phone && o.phone.replace(/\D/g, '').slice(-8) === userPhoneClean;
+      const matchEmail = userEmailClean && o.email && o.email.trim().toLowerCase() === userEmailClean;
+      return matchPhone || matchEmail;
+    });
+  }, [orders, userPhoneClean, userEmailClean]);
+
+  // Total spent accumulated strictly on this logged-in account
+  const userTotalSpent = useMemo(() => {
+    return userOrders
+      .filter((o) => o.status !== 'cancelled')
+      .reduce((sum, o) => sum + (o.total || 0), 0);
+  }, [userOrders]);
+
+  const ordersCount = useMemo(() => {
+    return orders.filter((o) => o.status !== 'cancelled').length;
+  }, [orders]);
+
+  // Active Loyalty Tiers from settings
+  const [activeLoyaltyTiers, setActiveLoyaltyTiers] = useState<LoyaltyTier[]>(() => getStoredLoyaltyTiers());
+
+  useEffect(() => {
+    const handleConfigSync = () => {
+      setActiveLoyaltyTiers(getStoredLoyaltyTiers());
+    };
+    window.addEventListener('usk_loyalty_config_updated', handleConfigSync);
+    return () => window.removeEventListener('usk_loyalty_config_updated', handleConfigSync);
+  }, []);
+
+  // Active Loyalty Tier: Strictly visible & active only after logging in with email or phone
+  const activeLoyalty = useMemo<LoyaltyTier | null>(() => {
+    if (!currentUser || (!userPhoneClean && !userEmailClean)) {
+      return null;
+    }
+    // Check if admin granted a VIP tier override for this email or phone
+    try {
+      const saved = localStorage.getItem('usk_loyalty_bonuses');
+      if (saved) {
+        const bonuses = JSON.parse(saved);
+        const override = (userEmailClean && bonuses[userEmailClean]) || (userPhoneClean && bonuses[`tel_${userPhoneClean}`]);
+        if (override?.forceTier) {
+          const forced = activeLoyaltyTiers.find((t) => t.id === override.forceTier);
+          if (forced) return forced;
+        }
+      }
+    } catch {
+      // ignore
+    }
+
+    return calculateLoyaltyTierBySpent(userTotalSpent, activeLoyaltyTiers);
+  }, [currentUser, userPhoneClean, userEmailClean, userTotalSpent, activeLoyaltyTiers]);
 
   // Search & Filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -118,6 +182,8 @@ export default function App() {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [isLoyaltyOpen, setIsLoyaltyOpen] = useState(false);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [isFormsOpen, setIsFormsOpen] = useState(false);
   const [detailProduct, setDetailProduct] = useState<Product | null>(null);
 
   // Toast message
@@ -213,8 +279,32 @@ export default function App() {
       prev.map((p) => {
         if (p.id === productId) {
           const nextStock = !p.in_stock;
-          showToast(nextStock ? `"${p.name}" бэлэн төлөвт шилжлээ` : `"${p.name}" дууссан төлөвт шилжлээ`);
-          return { ...p, in_stock: nextStock };
+          const nextQuantity = nextStock ? (p.stock_quantity && p.stock_quantity > 0 ? p.stock_quantity : 15) : 0;
+          showToast(nextStock ? `"${p.name}" бэлэн төлөвт шилжлээ (${nextQuantity}ш)` : `"${p.name}" дууссан төлөвт шилжлээ (0ш)`);
+          return { 
+            ...p, 
+            in_stock: nextStock,
+            stock_quantity: nextQuantity
+          };
+        }
+        return p;
+      })
+    );
+  };
+
+  const handleQuickUpdateStock = (productId: string, amount: number, isAbsolute = false) => {
+    setProducts((prev) =>
+      prev.map((p) => {
+        if (p.id === productId) {
+          const current = p.stock_quantity !== undefined ? p.stock_quantity : (p.in_stock ? 18 : 0);
+          const next = isAbsolute ? Math.max(0, amount) : Math.max(0, current + amount);
+          const nextInStock = next > 0;
+          showToast(`"${p.name}" үлдэгдэл шинэчлэгдлээ: ${next} ш`);
+          return {
+            ...p,
+            stock_quantity: next,
+            in_stock: nextInStock
+          };
         }
         return p;
       })
@@ -468,6 +558,19 @@ export default function App() {
                 Админ удирдлага
               </button>
               <button
+                id="admin-open-forms-strip-btn"
+                onClick={() => setIsFormsOpen(true)}
+                className="bg-stone-800 hover:bg-stone-700 text-stone-200 px-2.5 py-1 rounded-lg font-semibold text-[11px] border border-stone-700 cursor-pointer transition-all flex items-center gap-1.5"
+                title="Google Forms судалгаа & хүсэлтүүд"
+              >
+                <svg className="w-3 h-3" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <rect width="40" height="40" rx="8" fill="#7248B9"/>
+                  <path d="M14 12H26C27.1 12 28 12.9 28 14V26C28 27.1 27.1 28 26 28H14C12.9 28 12 27.1 12 26V14C12 12.9 12.9 12 14 12Z" fill="white"/>
+                  <path d="M16 16H24M16 20H24M16 24H21" stroke="#7248B9" strokeWidth="2" strokeLinecap="round"/>
+                </svg>
+                <span>Forms</span>
+              </button>
+              <button
                 id="admin-logout-strip-btn"
                 onClick={handleAdminLogout}
                 className="bg-stone-800 hover:bg-rose-900/60 text-stone-300 hover:text-rose-200 px-2.5 py-1 rounded-lg text-[11px] font-semibold border border-stone-700 cursor-pointer transition-all flex items-center gap-1"
@@ -489,6 +592,9 @@ export default function App() {
         cartTotal={cartCurrentPriceTotal}
         onOpenCart={() => setIsCartOpen(true)}
         onOpenLoyalty={() => setIsLoyaltyOpen(true)}
+        onOpenProfile={() => setIsProfileOpen(true)}
+        user={currentUser}
+        onOpenForms={() => setIsFormsOpen(true)}
         onOpenAdmin={handleOpenAdmin}
         onLogoutAdmin={handleAdminLogout}
         isAdminActive={isAdminAuthenticated}
@@ -521,6 +627,79 @@ export default function App() {
             if (found) setDetailProduct(found);
           }}
         />
+
+        {/* Customer Services Duo: User Security & Registration / Google Forms */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* User Profile & Security Banner */}
+          <div className="bg-gradient-to-br from-emerald-950 via-stone-900 to-slate-900 rounded-2xl p-4 sm:p-5 text-white shadow-xs border border-emerald-800/40 flex flex-col justify-between gap-4">
+            <div className="flex items-start gap-3.5">
+              <div className="w-11 h-11 rounded-xl bg-emerald-500/20 border border-emerald-400/30 flex items-center justify-center shrink-0 p-2.5 text-emerald-400">
+                <ShieldCheck className="w-full h-full" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="text-sm font-bold text-white">Хэрэглэгчийн Бүртгэл & Нууцлал</h3>
+                  <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/30">
+                    ✉️ Үнэгүй И-мэйл OTP
+                  </span>
+                </div>
+                <p className="text-xs text-emerald-200/90 mt-1 leading-relaxed">
+                  Таны худалдан авалтын түүх и-мэйл хаяг дээр автоматаар бүртгэгдэж явна. Нууц үг шаардахгүй нэг удаагийн үнэгүй кодоор хялбар нэвтэрч, өөрийн түүх болон лояалти хөнгөлөлтөө удирдан хараарай.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between pt-2 border-t border-emerald-900/50">
+              <span className="text-[11px] text-emerald-300/80">
+                {currentUser ? `Нэвтэрсэн: ${currentUser.name}` : 'Энгийн & Аюулгүй систем'}
+              </span>
+              <button
+                id="open-profile-banner-btn"
+                onClick={() => setIsProfileOpen(true)}
+                className="px-4 py-2 bg-white hover:bg-emerald-50 text-emerald-950 font-bold text-xs rounded-xl shadow-xs transition-all flex items-center justify-center gap-1.5 shrink-0 cursor-pointer"
+              >
+                <span>{currentUser ? 'Миний Профайл' : 'Бүртгүүлэх / Нэвтрэх'}</span>
+                <span className="text-emerald-600 font-black">→</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Google Forms Banner */}
+          <div className="bg-gradient-to-br from-purple-950 via-indigo-950 to-slate-900 rounded-2xl p-4 sm:p-5 text-white shadow-xs border border-purple-800/40 flex flex-col justify-between gap-4">
+            <div className="flex items-start gap-3.5">
+              <div className="w-11 h-11 rounded-xl bg-purple-500/20 border border-purple-400/30 flex items-center justify-center shrink-0 p-2.5">
+                <svg className="w-full h-full" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <rect width="40" height="40" rx="8" fill="#9065D0"/>
+                  <path d="M14 12H26C27.1 12 28 12.9 28 14V26C28 27.1 27.1 28 26 28H14C12.9 28 12 27.1 12 26V14C12 12.9 12.9 12 14 12Z" fill="white"/>
+                  <path d="M16 16H24M16 20H24M16 24H21" stroke="#7248B9" strokeWidth="2" strokeLinecap="round"/>
+                </svg>
+              </div>
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="text-sm font-bold text-white">Захиалгат Бараа & Санал Асуулга</h3>
+                  <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-purple-400/30 text-purple-200 border border-purple-400/20">
+                    Google Forms
+                  </span>
+                </div>
+                <p className="text-xs text-purple-200/90 mt-1 leading-relaxed">
+                  АНУ & Солонгосоос захиалах барааны тусгай хүсэлт илгээх болон үйлчилгээний санал асуулга бөглөж оноо аваарай.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between pt-2 border-t border-purple-900/50">
+              <span className="text-[11px] text-purple-300/80">Оноо & тусгай хүсэлт</span>
+              <button
+                id="open-forms-banner-btn"
+                onClick={() => setIsFormsOpen(true)}
+                className="px-4 py-2 bg-white hover:bg-purple-50 text-purple-950 font-bold text-xs rounded-xl shadow-xs transition-all flex items-center justify-center gap-1.5 shrink-0 cursor-pointer"
+              >
+                <span>Судалгаа & Захиалга</span>
+                <span className="text-purple-600 font-black">→</span>
+              </button>
+            </div>
+          </div>
+        </div>
 
         {/* Catalog Control Section: Categories, Country Origin Tabs, Filters */}
         <section id="catalog-section" className="space-y-4 pt-4 border-t border-stone-200">
@@ -788,6 +967,28 @@ export default function App() {
                 Гишүүнчлэлийн хөтөлбөр
               </button>
               <span>•</span>
+              <button
+                id="footer-user-profile-btn"
+                onClick={() => setIsProfileOpen(true)}
+                className="hover:text-emerald-400 text-stone-300 transition-colors cursor-pointer flex items-center gap-1.5"
+              >
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Бүртгэл & Нууцлал</span>
+              </button>
+              <span>•</span>
+              <button
+                id="footer-google-forms-btn"
+                onClick={() => setIsFormsOpen(true)}
+                className="hover:text-purple-400 text-stone-300 transition-colors cursor-pointer flex items-center gap-1.5"
+              >
+                <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <rect width="40" height="40" rx="8" fill="#7248B9"/>
+                  <path d="M14 12H26C27.1 12 28 12.9 28 14V26C28 27.1 27.1 28 26 28H14C12.9 28 12 27.1 12 26V14C12 12.9 12.9 12 14 12Z" fill="white"/>
+                  <path d="M16 16H24M16 20H24M16 24H21" stroke="#7248B9" strokeWidth="2" strokeLinecap="round"/>
+                </svg>
+                <span>Google Forms судалгаа</span>
+              </button>
+              <span>•</span>
               <span className="text-stone-400">{STORE_CONFIG.location}</span>
               <span>•</span>
               <a href={`tel:${STORE_CONFIG.phone}`} className="text-amber-400 font-bold hover:underline">
@@ -858,30 +1059,79 @@ export default function App() {
         isOpen={isCheckoutOpen}
         onClose={() => setIsCheckoutOpen(false)}
         items={cart}
-        activeLoyalty={activeLoyalty}
+        orders={orders}
+        currentUser={currentUser}
         dailyDiscountTotal={dailyDiscountTotal}
         onOrderSuccess={(order) => {
           const newOrder: OrderDetails = {
             ...order,
             status: 'new'
           };
+          const orderPhoneClean = order.phone?.replace(/\D/g, '').slice(-8) || '';
+          const currentPhoneClean = currentUser?.phone?.replace(/\D/g, '').slice(-8) || '';
+          const orderEmailClean = order.email?.trim().toLowerCase() || '';
+          const currentEmailClean = currentUser?.email?.trim().toLowerCase() || '';
+          const isCurrentAccount = Boolean(
+            (orderPhoneClean && orderPhoneClean === currentPhoneClean) ||
+            (orderEmailClean && orderEmailClean === currentEmailClean)
+          );
+          const prevUserSpent = isCurrentAccount ? userTotalSpent : 0;
+          const nextSpent = prevUserSpent + (order.total || 0);
+
+          let promotionMsg = '';
+          if (isCurrentAccount) {
+            if (nextSpent >= 2000000 && prevUserSpent < 2000000) {
+              promotionMsg = ' 🎉 Баяр хүргэе! Та дээд түвшний Алтан VIP (5%) гишүүн боллоо!';
+            } else if (nextSpent >= 1000000 && prevUserSpent < 1000000) {
+              promotionMsg = ' 🎉 Баяр хүргэе! Та Мөнгөн (3%) гишүүн боллоо!';
+            } else if (nextSpent >= 500000 && prevUserSpent < 500000) {
+              promotionMsg = ' 🎉 Баяр хүргэе! Та Хүрэл (2%) гишүүн боллоо!';
+            }
+          }
+
+          // Deduct stock quantity for ordered products
+          if (cart.length > 0) {
+            setProducts((prevProducts) =>
+              prevProducts.map((prod) => {
+                const purchasedItem = cart.find((item) => item.id === prod.id);
+                if (purchasedItem) {
+                  const currentStock = prod.stock_quantity !== undefined 
+                    ? prod.stock_quantity 
+                    : (prod.in_stock ? 18 : 0);
+                  const newStock = Math.max(0, currentStock - purchasedItem.quantity);
+                  return {
+                    ...prod,
+                    stock_quantity: newStock,
+                    in_stock: newStock > 0
+                  };
+                }
+                return prod;
+              })
+            );
+          }
+
           setOrders((prev) => [newOrder, ...prev]);
           setCart([]);
-          showToast(`Захиалга #${order.orderId} амжилттай бүртгэгдлээ!`);
+          showToast(`Захиалга #${order.orderId} амжилттай бүртгэгдлээ! Таны бүртгэл дээр түүх хадгалагдлаа.${promotionMsg}`);
         }}
       />
 
       <LoyaltyModal
         isOpen={isLoyaltyOpen}
         onClose={() => setIsLoyaltyOpen(false)}
-        activeLoyalty={activeLoyalty}
-        onSelectTier={(tier) => {
-          setActiveLoyalty(tier);
-          if (tier) {
-            showToast(`${tier.name} идэвхжлээ (${tier.discount_pct}% хөнгөлөлт)!`);
-          } else {
-            showToast('Энгийн горим руу шилжлээ');
-          }
+        orders={orders}
+        currentUser={currentUser}
+        onOpenProfile={() => setIsProfileOpen(true)}
+        onLoginUser={(newUser) => {
+          setCurrentUser(newUser);
+          localStorage.setItem('usk_current_user', JSON.stringify(newUser));
+          const methodLabel = newUser.loginMethod === 'email' ? 'И-мэйлээр' : 'Утасны дугаараар';
+          showToast(`${methodLabel} амжилттай нэвтэрлээ. Тавтай морил, ${newUser.name}!`);
+        }}
+        onLogoutUser={() => {
+          setCurrentUser(null);
+          localStorage.removeItem('usk_current_user');
+          showToast('Бүртгэлээс гарлаа.');
         }}
       />
 
@@ -908,8 +1158,37 @@ export default function App() {
           onLogout={handleAdminLogout}
           adminPin={adminPin}
           onChangePin={handleChangePin}
+          onOpenForms={() => setIsFormsOpen(true)}
+          onQuickUpdateStock={handleQuickUpdateStock}
         />
       )}
+
+      {/* User Profile & Security Modal */}
+      <UserProfileModal
+        isOpen={isProfileOpen}
+        onClose={() => setIsProfileOpen(false)}
+        user={currentUser}
+        onSaveUser={(updatedUser) => {
+          setCurrentUser(updatedUser);
+          localStorage.setItem('usk_current_user', JSON.stringify(updatedUser));
+          showToast(`Хэрэглэгчийн мэдээлэл шинэчлэгдлээ.`);
+        }}
+        onLogoutUser={() => {
+          setCurrentUser(null);
+          localStorage.removeItem('usk_current_user');
+          showToast('Бүртгэлээс гарлаа. Хувийн мэдээлэл бүрэн цэвэрлэгдсэн.');
+        }}
+        orders={orders}
+        activeLoyalty={activeLoyalty}
+        totalSpent={userTotalSpent}
+      />
+
+      {/* Google Forms Integration Modal */}
+      <GoogleFormsModal
+        isOpen={isFormsOpen}
+        onClose={() => setIsFormsOpen(false)}
+        onNotify={(msg) => showToast(msg)}
+      />
 
       {/* Admin Login Modal */}
       <AdminLoginModal

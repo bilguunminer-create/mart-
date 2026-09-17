@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   Package, 
   ShoppingBag, 
@@ -23,11 +23,33 @@ import {
   DollarSign,
   Layers,
   Image as ImageIcon,
-  LogOut
+  LogOut,
+  Award,
+  ShieldCheck,
+  ShieldAlert,
+  Shield,
+  Gift,
+  Star,
+  UserCheck,
+  Mail,
+  Lock,
+  Users,
+  Settings2,
+  Boxes,
+  Minus,
+  AlertTriangle
 } from 'lucide-react';
-import { Product, OrderDetails } from '../types';
-import { CATEGORIES, formatMNT } from '../data/storeData';
+import { Product, OrderDetails, LoyaltyTier } from '../types';
+import { 
+  CATEGORIES, 
+  LOYALTY_TIERS, 
+  formatMNT, 
+  getStoredLoyaltyTiers, 
+  getStoredCashbackPct,
+  calculateLoyaltyTierBySpent
+} from '../data/storeData';
 import { ProductFormModal } from './ProductFormModal';
+import { LoyaltyRulesModal } from './LoyaltyRulesModal';
 
 interface AdminPanelProps {
   products: Product[];
@@ -41,6 +63,28 @@ interface AdminPanelProps {
   onLogout?: () => void;
   adminPin: string;
   onChangePin: (newPin: string) => void;
+  onOpenForms?: () => void;
+  onQuickUpdateStock?: (productId: string, amount: number, isAbsolute?: boolean) => void;
+}
+
+export interface LoyaltyMember {
+  id: string; // email or phone
+  name: string;
+  email: string;
+  phone: string;
+  totalSpent: number;
+  orderCount: number;
+  deliveredCount: number;
+  lastOrderDate: string;
+  tier: LoyaltyTier | null;
+  cashPoints: number;
+  bonusPoints: number;
+  totalPoints: number;
+  nextTier: {
+    name: string;
+    remaining: number;
+    progressPct: number;
+  } | null;
 }
 
 export const AdminPanel: React.FC<AdminPanelProps> = ({
@@ -54,13 +98,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   onClose,
   onLogout,
   adminPin,
-  onChangePin
+  onChangePin,
+  onOpenForms,
+  onQuickUpdateStock
 }) => {
-  const [activeTab, setActiveTab] = useState<'products' | 'orders' | 'stats' | 'settings'>('products');
+  const [activeTab, setActiveTab] = useState<'products' | 'orders' | 'loyalty' | 'stats' | 'settings'>('products');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedOrigin, setSelectedOrigin] = useState<'ALL' | 'KR' | 'US'>('ALL');
-  const [stockFilter, setStockFilter] = useState<'all' | 'in_stock' | 'out_of_stock'>('all');
+  const [stockFilter, setStockFilter] = useState<'all' | 'in_stock' | 'low_stock' | 'out_of_stock'>('all');
 
   // Product Form Modal state
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -72,12 +118,250 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   // Orders status filter
   const [orderStatusFilter, setOrderStatusFilter] = useState<string>('all');
 
-  // New PIN input
-  const [newPin, setNewPin] = useState('');
+  // Security: PIN change state with 3-step verification
+  const [currentPinInput, setCurrentPinInput] = useState('');
+  const [newPinInput, setNewPinInput] = useState('');
+  const [confirmPinInput, setConfirmPinInput] = useState('');
   const [pinChangeMsg, setPinChangeMsg] = useState<string | null>(null);
+  const [pinChangeError, setPinChangeError] = useState<string | null>(null);
+
+  // Security: Last login audit
+  const lastLoginTime = useMemo(() => {
+    try {
+      return sessionStorage.getItem('usk_admin_last_login') || 'Одоогоор идэвхтэй';
+    } catch {
+      return 'Одоогоор идэвхтэй';
+    }
+  }, []);
+
+  // Security: Auto-logout idle timer (15 minutes = 900 seconds)
+  const [idleTimeRemaining, setIdleTimeRemaining] = useState<number>(900);
+  const idleTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    const handleUserActivity = () => {
+      setIdleTimeRemaining(900);
+    };
+
+    window.addEventListener('mousemove', handleUserActivity);
+    window.addEventListener('keydown', handleUserActivity);
+    window.addEventListener('click', handleUserActivity);
+    window.addEventListener('scroll', handleUserActivity);
+
+    idleTimerRef.current = setInterval(() => {
+      setIdleTimeRemaining((prev) => {
+        if (prev <= 1) {
+          if (idleTimerRef.current) clearInterval(idleTimerRef.current);
+          if (onLogout) onLogout();
+          onClose();
+          alert('Аюулгүй байдлын үүднээс идэвхгүй 15 минут болсон тул админ системээс автоматаар гарлаа.');
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => {
+      window.removeEventListener('mousemove', handleUserActivity);
+      window.removeEventListener('keydown', handleUserActivity);
+      window.removeEventListener('click', handleUserActivity);
+      window.removeEventListener('scroll', handleUserActivity);
+      if (idleTimerRef.current) clearInterval(idleTimerRef.current);
+    };
+  }, [onLogout, onClose]);
 
   // Reset confirmation
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+
+  // Loyalty Management state
+  const [loyaltySearch, setLoyaltySearch] = useState('');
+  const [loyaltyFilter, setLoyaltyFilter] = useState<'all' | 'gold' | 'silver' | 'bronze' | 'standard'>('all');
+  
+  // Dynamic loyalty rules and cashback config
+  const [loyaltyTiersConfig, setLoyaltyTiersConfig] = useState<LoyaltyTier[]>(() => getStoredLoyaltyTiers());
+  const [cashbackPctConfig, setCashbackPctConfig] = useState<number>(() => getStoredCashbackPct());
+  const [isRulesModalOpen, setIsRulesModalOpen] = useState(false);
+
+  // Sync when event dispatched
+  useEffect(() => {
+    const handleConfigUpdated = () => {
+      setLoyaltyTiersConfig(getStoredLoyaltyTiers());
+      setCashbackPctConfig(getStoredCashbackPct());
+    };
+    window.addEventListener('usk_loyalty_config_updated', handleConfigUpdated);
+    return () => window.removeEventListener('usk_loyalty_config_updated', handleConfigUpdated);
+  }, []);
+
+  // Custom loyalty bonuses and manual overrides persisted in localStorage
+  const [customLoyaltyData, setCustomLoyaltyData] = useState<Record<string, { bonusPoints?: number; forceTier?: string }>>(() => {
+    try {
+      const saved = localStorage.getItem('usk_loyalty_bonuses');
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+
+  // Modal for rewarding bonus points
+  const [bonusTarget, setBonusTarget] = useState<{ email: string; name: string; currentPoints: number } | null>(null);
+  const [bonusAmountInput, setBonusAmountInput] = useState<number>(5000);
+  const [bonusSuccessMsg, setBonusSuccessMsg] = useState<string | null>(null);
+
+  // Modal for changing manual tier override
+  const [tierOverrideTarget, setTierOverrideTarget] = useState<{ email: string; name: string; currentTierId: string } | null>(null);
+
+  // Save custom bonuses helper
+  const handleGrantBonus = (email: string, amount: number) => {
+    setCustomLoyaltyData((prev) => {
+      const existing = prev[email] || {};
+      const nextPoints = (existing.bonusPoints || 0) + amount;
+      const updated = {
+        ...prev,
+        [email]: { ...existing, bonusPoints: nextPoints }
+      };
+      try {
+        localStorage.setItem('usk_loyalty_bonuses', JSON.stringify(updated));
+      } catch {
+        // ignore
+      }
+      return updated;
+    });
+    setBonusSuccessMsg(`${amount.toLocaleString()} лояалти оноо амжилттай олгогдлоо!`);
+    setTimeout(() => {
+      setBonusSuccessMsg(null);
+      setBonusTarget(null);
+    }, 1500);
+  };
+
+  const handleSetTierOverride = (email: string, tierId: string) => {
+    setCustomLoyaltyData((prev) => {
+      const existing = prev[email] || {};
+      const updated = {
+        ...prev,
+        [email]: { ...existing, forceTier: tierId === 'auto' ? undefined : tierId }
+      };
+      try {
+        localStorage.setItem('usk_loyalty_bonuses', JSON.stringify(updated));
+      } catch {
+        // ignore
+      }
+      return updated;
+    });
+    setTierOverrideTarget(null);
+  };
+
+  // Group all orders by customer's email (or phone) to generate automated loyalty members
+  const loyaltyMembers = useMemo<LoyaltyMember[]>(() => {
+    const memberMap: Record<string, {
+      name: string;
+      email: string;
+      phone: string;
+      orders: OrderDetails[];
+    }> = {};
+
+    orders.forEach((o) => {
+      const emailKey = o.email ? o.email.trim().toLowerCase() : (o.phone ? `tel_${o.phone.replace(/\D/g, '')}` : 'unknown');
+      if (!memberMap[emailKey]) {
+        memberMap[emailKey] = {
+          name: o.customerName || 'Хэрэглэгч',
+          email: o.email ? o.email.trim().toLowerCase() : '',
+          phone: o.phone || '',
+          orders: []
+        };
+      }
+      memberMap[emailKey].orders.push(o);
+      if (o.customerName && memberMap[emailKey].name === 'Хэрэглэгч') {
+        memberMap[emailKey].name = o.customerName;
+      }
+      if (o.phone && !memberMap[emailKey].phone) {
+        memberMap[emailKey].phone = o.phone;
+      }
+    });
+
+    return Object.entries(memberMap).map(([id, info]) => {
+      const validOrders = info.orders.filter((o) => o.status !== 'cancelled');
+      const totalSpent = validOrders.reduce((sum, o) => sum + (o.total || 0), 0);
+      const deliveredCount = info.orders.filter((o) => o.status === 'delivered').length;
+      const lastOrder = info.orders[0]?.date || 'Огноогүй';
+
+      // Automatic Tier logic according to current active tiers config (descending by threshold)
+      const sortedTiers = [...loyaltyTiersConfig].sort((a, b) => b.threshold - a.threshold);
+      let autoTier: LoyaltyTier | null = null;
+      for (const tier of sortedTiers) {
+        if (totalSpent >= tier.threshold) {
+          autoTier = tier;
+          break;
+        }
+      }
+
+      // Check admin manual override
+      const override = customLoyaltyData[info.email || id];
+      let effectiveTier = autoTier;
+      if (override?.forceTier) {
+        effectiveTier = loyaltyTiersConfig.find((t) => t.id === override.forceTier) || autoTier;
+      }
+
+      // Dynamic Cash points calculation + bonus points
+      const cashPoints = Math.round(totalSpent * (cashbackPctConfig / 100));
+      const bonusPoints = override?.bonusPoints || 0;
+      const totalPoints = cashPoints + bonusPoints;
+
+      // Next tier progress calculation (ascending by threshold)
+      const ascTiers = [...loyaltyTiersConfig].sort((a, b) => a.threshold - b.threshold);
+      let nextTierInfo: LoyaltyMember['nextTier'] = null;
+      const nextTierTarget = ascTiers.find((t) => totalSpent < t.threshold);
+      if (nextTierTarget) {
+        const prevThresholdIndex = ascTiers.indexOf(nextTierTarget) - 1;
+        const prevThreshold = prevThresholdIndex >= 0 ? ascTiers[prevThresholdIndex].threshold : 0;
+        const span = nextTierTarget.threshold - prevThreshold;
+        const progress = Math.max(0, totalSpent - prevThreshold);
+        nextTierInfo = {
+          name: nextTierTarget.name.split(' ')[0],
+          remaining: nextTierTarget.threshold - totalSpent,
+          progressPct: span > 0 ? Math.min(100, Math.round((progress / span) * 100)) : 100
+        };
+      }
+
+      return {
+        id,
+        name: info.name,
+        email: info.email,
+        phone: info.phone,
+        totalSpent,
+        orderCount: info.orders.length,
+        deliveredCount,
+        lastOrderDate: lastOrder,
+        tier: effectiveTier,
+        cashPoints,
+        bonusPoints,
+        totalPoints,
+        nextTier: nextTierInfo
+      };
+    }).sort((a, b) => b.totalSpent - a.totalSpent);
+  }, [orders, customLoyaltyData, loyaltyTiersConfig, cashbackPctConfig]);
+
+  // Filtered loyalty members
+  const filteredLoyaltyMembers = useMemo(() => {
+    return loyaltyMembers.filter((m) => {
+      const matchesSearch = 
+        m.name.toLowerCase().includes(loyaltySearch.toLowerCase()) ||
+        m.email.toLowerCase().includes(loyaltySearch.toLowerCase()) ||
+        m.phone.includes(loyaltySearch);
+
+      if (!matchesSearch) return false;
+
+      if (loyaltyFilter === 'all') return true;
+      if (loyaltyFilter === 'standard') return !m.tier;
+      return m.tier?.id === loyaltyFilter;
+    });
+  }, [loyaltyMembers, loyaltySearch, loyaltyFilter]);
+
+  // Inventory and product stats
+  const totalProducts = products.length;
+  const inStockCount = products.filter(p => p.in_stock && (p.stock_quantity === undefined || p.stock_quantity > 0)).length;
+  const lowStockCount = products.filter(p => p.in_stock && p.stock_quantity !== undefined && p.stock_quantity > 0 && p.stock_quantity <= 5).length;
+  const outOfStockCount = products.filter(p => !p.in_stock || (p.stock_quantity !== undefined && p.stock_quantity <= 0)).length;
+  const totalStockUnits = products.reduce((sum, p) => sum + (p.stock_quantity ?? (p.in_stock ? 18 : 0)), 0);
 
   // Filter products
   const filteredProducts = products.filter((prod) => {
@@ -86,9 +370,18 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                           prod.id.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCat = selectedCategory === 'all' || prod.category === selectedCategory;
     const matchesOrigin = selectedOrigin === 'ALL' || prod.origin === selectedOrigin;
+    
+    const isOut = !prod.in_stock || (prod.stock_quantity !== undefined && prod.stock_quantity <= 0);
+    const isLow = prod.in_stock && prod.stock_quantity !== undefined && prod.stock_quantity > 0 && prod.stock_quantity <= 5;
+    const isIn = prod.in_stock && (prod.stock_quantity === undefined || prod.stock_quantity > 0);
+
     const matchesStock = stockFilter === 'all' 
       ? true 
-      : stockFilter === 'in_stock' ? prod.in_stock : !prod.in_stock;
+      : stockFilter === 'in_stock' 
+        ? isIn 
+        : stockFilter === 'low_stock' 
+          ? isLow 
+          : isOut;
 
     return matchesSearch && matchesCat && matchesOrigin && matchesStock;
   });
@@ -99,10 +392,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     return (order.status || 'new') === orderStatusFilter;
   });
 
-  // Stats calculation
-  const totalProducts = products.length;
-  const inStockCount = products.filter(p => p.in_stock).length;
-  const outOfStockCount = totalProducts - inStockCount;
+  // Overall order stats
   const totalOrders = orders.length;
   const newOrdersCount = orders.filter(o => !o.status || o.status === 'new').length;
   const totalRevenue = orders
@@ -124,14 +414,33 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     setDeletingProductId(null);
   };
 
+  // Secure 3-step PIN change
   const handleSavePin = (e: React.FormEvent) => {
     e.preventDefault();
-    if (newPin.trim().length >= 4) {
-      onChangePin(newPin.trim());
-      setPinChangeMsg('ПИН код амжилттай шинэчлэгдлээ!');
-      setNewPin('');
-      setTimeout(() => setPinChangeMsg(null), 3000);
+    setPinChangeError(null);
+    setPinChangeMsg(null);
+
+    if (currentPinInput.trim() !== adminPin) {
+      setPinChangeError('Одоогийн хуучин ПИН код буруу байна!');
+      return;
     }
+
+    if (newPinInput.trim().length < 4) {
+      setPinChangeError('Шинэ ПИН код хамгийн багадаа 4 оронтой байх ёстой!');
+      return;
+    }
+
+    if (newPinInput.trim() !== confirmPinInput.trim()) {
+      setPinChangeError('Шинэ ПИН код болон давтан оруулсан код хоорондоо тохирохгүй байна!');
+      return;
+    }
+
+    onChangePin(newPinInput.trim());
+    setPinChangeMsg('Админ ПИН код амжилттай шинэчлэгдлээ! Систем шинэ кодоор хамгаалагдлаа.');
+    setCurrentPinInput('');
+    setNewPinInput('');
+    setConfirmPinInput('');
+    setTimeout(() => setPinChangeMsg(null), 4000);
   };
 
   const getStatusBadge = (status?: string) => {
@@ -182,6 +491,22 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               <span>Шинэ: <strong className="text-amber-400">{newOrdersCount}</strong> захиалга</span>
             </div>
 
+            {onOpenForms && (
+              <button
+                id="admin-google-forms-btn"
+                onClick={onOpenForms}
+                className="px-3 py-1.5 bg-stone-800 hover:bg-stone-700 text-stone-200 hover:text-white text-xs font-semibold rounded-xl border border-stone-700 transition-all cursor-pointer flex items-center gap-1.5"
+                title="Google Forms судалгаа & хариултууд удирдах"
+              >
+                <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <rect width="40" height="40" rx="8" fill="#7248B9"/>
+                  <path d="M14 12H26C27.1 12 28 12.9 28 14V26C28 27.1 27.1 28 26 28H14C12.9 28 12 27.1 12 26V14C12 12.9 12.9 12 14 12Z" fill="white"/>
+                  <path d="M16 16H24M16 20H24M16 24H21" stroke="#7248B9" strokeWidth="2" strokeLinecap="round"/>
+                </svg>
+                <span className="hidden sm:inline">Forms Судалгаа</span>
+              </button>
+            )}
+
             {onLogout && (
               <button
                 onClick={() => {
@@ -207,66 +532,94 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         </div>
 
         {/* Navigation Tabs */}
-        <div className="max-w-7xl mx-auto px-4 flex gap-2 border-t border-stone-800/60 overflow-x-auto">
-          <button
-            id="admin-tab-products"
-            onClick={() => setActiveTab('products')}
-            className={`py-3 px-4 text-xs font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
-              activeTab === 'products'
-                ? 'border-rose-500 text-rose-400'
-                : 'border-transparent text-stone-400 hover:text-stone-200'
-            }`}
-          >
-            <Package className="w-4 h-4" />
-            <span>Бараа бүтээгдэхүүн</span>
-            <span className="px-1.5 py-0.2 rounded-full bg-stone-800 text-[10px] text-stone-300">
-              {totalProducts}
-            </span>
-          </button>
-
-          <button
-            id="admin-tab-orders"
-            onClick={() => setActiveTab('orders')}
-            className={`py-3 px-4 text-xs font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
-              activeTab === 'orders'
-                ? 'border-rose-500 text-rose-400'
-                : 'border-transparent text-stone-400 hover:text-stone-200'
-            }`}
-          >
-            <ShoppingBag className="w-4 h-4" />
-            <span>Ирсэн захиалгууд</span>
-            {newOrdersCount > 0 && (
-              <span className="px-1.5 py-0.2 rounded-full bg-rose-600 text-[10px] text-white font-bold animate-pulse">
-                {newOrdersCount} шинэ
+        <div className="max-w-7xl mx-auto px-4 flex items-center justify-between border-t border-stone-800/60 overflow-x-auto">
+          <div className="flex gap-2">
+            <button
+              id="admin-tab-products"
+              onClick={() => setActiveTab('products')}
+              className={`py-3 px-4 text-xs font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+                activeTab === 'products'
+                  ? 'border-rose-500 text-rose-400'
+                  : 'border-transparent text-stone-400 hover:text-stone-200'
+              }`}
+            >
+              <Package className="w-4 h-4" />
+              <span>Бараа бүтээгдэхүүн</span>
+              <span className="px-1.5 py-0.2 rounded-full bg-stone-800 text-[10px] text-stone-300">
+                {totalProducts}
               </span>
-            )}
-          </button>
+            </button>
 
-          <button
-            id="admin-tab-stats"
-            onClick={() => setActiveTab('stats')}
-            className={`py-3 px-4 text-xs font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
-              activeTab === 'stats'
-                ? 'border-rose-500 text-rose-400'
-                : 'border-transparent text-stone-400 hover:text-stone-200'
-            }`}
-          >
-            <TrendingUp className="w-4 h-4" />
-            <span>Хяналтын тойм</span>
-          </button>
+            <button
+              id="admin-tab-orders"
+              onClick={() => setActiveTab('orders')}
+              className={`py-3 px-4 text-xs font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+                activeTab === 'orders'
+                  ? 'border-rose-500 text-rose-400'
+                  : 'border-transparent text-stone-400 hover:text-stone-200'
+              }`}
+            >
+              <ShoppingBag className="w-4 h-4" />
+              <span>Ирсэн захиалгууд</span>
+              {newOrdersCount > 0 && (
+                <span className="px-1.5 py-0.2 rounded-full bg-rose-600 text-[10px] text-white font-bold animate-pulse">
+                  {newOrdersCount} шинэ
+                </span>
+              )}
+            </button>
 
-          <button
-            id="admin-tab-settings"
-            onClick={() => setActiveTab('settings')}
-            className={`py-3 px-4 text-xs font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
-              activeTab === 'settings'
-                ? 'border-rose-500 text-rose-400'
-                : 'border-transparent text-stone-400 hover:text-stone-200'
-            }`}
-          >
-            <RotateCcw className="w-4 h-4" />
-            <span>Тохиргоо & Сэргээх</span>
-          </button>
+            <button
+              id="admin-tab-loyalty"
+              onClick={() => setActiveTab('loyalty')}
+              className={`py-3 px-4 text-xs font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+                activeTab === 'loyalty'
+                  ? 'border-amber-500 text-amber-400'
+                  : 'border-transparent text-stone-400 hover:text-stone-200'
+              }`}
+            >
+              <Award className="w-4 h-4 text-amber-400" />
+              <span>Лояалти гишүүд</span>
+              <span className="px-1.5 py-0.2 rounded-full bg-amber-500/20 text-amber-300 text-[10px] font-bold">
+                {loyaltyMembers.length}
+              </span>
+            </button>
+
+            <button
+              id="admin-tab-stats"
+              onClick={() => setActiveTab('stats')}
+              className={`py-3 px-4 text-xs font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+                activeTab === 'stats'
+                  ? 'border-rose-500 text-rose-400'
+                  : 'border-transparent text-stone-400 hover:text-stone-200'
+              }`}
+            >
+              <TrendingUp className="w-4 h-4" />
+              <span>Хяналтын тойм</span>
+            </button>
+
+            <button
+              id="admin-tab-settings"
+              onClick={() => setActiveTab('settings')}
+              className={`py-3 px-4 text-xs font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+                activeTab === 'settings'
+                  ? 'border-rose-500 text-rose-400'
+                  : 'border-transparent text-stone-400 hover:text-stone-200'
+              }`}
+            >
+              <ShieldCheck className="w-4 h-4 text-emerald-400" />
+              <span>Тохиргоо & Хамгаалалт</span>
+              {adminPin === '1234' && (
+                <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" title="Анхдагч ПИН ашиглаж байна" />
+              )}
+            </button>
+          </div>
+
+          <div className="hidden lg:flex items-center gap-2 py-2 pr-2 text-[11px] text-stone-400">
+            <span className="flex items-center gap-1 bg-stone-800/80 px-2.5 py-1 rounded-lg border border-stone-700">
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Аюулгүй сесс: <strong className="text-emerald-300 font-mono">{Math.floor(idleTimeRemaining / 60)}:{String(idleTimeRemaining % 60).padStart(2, '0')}</strong></span>
+            </span>
+          </div>
         </div>
       </header>
 
@@ -275,6 +628,97 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         {/* ================= PRODUCTS TAB ================= */}
         {activeTab === 'products' && (
           <div className="space-y-4">
+            {/* Inventory Overview KPI Cards */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+              <div 
+                onClick={() => setStockFilter('all')}
+                className={`p-4 rounded-2xl border transition-all cursor-pointer ${
+                  stockFilter === 'all' 
+                    ? 'bg-stone-900 text-white border-stone-800 shadow-md' 
+                    : 'bg-white text-stone-900 border-stone-200 hover:border-stone-300'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className={`text-xs font-bold ${stockFilter === 'all' ? 'text-stone-300' : 'text-stone-500'}`}>
+                    Нийт бараа
+                  </span>
+                  <Boxes className="w-4 h-4 text-stone-400" />
+                </div>
+                <div className="mt-2 flex items-baseline gap-1.5">
+                  <span className="text-xl sm:text-2xl font-black">{totalProducts}</span>
+                  <span className={`text-xs ${stockFilter === 'all' ? 'text-stone-400' : 'text-stone-500'}`}>
+                    төрөл ({totalStockUnits} ш)
+                  </span>
+                </div>
+              </div>
+
+              <div 
+                onClick={() => setStockFilter('in_stock')}
+                className={`p-4 rounded-2xl border transition-all cursor-pointer ${
+                  stockFilter === 'in_stock' 
+                    ? 'bg-emerald-700 text-white border-emerald-600 shadow-md' 
+                    : 'bg-white text-stone-900 border-stone-200 hover:border-emerald-300'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className={`text-xs font-bold ${stockFilter === 'in_stock' ? 'text-emerald-100' : 'text-emerald-700'}`}>
+                    Бэлэн худалдаанд
+                  </span>
+                  <CheckCircle2 className={`w-4 h-4 ${stockFilter === 'in_stock' ? 'text-emerald-200' : 'text-emerald-600'}`} />
+                </div>
+                <div className="mt-2 flex items-baseline gap-1.5">
+                  <span className="text-xl sm:text-2xl font-black">{inStockCount}</span>
+                  <span className={`text-xs ${stockFilter === 'in_stock' ? 'text-emerald-200' : 'text-stone-500'}`}>
+                    төрөл бэлэн
+                  </span>
+                </div>
+              </div>
+
+              <div 
+                onClick={() => setStockFilter('low_stock')}
+                className={`p-4 rounded-2xl border transition-all cursor-pointer ${
+                  stockFilter === 'low_stock' 
+                    ? 'bg-amber-600 text-white border-amber-500 shadow-md' 
+                    : 'bg-white text-stone-900 border-stone-200 hover:border-amber-300'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className={`text-xs font-bold ${stockFilter === 'low_stock' ? 'text-amber-100' : 'text-amber-700'}`}>
+                    Үлдэгдэл цөөн (≤5)
+                  </span>
+                  <AlertTriangle className={`w-4 h-4 ${stockFilter === 'low_stock' ? 'text-amber-200' : 'text-amber-600'}`} />
+                </div>
+                <div className="mt-2 flex items-baseline gap-1.5">
+                  <span className="text-xl sm:text-2xl font-black text-amber-500">{lowStockCount}</span>
+                  <span className={`text-xs ${stockFilter === 'low_stock' ? 'text-amber-100' : 'text-stone-500'}`}>
+                    төрөл татан авах
+                  </span>
+                </div>
+              </div>
+
+              <div 
+                onClick={() => setStockFilter('out_of_stock')}
+                className={`p-4 rounded-2xl border transition-all cursor-pointer ${
+                  stockFilter === 'out_of_stock' 
+                    ? 'bg-rose-700 text-white border-rose-600 shadow-md' 
+                    : 'bg-white text-stone-900 border-stone-200 hover:border-rose-300'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className={`text-xs font-bold ${stockFilter === 'out_of_stock' ? 'text-rose-100' : 'text-rose-700'}`}>
+                    Түр дууссан (0ш)
+                  </span>
+                  <AlertCircle className={`w-4 h-4 ${stockFilter === 'out_of_stock' ? 'text-rose-200' : 'text-rose-600'}`} />
+                </div>
+                <div className="mt-2 flex items-baseline gap-1.5">
+                  <span className="text-xl sm:text-2xl font-black text-rose-600">{outOfStockCount}</span>
+                  <span className={`text-xs ${stockFilter === 'out_of_stock' ? 'text-rose-200' : 'text-stone-500'}`}>
+                    төрөл захиалгагүй
+                  </span>
+                </div>
+              </div>
+            </div>
+
             {/* Top Toolbar */}
             <div className="bg-white p-4 rounded-2xl border border-stone-200 shadow-xs flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
               <div className="flex-1 flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
@@ -327,11 +771,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 <select
                   value={stockFilter}
                   onChange={(e) => setStockFilter(e.target.value as any)}
-                  className="px-3 py-2 text-xs border border-stone-200 rounded-xl focus:outline-none focus:border-rose-500 bg-white"
+                  className="px-3 py-2 text-xs border border-stone-200 rounded-xl focus:outline-none focus:border-rose-500 bg-white font-medium"
                 >
-                  <option value="all">Бүх төлөв</option>
-                  <option value="in_stock">Бэлэн байгаа ({inStockCount})</option>
-                  <option value="out_of_stock">Дууссан ({outOfStockCount})</option>
+                  <option value="all">Бүх үлдэгдэл ({totalProducts})</option>
+                  <option value="in_stock">✅ Бэлэн байгаа ({inStockCount})</option>
+                  <option value="low_stock">⚠️ Үлдэгдэл цөөн (≤5) ({lowStockCount})</option>
+                  <option value="out_of_stock">🚫 Дууссан (0ш) ({outOfStockCount})</option>
                 </select>
               </div>
 
@@ -348,11 +793,18 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
             {/* Products Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              {filteredProducts.map((prod) => (
+              {filteredProducts.map((prod) => {
+                const availableStock = prod.stock_quantity !== undefined 
+                  ? prod.stock_quantity 
+                  : (prod.in_stock ? 18 : 0);
+                const isOut = !prod.in_stock || availableStock <= 0;
+                const isLow = !isOut && availableStock <= 5;
+
+                return (
                 <div
                   key={prod.id}
                   className={`bg-white rounded-2xl border transition-all shadow-xs hover:shadow-md flex flex-col overflow-hidden ${
-                    !prod.in_stock ? 'border-amber-200 bg-stone-50/50' : 'border-stone-200'
+                    isOut ? 'border-rose-200 bg-stone-50/50' : isLow ? 'border-amber-300' : 'border-stone-200'
                   }`}
                 >
                   {/* Image container */}
@@ -361,7 +813,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       src={prod.image}
                       alt={prod.name}
                       className={`w-full h-full object-cover transition-transform group-hover:scale-105 duration-300 ${
-                        !prod.in_stock ? 'grayscale opacity-75' : ''
+                        isOut ? 'grayscale opacity-75' : ''
                       }`}
                     />
                     <div className="absolute top-2 left-2 flex flex-col gap-1 items-start">
@@ -378,11 +830,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
                     <div className="absolute top-2 right-2">
                       <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold shadow-xs ${
-                        prod.in_stock 
-                          ? 'bg-emerald-500 text-white' 
-                          : 'bg-stone-800 text-amber-300'
+                        isOut 
+                          ? 'bg-rose-600 text-white' 
+                          : isLow 
+                            ? 'bg-amber-500 text-white animate-pulse' 
+                            : 'bg-emerald-500 text-white'
                       }`}>
-                        {prod.in_stock ? 'Бэлэн' : 'Дууссан'}
+                        {isOut ? '0 ш (Дууссан)' : `${availableStock} ш бэлэн`}
                       </span>
                     </div>
 
@@ -423,6 +877,90 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       </p>
                     </div>
 
+                    {/* Live Inventory Stock Bar & 1-Click Restock Controls */}
+                    <div className="bg-stone-50 p-2 rounded-xl border border-stone-200/80 space-y-1.5">
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="text-stone-500 font-medium">Үлдэгдэл:</span>
+                        {isOut ? (
+                          <span className="font-bold text-rose-700 bg-rose-100 px-2 py-0.5 rounded text-[10px] border border-rose-200">
+                            0 ш (Түр дууссан)
+                          </span>
+                        ) : isLow ? (
+                          <span className="font-black text-amber-900 bg-amber-100 px-2 py-0.5 rounded text-[10px] border border-amber-300 animate-pulse">
+                            ⚠️ {availableStock} ш (Бага!)
+                          </span>
+                        ) : (
+                          <span className="font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded text-[10px] border border-emerald-200">
+                            {availableStock} ш бэлэн
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Quick Restock Buttons */}
+                      <div className="flex items-center justify-between gap-1 pt-1 border-t border-stone-200/60">
+                        <span className="text-[10px] text-stone-400 font-semibold">Татан авах:</span>
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const next = Math.max(0, availableStock - 1);
+                              if (onQuickUpdateStock) {
+                                onQuickUpdateStock(prod.id, -1);
+                              } else {
+                                onSaveProduct({
+                                  ...prod,
+                                  stock_quantity: next,
+                                  in_stock: next > 0
+                                });
+                              }
+                            }}
+                            className="px-1.5 py-0.5 bg-white hover:bg-stone-200 text-stone-700 font-bold rounded text-[10px] border border-stone-200 cursor-pointer"
+                            title="1 ширхэгээр хасах"
+                          >
+                            -1
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const next = availableStock + 5;
+                              if (onQuickUpdateStock) {
+                                onQuickUpdateStock(prod.id, 5);
+                              } else {
+                                onSaveProduct({
+                                  ...prod,
+                                  stock_quantity: next,
+                                  in_stock: true
+                                });
+                              }
+                            }}
+                            className="px-1.5 py-0.5 bg-white hover:bg-emerald-50 text-emerald-700 font-bold rounded text-[10px] border border-emerald-200 cursor-pointer"
+                            title="5 ширхэгээр нэмэх"
+                          >
+                            +5
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const next = availableStock + 10;
+                              if (onQuickUpdateStock) {
+                                onQuickUpdateStock(prod.id, 10);
+                              } else {
+                                onSaveProduct({
+                                  ...prod,
+                                  stock_quantity: next,
+                                  in_stock: true
+                                });
+                              }
+                            }}
+                            className="px-1.5 py-0.5 bg-white hover:bg-emerald-50 text-emerald-700 font-bold rounded text-[10px] border border-emerald-200 cursor-pointer"
+                            title="10 ширхэгээр нэмэх"
+                          >
+                            +10
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
                     <div className="pt-2 border-t border-stone-100 flex items-center justify-between">
                       <div>
                         <span className="text-[10px] text-stone-400 block">Үнэ:</span>
@@ -448,7 +986,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     </div>
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
 
             {filteredProducts.length === 0 && (
@@ -714,49 +1253,524 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 </div>
               </div>
             </div>
+
+            {/* Loyalty Automatic Tier System Overview with quick switch */}
+            <div className="bg-white p-5 rounded-2xl border border-stone-200 shadow-xs space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-stone-100">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-600 flex items-center justify-center font-bold">
+                    <Award className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-stone-900 text-sm">Лояалти гишүүнчлэлийн автомат систем</h4>
+                    <p className="text-[11px] text-stone-500">
+                      Худалдан авалтын бодит нийлбэр дүнгээр автоматаар олгогдоно (Гараар сонгон турших боломжгүй)
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setIsRulesModalOpen(true)}
+                    className="text-xs bg-stone-100 hover:bg-stone-200 text-stone-800 font-bold px-3 py-1.5 rounded-xl cursor-pointer transition-all flex items-center gap-1.5 border border-stone-300"
+                  >
+                    <Edit3 className="w-3.5 h-3.5" />
+                    <span>Дүрэм засах</span>
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('loyalty')}
+                    className="text-xs bg-amber-500 hover:bg-amber-600 text-white font-bold px-3 py-1.5 rounded-xl cursor-pointer transition-all flex items-center gap-1.5 shadow-xs w-fit"
+                  >
+                    <Users className="w-3.5 h-3.5" />
+                    <span>Гишүүдийг удирдах ({loyaltyMembers.length})</span>
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+                {loyaltyTiersConfig.map((tier) => (
+                  <div 
+                    key={tier.id} 
+                    onClick={() => setIsRulesModalOpen(true)}
+                    className="p-3.5 rounded-xl border border-stone-200 hover:border-amber-400 bg-stone-50/60 hover:bg-white transition-all cursor-pointer space-y-1.5 group"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-black text-xs text-stone-900 flex items-center gap-1.5">
+                        <span>{tier.badge}</span>
+                      </span>
+                      <span className="font-bold text-xs text-amber-600 bg-amber-50 px-2 py-0.5 rounded border border-amber-200/60">
+                        {tier.discount_pct}% Байнгын
+                      </span>
+                    </div>
+                    <div className="text-[11px] text-stone-600 font-medium">
+                      Босго: <strong>{formatMNT(tier.threshold)}+</strong>
+                    </div>
+                    {tier.admin_gift && (
+                      <div className="text-[10px] text-stone-500 pt-1 border-t border-stone-200/60 truncate">
+                        🎁 {tier.admin_gift}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         )}
 
-        {/* ================= SETTINGS TAB ================= */}
+        {/* ================= LOYALTY TAB ================= */}
+        {activeTab === 'loyalty' && (
+          <div className="space-y-6">
+            {/* Loyalty Metric Cards */}
+            <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
+              <div className="bg-white p-4 rounded-2xl border border-stone-200 shadow-xs">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs text-stone-500 font-medium">Нийт гишүүд</span>
+                  <div className="w-8 h-8 rounded-xl bg-stone-100 flex items-center justify-center text-stone-700">
+                    <Users className="w-4 h-4" />
+                  </div>
+                </div>
+                <div className="text-xl sm:text-2xl font-black text-stone-900">
+                  {loyaltyMembers.length}
+                </div>
+                <p className="text-[10px] text-stone-400 mt-1">Захиалга өгсөн нийт хэрэглэгч</p>
+              </div>
+
+              {loyaltyTiersConfig.map((tier) => (
+                <div 
+                  key={tier.id}
+                  onClick={() => setIsRulesModalOpen(true)}
+                  className="bg-white hover:bg-amber-50/20 p-4 rounded-2xl border border-stone-200 hover:border-amber-400 shadow-xs cursor-pointer transition-all"
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs text-stone-800 font-semibold truncate">{tier.badge} ({tier.discount_pct}%)</span>
+                    <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center font-bold">
+                      <Star className="w-4 h-4 fill-amber-400 text-amber-500" />
+                    </div>
+                  </div>
+                  <div className="text-xl sm:text-2xl font-black text-stone-900">
+                    {loyaltyMembers.filter((m) => m.tier?.id === tier.id).length}
+                  </div>
+                  <p className="text-[10px] text-stone-500 mt-1">{formatMNT(tier.threshold)}-с дээш</p>
+                </div>
+              ))}
+
+              <div className="bg-white p-4 rounded-2xl border border-rose-200/80 bg-linear-to-b from-rose-50/40 to-white shadow-xs">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs text-rose-800 font-semibold">💎 Нийт оноо</span>
+                  <div className="w-8 h-8 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center">
+                    <Sparkles className="w-4 h-4" />
+                  </div>
+                </div>
+                <div className="text-xl sm:text-2xl font-black text-rose-900">
+                  {loyaltyMembers.reduce((sum, m) => sum + m.totalPoints, 0).toLocaleString()}
+                </div>
+                <p className="text-[10px] text-rose-600/80 mt-1">{cashbackPctConfig}% буцаан олголт + бонус</p>
+              </div>
+            </div>
+
+            {/* Loyalty System Rules Banner */}
+            <div className="bg-linear-to-r from-stone-900 to-stone-800 text-white p-5 rounded-2xl shadow-sm space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-amber-400 text-stone-950 flex items-center justify-center font-black">
+                    <Award className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-extrabold text-sm sm:text-base text-white flex items-center gap-2">
+                      <span>Автомат Лояалти Зэрэглэлийн Дүрэм</span>
+                      <span className="text-[10px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-bold px-2 py-0.5 rounded-full">
+                        Админ Засвар Нээлттэй
+                      </span>
+                    </h3>
+                    <p className="text-xs text-stone-300">
+                      Хэрэглэгч системд нэвтрэхэд бодит худалдан авалтын дүнгээр зэрэглэл автоматаар тооцогдож, сагсанд хөнгөлөлт шууд хасагдана.
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setIsRulesModalOpen(true)}
+                  className="px-4 py-2.5 bg-amber-400 hover:bg-amber-300 text-stone-950 text-xs font-black rounded-xl cursor-pointer shadow-md transition-all flex items-center gap-2 shrink-0 self-start sm:self-auto"
+                >
+                  <Edit3 className="w-4 h-4" />
+                  <span>Дүрэм, болзол & урамшуулал засах</span>
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-2 border-t border-stone-700/80 text-xs">
+                {loyaltyTiersConfig.map((tier) => (
+                  <div 
+                    key={tier.id}
+                    onClick={() => setIsRulesModalOpen(true)}
+                    className="bg-stone-800/80 hover:bg-stone-800 p-3 rounded-xl border border-stone-700 hover:border-amber-400 transition-all cursor-pointer flex items-center justify-between group"
+                  >
+                    <div>
+                      <div className="font-bold text-amber-300 flex items-center gap-1">
+                        <span>{tier.badge}</span>
+                        <span className="text-stone-300 font-normal">({formatMNT(tier.threshold)}+)</span>
+                      </div>
+                      <div className="text-[11px] text-stone-400">Бүх бараанаас {tier.discount_pct}% байнгын хөнгөлөлт</div>
+                      {tier.admin_gift && (
+                        <div className="text-[10px] text-stone-400 truncate max-w-[190px] mt-0.5">🎁 {tier.admin_gift}</div>
+                      )}
+                    </div>
+                    <div className="flex flex-col items-end gap-1 shrink-0 ml-2">
+                      <span className="text-xs font-black text-white bg-stone-700 px-2 py-1 rounded-lg">{tier.discount_pct}%</span>
+                      <span className="text-[10px] text-amber-400 font-bold opacity-0 group-hover:opacity-100 transition-opacity">Засах ✏️</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Loyalty Members Filter & Search */}
+            <div className="bg-white p-4 rounded-2xl border border-stone-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="relative flex-1">
+                <Search className="w-4 h-4 text-stone-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="Хэрэглэгчийн нэр, имэйл хаяг, утсаар хайх..."
+                  value={loyaltySearch}
+                  onChange={(e) => setLoyaltySearch(e.target.value)}
+                  className="w-full pl-9 pr-4 py-2 text-xs border border-stone-300 rounded-xl focus:outline-none focus:border-rose-500 bg-stone-50"
+                />
+              </div>
+
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
+                <span className="text-xs font-bold text-stone-500 mr-1 whitespace-nowrap">Шүүлт:</span>
+                {[
+                  { id: 'all', label: 'Бүгд' },
+                  { id: 'gold', label: '🥇 Алт' },
+                  { id: 'silver', label: '🥈 Мөнгө' },
+                  { id: 'bronze', label: '🥉 Хүрэл' },
+                  { id: 'standard', label: 'Стандарт' }
+                ].map((tab) => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setLoyaltyFilter(tab.id as any)}
+                    className={`px-3 py-1.5 text-xs font-bold rounded-xl cursor-pointer whitespace-nowrap transition-all ${
+                      loyaltyFilter === tab.id
+                        ? 'bg-stone-900 text-white'
+                        : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Loyalty Members Table */}
+            <div className="bg-white rounded-2xl border border-stone-200 shadow-xs overflow-hidden">
+              <div className="p-4 border-b border-stone-100 flex items-center justify-between">
+                <div>
+                  <h4 className="font-bold text-stone-900 text-sm">Гишүүнчлэлийн жагсаалт</h4>
+                  <p className="text-xs text-stone-500">
+                    Илэрц: <strong>{filteredLoyaltyMembers.length}</strong> хэрэглэгч
+                  </p>
+                </div>
+                <div className="text-xs text-stone-500 flex items-center gap-1">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                  <span>1% Оноо худалдан авалт бүрээс автоматаар олгогдоно</span>
+                </div>
+              </div>
+
+              {filteredLoyaltyMembers.length === 0 ? (
+                <div className="p-12 text-center text-stone-400 space-y-2">
+                  <UserCheck className="w-10 h-10 mx-auto text-stone-300" />
+                  <p className="text-sm font-semibold text-stone-600">Тохирох гишүүн олдсонгүй</p>
+                  <p className="text-xs text-stone-400">Хайлтын утгаа өөрчлөх эсвэл шүүлтүүрээ арилгана уу.</p>
+                </div>
+              ) : (
+                <div className="divide-y divide-stone-100">
+                  {filteredLoyaltyMembers.map((member) => (
+                    <div key={member.id} className="p-4 sm:p-5 hover:bg-stone-50/60 transition-colors flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                      {/* Member Info */}
+                      <div className="flex items-start sm:items-center gap-3">
+                        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-black text-sm shrink-0 shadow-xs ${
+                          member.tier?.id === 'gold'
+                            ? 'bg-amber-100 text-amber-800 border-2 border-amber-300'
+                            : member.tier?.id === 'silver'
+                            ? 'bg-slate-100 text-slate-800 border-2 border-slate-300'
+                            : member.tier?.id === 'bronze'
+                            ? 'bg-amber-900/10 text-amber-900 border-2 border-amber-700/30'
+                            : 'bg-stone-100 text-stone-600'
+                        }`}>
+                          {member.tier ? member.tier.badge.split(' ')[0] : '👤'}
+                        </div>
+
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-extrabold text-stone-900 text-sm">{member.name}</span>
+                            {member.tier ? (
+                              <span className={`px-2.5 py-0.5 rounded-full text-xs font-black flex items-center gap-1 ${
+                                member.tier.id === 'gold'
+                                  ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                                  : member.tier.id === 'silver'
+                                  ? 'bg-slate-100 text-slate-800 border border-slate-300'
+                                  : 'bg-amber-900/10 text-amber-900 border border-amber-700/30'
+                              }`}>
+                                {member.tier.badge} ({member.tier.discount_pct}% хөнгөлөлт)
+                              </span>
+                            ) : (
+                              <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-stone-100 text-stone-600">
+                                Стандарт гишүүн (1% оноо)
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="flex items-center gap-3 text-xs text-stone-500 flex-wrap">
+                            {member.email && (
+                              <span className="flex items-center gap-1 font-mono text-[11px] text-stone-600">
+                                <Mail className="w-3 h-3 text-stone-400" />
+                                {member.email}
+                              </span>
+                            )}
+                            {member.phone && (
+                              <span className="flex items-center gap-1 text-stone-600">
+                                <Phone className="w-3 h-3 text-stone-400" />
+                                {member.phone}
+                              </span>
+                            )}
+                            <span>Сүүлийн захиалга: <strong>{member.lastOrderDate}</strong></span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Financial & Loyalty Progress */}
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-6 bg-stone-50/80 p-3 rounded-xl border border-stone-200/60 text-xs">
+                        <div>
+                          <span className="text-[10px] text-stone-400 font-semibold block uppercase tracking-wider">Нийт худалдан авалт</span>
+                          <span className="font-black text-stone-900 text-sm">{formatMNT(member.totalSpent)}</span>
+                          <span className="block text-[10px] text-stone-500">{member.orderCount} захиалга ({member.deliveredCount} амжилттай)</span>
+                        </div>
+
+                        <div>
+                          <span className="text-[10px] text-stone-400 font-semibold block uppercase tracking-wider">Лояалти оноо</span>
+                          <div className="flex items-center gap-1">
+                            <span className="font-black text-rose-600 text-sm">{member.totalPoints.toLocaleString()}</span>
+                            <span className="text-[10px] text-stone-500">оноо</span>
+                          </div>
+                          <span className="block text-[10px] text-stone-400">
+                            1%: {member.cashPoints.toLocaleString()} {member.bonusPoints > 0 && `| Бонус: +${member.bonusPoints.toLocaleString()}`}
+                          </span>
+                        </div>
+
+                        <div className="col-span-2 sm:col-span-1">
+                          <span className="text-[10px] text-stone-400 font-semibold block uppercase tracking-wider">Дараагийн зэрэглэл</span>
+                          {member.nextTier ? (
+                            <div>
+                              <div className="flex items-center justify-between text-[11px] font-bold text-stone-700 mb-1">
+                                <span>{member.nextTier.name}</span>
+                                <span className="text-amber-600">{formatMNT(member.nextTier.remaining)} дутуу</span>
+                              </div>
+                              <div className="w-full bg-stone-200 h-1.5 rounded-full overflow-hidden">
+                                <div
+                                  className="bg-amber-500 h-full rounded-full transition-all"
+                                  style={{ width: `${member.nextTier.progressPct}%` }}
+                                />
+                              </div>
+                            </div>
+                          ) : (
+                            <span className="text-emerald-700 font-bold text-xs flex items-center gap-1 pt-1">
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                              Дээд зэрэглэл (VIP)
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Admin Override Actions */}
+                      <div className="flex items-center gap-2 pt-2 lg:pt-0 shrink-0">
+                        <button
+                          onClick={() => {
+                            setBonusTarget({
+                              email: member.email || member.id,
+                              name: member.name,
+                              currentPoints: member.totalPoints
+                            });
+                            setBonusAmountInput(5000);
+                          }}
+                          className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold rounded-xl cursor-pointer transition-all flex items-center gap-1 shadow-2xs"
+                          title="Хэрэглэгчид бонус оноо бэлэглэх"
+                        >
+                          <Gift className="w-3.5 h-3.5" />
+                          <span>Бонус оноо</span>
+                        </button>
+
+                        <button
+                          onClick={() => {
+                            setTierOverrideTarget({
+                              email: member.email || member.id,
+                              name: member.name,
+                              currentTierId: member.tier?.id || 'auto'
+                            });
+                          }}
+                          className="px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 text-xs font-bold rounded-xl cursor-pointer transition-all flex items-center gap-1 shadow-2xs"
+                          title="VIP зэрэглэлийг шууд олгох эсвэл өөрчлөх"
+                        >
+                          <Award className="w-3.5 h-3.5" />
+                          <span>VIP Зэрэглэл</span>
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ================= SETTINGS & SECURITY TAB ================= */}
         {activeTab === 'settings' && (
-          <div className="max-w-2xl space-y-6">
-            {/* PIN Change Section */}
+          <div className="max-w-3xl space-y-6">
+            {/* Admin Security & Session Status */}
+            <div className="bg-white p-6 rounded-2xl border border-stone-200 shadow-xs space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-stone-100">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
+                    <ShieldCheck className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h4 className="font-extrabold text-stone-900 text-sm">Админ Системийн Хамгаалалт & Аюулгүй Байдал</h4>
+                    <p className="text-xs text-stone-500">Нэвтрэлтийн сесс, ПИН хамгаалалт, автомат түгжээ</p>
+                  </div>
+                </div>
+                <span className="px-3 py-1 bg-emerald-100 text-emerald-800 text-xs font-extrabold rounded-full flex items-center gap-1">
+                  <ShieldCheck className="w-3.5 h-3.5" />
+                  Идэвхтэй хамгаалагдсан
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                <div className="p-3.5 bg-stone-50 rounded-xl border border-stone-200/80 space-y-1">
+                  <span className="text-stone-500 text-[11px] font-medium">Сессийн автомат түгжээ</span>
+                  <div className="font-extrabold text-stone-900 text-sm flex items-center gap-1.5">
+                    <Clock className="w-4 h-4 text-emerald-600" />
+                    <span>{Math.floor(idleTimeRemaining / 60)} мин {idleTimeRemaining % 60} сек</span>
+                  </div>
+                  <p className="text-[10px] text-stone-400">15 мин идэвхгүй үед автоматаар түгжинэ</p>
+                </div>
+
+                <div className="p-3.5 bg-stone-50 rounded-xl border border-stone-200/80 space-y-1">
+                  <span className="text-stone-500 text-[11px] font-medium">Сүүлд нэвтэрсэн</span>
+                  <div className="font-bold text-stone-900 text-xs truncate">
+                    {lastLoginTime}
+                  </div>
+                  <p className="text-[10px] text-stone-400">Аудит бүртгэлд хадгалагдсан</p>
+                </div>
+
+                <div className="p-3.5 bg-stone-50 rounded-xl border border-stone-200/80 space-y-1">
+                  <span className="text-stone-500 text-[11px] font-medium">ПИН кодны статус</span>
+                  <div className="font-bold text-xs">
+                    {adminPin === '1234' ? (
+                      <span className="text-amber-600 font-extrabold flex items-center gap-1">
+                        <AlertCircle className="w-3.5 h-3.5" />
+                        Анхдагч (1234)
+                      </span>
+                    ) : (
+                      <span className="text-emerald-700 font-extrabold flex items-center gap-1">
+                        <ShieldCheck className="w-3.5 h-3.5" />
+                        Өөрчилж хамгаалсан
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[10px] text-stone-400">
+                    {adminPin === '1234' ? 'Шинэ кодоор солихыг зөвлөж байна' : 'Хамгаалалт өндөр түвшинд'}
+                  </p>
+                </div>
+              </div>
+
+              {onLogout && (
+                <div className="pt-2 flex justify-end">
+                  <button
+                    onClick={() => {
+                      onLogout();
+                      onClose();
+                    }}
+                    className="px-4 py-2 bg-stone-100 hover:bg-rose-50 text-rose-700 hover:text-rose-800 text-xs font-bold rounded-xl border border-stone-200 hover:border-rose-200 transition-all cursor-pointer flex items-center gap-2"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    <span>Админ эрхээс яг одоо гарах</span>
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* PIN Change Section with 3-Step Verification */}
             <div className="bg-white p-6 rounded-2xl border border-stone-200 shadow-xs space-y-4">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-stone-100 flex items-center justify-center text-stone-800">
                   <KeyRound className="w-5 h-5" />
                 </div>
                 <div>
-                  <h4 className="font-bold text-stone-900 text-sm">Админ ПИН код солих</h4>
-                  <p className="text-xs text-stone-500">Админ цонх руу орох 4 оронтой нууц кодоо шинэчлэх</p>
+                  <h4 className="font-bold text-stone-900 text-sm">Админ ПИН код солих (Баталгаажуулалттай)</h4>
+                  <p className="text-xs text-stone-500">Админ нэвтрэх 4 оронтой нууц кодоо шинэчлэх</p>
                 </div>
               </div>
 
               {pinChangeMsg && (
-                <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-xl text-xs flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 shrink-0" />
-                  <span>{pinChangeMsg}</span>
+                <div className="p-3.5 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span className="font-bold">{pinChangeMsg}</span>
                 </div>
               )}
 
-              <form onSubmit={handleSavePin} className="space-y-3">
+              {pinChangeError && (
+                <div className="p-3.5 bg-rose-50 border border-rose-200 text-rose-800 rounded-xl text-xs flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                  <span className="font-bold">{pinChangeError}</span>
+                </div>
+              )}
+
+              <form onSubmit={handleSavePin} className="space-y-3.5">
                 <div>
-                  <label className="block text-xs font-semibold text-stone-700 mb-1">
-                    Шинэ ПИН код (Хамгийн багадаа 4 оронтой)
+                  <label className="block text-xs font-bold text-stone-700 mb-1">
+                    1. Одоогийн хуучин ПИН код
                   </label>
                   <input
                     type="password"
-                    placeholder="Жишээ: 5678"
-                    value={newPin}
-                    onChange={(e) => setNewPin(e.target.value)}
-                    className="w-full px-3.5 py-2 text-xs border border-stone-300 rounded-xl focus:outline-none focus:border-rose-500 font-mono tracking-widest"
+                    placeholder="Одоо ашиглаж буй ПИН (Анхдагч: 1234)"
+                    value={currentPinInput}
+                    onChange={(e) => setCurrentPinInput(e.target.value)}
+                    className="w-full px-3.5 py-2 text-xs border border-stone-300 rounded-xl focus:outline-none focus:border-rose-500 font-mono tracking-widest bg-stone-50"
                   />
                 </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-stone-700 mb-1">
+                      2. Шинэ ПИН код (Дор хаяж 4 орон)
+                    </label>
+                    <input
+                      type="password"
+                      placeholder="Жишээ: 8899"
+                      value={newPinInput}
+                      onChange={(e) => setNewPinInput(e.target.value)}
+                      className="w-full px-3.5 py-2 text-xs border border-stone-300 rounded-xl focus:outline-none focus:border-rose-500 font-mono tracking-widest"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-stone-700 mb-1">
+                      3. Шинэ ПИН код давтан оруулах
+                    </label>
+                    <input
+                      type="password"
+                      placeholder="Шинэ кодоо дахин бичнэ үү"
+                      value={confirmPinInput}
+                      onChange={(e) => setConfirmPinInput(e.target.value)}
+                      className="w-full px-3.5 py-2 text-xs border border-stone-300 rounded-xl focus:outline-none focus:border-rose-500 font-mono tracking-widest"
+                    />
+                  </div>
+                </div>
+
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-stone-900 hover:bg-stone-800 text-white text-xs font-bold rounded-xl cursor-pointer"
+                  className="px-5 py-2.5 bg-stone-900 hover:bg-stone-800 text-white text-xs font-bold rounded-xl cursor-pointer shadow-xs transition-all flex items-center gap-2"
                 >
-                  ПИН код хадгалах
+                  <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                  <span>ПИН кодыг баталгаажуулж хадгалах</span>
                 </button>
               </form>
             </div>
@@ -802,10 +1816,215 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   </div>
                 </div>
               )}
+              {/* Loyalty System Configuration in Settings */}
+              <div className="bg-stone-50 p-4 sm:p-5 rounded-2xl border border-stone-200 space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-600 flex items-center justify-center font-bold">
+                      <Award className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-stone-900 text-sm">Лояалти Зэрэглэл & Урамшууллын Дүрэм</h4>
+                      <p className="text-[11px] text-stone-500">
+                        Босго дүн, хөнгөлөлтийн хувь, тусгай бэлэг, кэшбэк хувийг эндээс тохируулна.
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsRulesModalOpen(true)}
+                    className="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-stone-950 text-xs font-black rounded-xl cursor-pointer transition-all flex items-center gap-1.5 shadow-xs w-fit"
+                  >
+                    <Edit3 className="w-3.5 h-3.5" />
+                    <span>Дүрэм засах</span>
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 text-xs">
+                  <div className="bg-white p-2.5 rounded-xl border border-stone-200 shadow-2xs">
+                    <span className="text-[10px] text-stone-500 font-bold block">Суурь кэшбэк</span>
+                    <span className="text-xs font-black text-rose-600">{cashbackPctConfig}%</span>
+                  </div>
+                  {loyaltyTiersConfig.map((tier) => (
+                    <div key={tier.id} className="bg-white p-2.5 rounded-xl border border-stone-200 shadow-2xs">
+                      <span className="text-[10px] text-stone-500 font-bold block truncate">{tier.badge}</span>
+                      <span className="text-xs font-black text-stone-900">{formatMNT(tier.threshold)}</span>
+                      <span className="text-[10px] text-amber-600 font-bold ml-1">(-{tier.discount_pct}%)</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
         )}
       </main>
+
+      {/* Bonus Points Reward Modal */}
+      {bonusTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl border border-stone-200 space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-stone-100">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center">
+                  <Gift className="w-4 h-4" />
+                </div>
+                <h4 className="font-bold text-stone-900 text-sm">Бонус оноо олгох</h4>
+              </div>
+              <button
+                onClick={() => setBonusTarget(null)}
+                className="p-1 rounded-lg text-stone-400 hover:text-stone-600 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-2 text-xs">
+              <p className="text-stone-600">
+                Хэрэглэгч: <strong className="text-stone-900">{bonusTarget.name}</strong>
+              </p>
+              <p className="text-stone-500 font-mono text-[11px]">{bonusTarget.email}</p>
+              <p className="text-stone-600">
+                Одоогийн нийт оноо: <strong className="text-rose-600">{bonusTarget.currentPoints.toLocaleString()}</strong> оноо
+              </p>
+            </div>
+
+            {bonusSuccessMsg && (
+              <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs font-bold flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                <span>{bonusSuccessMsg}</span>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <label className="block text-xs font-bold text-stone-700">
+                Нэмж олгох бонус оноо (₮):
+              </label>
+              <div className="grid grid-cols-3 gap-1.5">
+                {[2000, 5000, 10000].map((amt) => (
+                  <button
+                    key={amt}
+                    type="button"
+                    onClick={() => setBonusAmountInput(amt)}
+                    className={`py-1.5 px-2 text-xs font-bold rounded-lg border cursor-pointer ${
+                      bonusAmountInput === amt
+                        ? 'bg-rose-600 text-white border-rose-600'
+                        : 'bg-stone-50 text-stone-700 border-stone-200 hover:bg-stone-100'
+                    }`}
+                  >
+                    +{amt.toLocaleString()}
+                  </button>
+                ))}
+              </div>
+              <input
+                type="number"
+                min="500"
+                step="500"
+                value={bonusAmountInput}
+                onChange={(e) => setBonusAmountInput(Number(e.target.value))}
+                className="w-full px-3 py-2 text-xs border border-stone-300 rounded-xl focus:outline-none focus:border-rose-500 font-mono font-bold"
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setBonusTarget(null)}
+                className="px-3.5 py-1.5 text-xs font-bold text-stone-600 hover:text-stone-900 cursor-pointer"
+              >
+                Болих
+              </button>
+              <button
+                type="button"
+                onClick={() => handleGrantBonus(bonusTarget.email, bonusAmountInput)}
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl shadow-md cursor-pointer flex items-center gap-1.5"
+              >
+                <Gift className="w-3.5 h-3.5" />
+                <span>Оноо олгох</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Manual Tier Override Modal */}
+      {tierOverrideTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl border border-stone-200 space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-stone-100">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center font-bold">
+                  <Award className="w-4 h-4" />
+                </div>
+                <h4 className="font-bold text-stone-900 text-sm">VIP Зэрэглэл Тохируулах</h4>
+              </div>
+              <button
+                onClick={() => setTierOverrideTarget(null)}
+                className="p-1 rounded-lg text-stone-400 hover:text-stone-600 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-1.5 text-xs">
+              <p className="text-stone-600">
+                Хэрэглэгч: <strong className="text-stone-900">{tierOverrideTarget.name}</strong>
+              </p>
+              <p className="text-stone-500 font-mono text-[11px]">{tierOverrideTarget.email}</p>
+            </div>
+
+            <div className="space-y-2">
+              <label className="block text-xs font-bold text-stone-700">
+                Олгох зэрэглэлийг сонгоно уу:
+              </label>
+              <div className="space-y-1.5">
+                {[
+                  { id: 'auto', name: '⚡ Автомат горим', desc: 'Худалдан авалтын бодит дүнгээр' },
+                  { id: 'bronze', name: '🥉 Хүрэл гишүүн', desc: '2% байнгын хөнгөлөлт' },
+                  { id: 'silver', name: '🥈 Мөнгөн гишүүн', desc: '3% байнгын хөнгөлөлт' },
+                  { id: 'gold', name: '🥇 Алтан VIP гишүүн', desc: '5% байнгын VIP хөнгөлөлт' }
+                ].map((tierOpt) => (
+                  <button
+                    key={tierOpt.id}
+                    type="button"
+                    onClick={() => handleSetTierOverride(tierOverrideTarget.email, tierOpt.id)}
+                    className="w-full text-left p-2.5 rounded-xl border border-stone-200 hover:border-amber-400 hover:bg-amber-50/50 transition-all flex items-center justify-between cursor-pointer"
+                  >
+                    <div>
+                      <div className="font-bold text-xs text-stone-900">{tierOpt.name}</div>
+                      <div className="text-[11px] text-stone-500">{tierOpt.desc}</div>
+                    </div>
+                    {tierOverrideTarget.currentTierId === tierOpt.id && (
+                      <Check className="w-4 h-4 text-emerald-600" />
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-2">
+              <button
+                type="button"
+                onClick={() => setTierOverrideTarget(null)}
+                className="px-4 py-2 text-xs font-bold text-stone-600 hover:text-stone-900 cursor-pointer"
+              >
+                Хаах
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Loyalty Rules Configuration Modal */}
+      <LoyaltyRulesModal
+        isOpen={isRulesModalOpen}
+        onClose={() => setIsRulesModalOpen(false)}
+        tiers={loyaltyTiersConfig}
+        cashbackPct={cashbackPctConfig}
+        onSave={(updatedTiers, updatedCashback) => {
+          setLoyaltyTiersConfig(updatedTiers);
+          setCashbackPctConfig(updatedCashback);
+        }}
+      />
 
       {/* Product Form Modal (Add / Edit) */}
       <ProductFormModal
