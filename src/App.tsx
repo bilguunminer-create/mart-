@@ -42,7 +42,7 @@ import { UserProfileModal } from './components/UserProfileModal';
 import { GoogleFormsModal } from './components/GoogleFormsModal';
 import { StoreHeroBanner } from './components/StoreHeroBanner';
 import { BeeEmblemLogo } from './components/BeeEmblemLogo';
-import { getStoreCustomerProfiles, getStoreOrders, saveStoreOrder, updateStoreOrderStatus } from './services/supabaseAuth';
+import { getStoreCustomerProfiles, getStoreOrders, getStoreSettings, saveStoreOrder, updateStoreOrderStatus } from './services/supabaseAuth';
 
 export default function App() {
   // Today's day of week (0 = Sunday, 1 = Monday, ...)
@@ -50,32 +50,21 @@ export default function App() {
     return new Date().getDay();
   });
 
-  // Products state (persisted in localStorage)
-  const [products, setProducts] = useState<Product[]>(() => {
-    try {
-      const saved = localStorage.getItem('usk_products_list');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed;
-        }
-      }
-      return PRODUCTS;
-    } catch {
-      return PRODUCTS;
-    }
-  });
+  // The public catalog is loaded from Supabase. PRODUCTS is only the first render fallback.
+  const [products, setProducts] = useState<Product[]>(PRODUCTS);
+  useEffect(() => {
+    getStoreSettings().then((settings) => {
+      const remoteProducts = settings.data.products;
+      if (!Array.isArray(remoteProducts)) return;
+      setProducts(remoteProducts.map((product: any) => ({
+        ...product,
+        stock_quantity: Number(product.stock ?? 0),
+        in_stock: Boolean(product.in_stock) && Number(product.stock ?? 0) > 0,
+      })) as Product[]);
+    }).catch(() => { /* The built-in catalog remains visible if the network is unavailable. */ });
+  }, []);
 
-  // Orders state (persisted in localStorage)
-  const [orders, setOrders] = useState<OrderDetails[]>(() => {
-    try {
-      const saved = localStorage.getItem('usk_orders_list');
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  });
-
+  // Orders are loaded from Supabase after a user signs in.\n  const [orders, setOrders] = useState<OrderDetails[]>([]);\n
   const [memberProfiles, setMemberProfiles] = useState<Array<{ user_id: string; name: string; phone: string; address: string; created_at?: string }>>([]);
 
   // Admin states
@@ -268,23 +257,6 @@ export default function App() {
     }
   }, [activeLoyalty]);
 
-  // Sync products to localStorage
-  useEffect(() => {
-    try {
-      localStorage.setItem('usk_products_list', JSON.stringify(products));
-    } catch {
-      // ignore storage errors
-    }
-  }, [products]);
-
-  // Sync orders to localStorage
-  useEffect(() => {
-    try {
-      localStorage.setItem('usk_orders_list', JSON.stringify(orders));
-    } catch {
-      // ignore storage errors
-    }
-  }, [orders]);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
