@@ -756,6 +756,7 @@ export default function App() {
             }
             setShowDealsOnly(true);
           }}
+          products={products}
         />
 
         {/* Curated Combos Section */}
