@@ -1431,29 +1431,48 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 </div>
               ) : memberProfiles.map((profile) => {
                 const profileOrders = orders.filter((order) => order.customerId === profile.user_id);
+                const approved = profileOrders.filter((order) => ['confirmed', 'shipping', 'delivered'].includes(order.status || 'new'));
+                const totalSpent = approved.reduce((sum, order) => sum + order.total, 0);
+                const tiers = [...loyaltyTiersConfig].sort((a, b) => a.threshold - b.threshold);
+                const currentTier = [...tiers].reverse().find((tier) => totalSpent >= tier.threshold);
+                const nextTier = tiers.find((tier) => totalSpent < tier.threshold);
+                const previous = nextTier ? (tiers[tiers.indexOf(nextTier) - 1]?.threshold || 0) : totalSpent;
+                const remaining = nextTier ? Math.max(0, nextTier.threshold - totalSpent) : 0;
+                const progress = nextTier ? Math.min(100, Math.round((totalSpent - previous) * 100 / Math.max(1, nextTier.threshold - previous))) : 100;
                 return (
-                  <div key={profile.user_id} className="p-5 border-b border-stone-100 last:border-b-0">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <div>
-                        <p className="font-black text-stone-900">{profile.name || 'Хэрэглэгч'}</p>
-                        <p className="text-xs text-stone-500">{profile.phone || 'Утас бүртгээгүй'} · {profile.address || 'Хаяг бүртгээгүй'}</p>
+                  <div key={profile.user_id} className="p-5 border-b border-stone-100 last:border-b-0 bg-linear-to-r from-white to-amber-50/30">
+                    <div className="flex flex-col lg:flex-row gap-4">
+                      <div className="lg:w-56">
+                        <div className="flex items-center gap-3">
+                          <div className="w-11 h-11 rounded-2xl bg-stone-900 text-amber-300 flex items-center justify-center font-black">{(profile.name || 'Х').slice(0, 1).toUpperCase()}</div>
+                          <div><p className="font-black text-stone-900">{profile.name || 'Хэрэглэгч'}</p><p className="text-xs text-stone-500">{profile.phone || 'Утас бүртгээгүй'}</p></div>
+                        </div>
+                        <p className="mt-2 text-xs text-stone-500">{profile.address || 'Хаяг бүртгээгүй'}</p>
                       </div>
-                      <span className="px-3 py-1 rounded-full bg-blue-50 text-blue-700 font-bold text-xs">{profileOrders.length} захиалга</span>
+                      <div className="flex-1 grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div className="rounded-2xl bg-white border border-stone-200 p-3"><p className="text-[10px] font-bold text-stone-400">БАТАЛГААЖСАН ХУДАЛДАН АВАЛТ</p><p className="mt-1 font-black">{formatMNT(totalSpent)}</p><p className="text-[11px] text-stone-500">{approved.length} захиалга</p></div>
+                        <div className="rounded-2xl bg-amber-50 border border-amber-200 p-3"><p className="text-[10px] font-bold text-amber-700">ОДООГИЙН ТҮВШИН</p><p className="mt-1 font-black text-amber-900">{currentTier ? currentTier.badge : 'Стандарт'}</p><p className="text-[11px] text-amber-700">{currentTier ? currentTier.discount_pct + '% VIP' : 'VIP эрх нээгдээгүй'}</p></div>
+                        <div className="rounded-2xl bg-blue-50 border border-blue-200 p-3"><p className="text-[10px] font-bold text-blue-700">ДАРААГИЙН ТҮВШИН</p><p className="mt-1 font-black text-blue-900">{nextTier ? nextTier.badge : 'Дээд түвшин'}</p><p className="text-[11px] text-blue-700">{nextTier ? formatMNT(remaining) + ' дутуу' : 'Бүх шатанд хүрсэн'}</p></div>
+                      </div>
                     </div>
-                    <div className="mt-3 space-y-2">
+                    <div className="mt-4 h-2 bg-stone-100 rounded-full overflow-hidden"><div className="h-full rounded-full bg-linear-to-r from-amber-400 to-rose-500" style={{ width: progress + '%' }} /></div>
+                    {nextTier && <p className="mt-1 text-[11px] text-stone-500"><strong>{nextTier.name}</strong> түвшинд хүрэхэд {formatMNT(remaining)}-ийн худалдан авалт дутуу.</p>}
+                    <div className="mt-4 space-y-2">
+                      <p className="text-xs font-black text-stone-800">Захиалсан барааны дэлгэрэнгүй</p>
                       {profileOrders.length === 0 ? <p className="text-xs text-stone-400">Захиалга бүртгэгдээгүй.</p> : profileOrders.map((order) => (
-                        <div key={order.orderId} className="flex flex-wrap gap-x-4 gap-y-1 bg-stone-50 rounded-xl p-3 text-xs">
-                          <span className="font-mono font-bold">#{order.orderId}</span>
-                          <span>{formatMNT(order.total)}</span>
-                          <span>{order.items.reduce((sum, item) => sum + item.quantity, 0)} бараа</span>
-                          <span className="font-bold text-emerald-700">{order.status === 'delivered' ? 'Хүргэгдсэн' : order.status === 'shipping' ? 'Хүргэлтэд' : order.status === 'confirmed' ? 'Баталгаажсан' : order.status === 'cancelled' ? 'Цуцалсан' : 'Шинэ'}</span>
-                          <span className="text-stone-500">{order.date}</span>
+                        <div key={order.orderId} className="rounded-xl border border-stone-200 bg-white p-3">
+                          <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs"><span className="font-mono font-bold">#{order.orderId.slice(0, 8)}</span><span className="font-black">{formatMNT(order.total)}</span><span className="font-bold text-emerald-700">{order.status === 'delivered' ? 'Хүргэгдсэн' : order.status === 'shipping' ? 'Хүргэлтэд' : order.status === 'confirmed' ? 'Баталгаажсан' : order.status === 'cancelled' ? 'Цуцалсан' : 'Шинэ'}</span><span className="text-stone-500">{order.date}</span></div>
+                          <div className="mt-2 flex flex-wrap gap-1.5">{order.items.map((item) => <span key={item.id} className="px-2 py-1 rounded-lg bg-stone-50 border border-stone-200 text-[11px]">{item.name} <strong>×{item.quantity}</strong> · {formatMNT(item.price * item.quantity)}</span>)}</div>
                         </div>
                       ))}
                     </div>
                   </div>
                 );
               })}
+            </div>
+          </div>
+        )}
+
             </div>
           </div>
         )}
