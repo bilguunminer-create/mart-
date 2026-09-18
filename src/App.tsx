@@ -1139,7 +1139,18 @@ export default function App() {
         orders={orders}
         currentUser={currentUser}
         dailyDiscountTotal={dailyDiscountTotal}
-        onOrderSuccess={(order) => {
+        onOrderSuccess={async (order) => {
+          if (!currentUser?.accessToken) {
+            throw new Error('Захиалгаа хадгалахын тулд эхлээд бүртгэлдээ нэвтэрнэ үү.');
+          }
+          await saveStoreOrder(currentUser.accessToken, {
+            customerName: order.customerName,
+            phone: order.phone,
+            address: order.address,
+            notes: order.notes,
+            total: order.total,
+            items: order.items.map((item) => ({ id: item.id, quantity: item.quantity })),
+          });
           const newOrder: OrderDetails = {
             ...order,
             status: 'new'
@@ -1187,20 +1198,6 @@ export default function App() {
             );
           }
 
-          if (currentUser?.accessToken) {
-            void saveStoreOrder(currentUser.accessToken, {
-              customerName: newOrder.customerName,
-              phone: newOrder.phone,
-              address: newOrder.address,
-              notes: newOrder.notes,
-              total: newOrder.total,
-              items: newOrder.items.map((item) => ({ id: item.id, quantity: item.quantity })),
-            }).catch(() => {
-              showToast('Захиалга төв санд хадгалагдсангүй. Холболтоо шалгаад дахин оролдоно уу.');
-            });
-          } else {
-            showToast('Захиалгаа төв санд хадгалахын тулд эхлээд бүртгэлдээ нэвтэрнэ үү.');
-          }
           setOrders((prev) => [newOrder, ...prev]);
           setCart([]);
           showToast(`Захиалга #${order.orderId} амжилттай бүртгэгдлээ! Таны бүртгэл дээр түүх хадгалагдлаа.${promotionMsg}`);
