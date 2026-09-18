@@ -144,7 +144,12 @@ export const UserProfileModal: React.FC<Props> = ({ isOpen, onClose, user, onSav
       if (mode === 'signup') {
         if (signupStep === 'details') {
           if (!name.trim()) throw new Error('Нэрээ оруулна уу.');
-          await requestSignupOtp(cleanEmail, { name: name.trim(), phone, address });
+          const signup = await requestSignupOtp(cleanEmail, { name: name.trim(), phone, address });
+          if (signup.user?.identities && signup.user.identities.length === 0) {
+            setMode('recover');
+            setMessage('Энэ и-мэйл хаяг бүртгэлтэй байна. Нууц үгээ сэргээнэ үү.');
+            return;
+          }
           setSignupStep('otp');
           setMessage('И-мэйлээр баталгаажуулах код илгээгдлээ. Кодоо оруулна уу.');
           return;
