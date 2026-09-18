@@ -133,3 +133,12 @@ export async function updateStoreOrderStatus(token: string, orderId: string, sta
     body: JSON.stringify({ order_id: orderId, next_status: status }),
   }, token);
 }
+
+
+export type StoreSettings = { data: { products?: Array<Record<string, unknown>>; [key: string]: unknown }; version: number };
+
+export async function getStoreSettings() {
+  const rows = await request<StoreSettings[]>('/rest/v1/store_settings?id=eq.true&select=data,version', { method: 'GET' });
+  if (!rows[0]) throw new Error('Дэлгүүрийн тохиргоо олдсонгүй.');
+  return rows[0];
+}
