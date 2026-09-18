@@ -1,6 +1,6 @@
 const SUPABASE_URL = 'https://rebtikccivjcsxieeyxe.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_6cFfPZrw3hfRy-RqefprLQ_c94gv3Ik';
-const APP_URL = 'https://www.uskmart.com';
+const APP_URL = typeof window === 'undefined' ? 'https://www.uskmart.com' : window.location.origin;
 
 export type AuthSession = { access_token: string; refresh_token?: string; user: { id: string; email?: string; email_confirmed_at?: string | null } };
 type Profile = { name: string; phone?: string; address?: string };
