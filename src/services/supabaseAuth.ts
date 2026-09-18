@@ -56,3 +56,7 @@ export async function saveProfile(token: string, userId: string, profile: Profil
     body: JSON.stringify({ user_id: userId, name: profile.name, phone: profile.phone || '', address: profile.address || '' }),
   }, token);
 }
+
+export async function updatePassword(token: string, password: string) {
+  await request('/auth/v1/user', { method: 'PUT', body: JSON.stringify({ password }) }, token);
+}
