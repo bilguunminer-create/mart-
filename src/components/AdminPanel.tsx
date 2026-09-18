@@ -56,6 +56,7 @@ import { LoyaltyRulesModal } from './LoyaltyRulesModal';
 interface AdminPanelProps {
   products: Product[];
   orders: OrderDetails[];
+  memberProfiles?: Array<{ user_id: string; name: string; phone: string; address: string; created_at?: string }>;
   onSaveProduct: (product: Product) => void;
   onDeleteProduct: (productId: string) => void;
   onToggleStock: (productId: string) => void;
@@ -92,6 +93,7 @@ export interface LoyaltyMember {
 export const AdminPanel: React.FC<AdminPanelProps> = ({
   products,
   orders,
+  memberProfiles = [],
   onSaveProduct,
   onDeleteProduct,
   onToggleStock,
@@ -339,6 +341,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       orders: OrderDetails[];
     }> = {};
 
+    memberProfiles.forEach((profile) => {
+      memberMap[profile.user_id] = {
+        name: profile.name || 'Хэрэглэгч',
+        email: '',
+        phone: profile.phone || '',
+        orders: [],
+      };
+    });
+
     orders.forEach((o) => {
       const emailKey = o.email ? o.email.trim().toLowerCase() : (o.phone ? `tel_${o.phone.replace(/\D/g, '')}` : 'unknown');
       if (!memberMap[emailKey]) {
@@ -359,7 +370,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     });
 
     return Object.entries(memberMap).map(([id, info]) => {
-      const validOrders = info.orders.filter((o) => o.status !== 'cancelled');
+      const validOrders = info.orders.filter((o) => o.status === 'delivered');
       const totalSpent = validOrders.reduce((sum, o) => sum + (o.total || 0), 0);
       const deliveredCount = info.orders.filter((o) => o.status === 'delivered').length;
       const lastOrder = info.orders[0]?.date || 'Огноогүй';
@@ -418,7 +429,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         nextTier: nextTierInfo
       };
     }).sort((a, b) => b.totalSpent - a.totalSpent);
-  }, [orders, customLoyaltyData, loyaltyTiersConfig, cashbackPctConfig]);
+  }, [orders, memberProfiles, customLoyaltyData, loyaltyTiersConfig, cashbackPctConfig]);
 
   // Filtered loyalty members
   const filteredLoyaltyMembers = useMemo(() => {
