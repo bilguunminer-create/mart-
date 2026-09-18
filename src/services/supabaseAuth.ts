@@ -40,7 +40,7 @@ export async function requestSignupOtp(email: string, profile: Profile) {
 export async function verifySignupOtp(email: string, token: string) {
   return request<AuthSession>('/auth/v1/verify', {
     method: 'POST',
-    body: JSON.stringify({ email, token, type: 'email' }),
+    body: JSON.stringify({ email, token, type: 'signup' }),
   });
 }
 
