@@ -316,40 +316,31 @@ export default function App() {
   };
 
   const handleToggleStock = (productId: string) => {
-    setProducts((prev) =>
-      prev.map((p) => {
-        if (p.id === productId) {
-          const nextStock = !p.in_stock;
-          const nextQuantity = nextStock ? (p.stock_quantity && p.stock_quantity > 0 ? p.stock_quantity : 15) : 0;
-          showToast(nextStock ? `"${p.name}" бэлэн төлөвт шилжлээ (${nextQuantity}ш)` : `"${p.name}" дууссан төлөвт шилжлээ (0ш)`);
-          return { 
-            ...p, 
-            in_stock: nextStock,
-            stock_quantity: nextQuantity
-          };
-        }
-        return p;
-      })
-    );
+    setProducts((prev) => {
+      const next = prev.map((p) => {
+        if (p.id !== productId) return p;
+        const nextStock = !p.in_stock;
+        const nextQuantity = nextStock ? (p.stock_quantity && p.stock_quantity > 0 ? p.stock_quantity : 15) : 0;
+        showToast(nextStock ? `"${p.name}" бэлэн төлөвт шилжлээ (${nextQuantity}ш)` : `"${p.name}" дууссан төлөвт шилжлээ (0ш)`);
+        return { ...p, in_stock: nextStock, stock_quantity: nextQuantity };
+      });
+      persistProducts(next);
+      return next;
+    });
   };
 
   const handleQuickUpdateStock = (productId: string, amount: number, isAbsolute = false) => {
-    setProducts((prev) =>
-      prev.map((p) => {
-        if (p.id === productId) {
-          const current = p.stock_quantity !== undefined ? p.stock_quantity : (p.in_stock ? 18 : 0);
-          const next = isAbsolute ? Math.max(0, amount) : Math.max(0, current + amount);
-          const nextInStock = next > 0;
-          showToast(`"${p.name}" үлдэгдэл шинэчлэгдлээ: ${next} ш`);
-          return {
-            ...p,
-            stock_quantity: next,
-            in_stock: nextInStock
-          };
-        }
-        return p;
-      })
-    );
+    setProducts((prev) => {
+      const nextProducts = prev.map((p) => {
+        if (p.id !== productId) return p;
+        const current = p.stock_quantity !== undefined ? p.stock_quantity : (p.in_stock ? 15 : 0);
+        const nextStock = isAbsolute ? Math.max(0, amount) : Math.max(0, current + amount);
+        showToast(`"${p.name}" үлдэгдэл шинэчлэгдлээ: ${nextStock} ш`);
+        return { ...p, stock_quantity: nextStock, in_stock: nextStock > 0 };
+      });
+      persistProducts(nextProducts);
+      return nextProducts;
+    });
   };
 
   const handleUpdateOrderStatus = (orderId: string, status: 'new' | 'confirmed' | 'shipping' | 'delivered' | 'cancelled') => {
