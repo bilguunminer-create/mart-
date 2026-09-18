@@ -90,6 +90,7 @@ export interface LoyaltyMember {
     remaining: number;
     progressPct: number;
   } | null;
+  orders: OrderDetails[];
 }
 
 export const AdminPanel: React.FC<AdminPanelProps> = ({
@@ -117,6 +118,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [stockFilter, setStockFilter] = useState<'all' | 'in_stock' | 'low_stock' | 'out_of_stock'>('all');
   const [checkoutDraft, setCheckoutDraft] = useState(checkoutSettings);
   const [checkoutSettingsMessage, setCheckoutSettingsMessage] = useState<string | null>(null);
+  const [expandedMemberId, setExpandedMemberId] = useState<string | null>(null);
 
   useEffect(() => {
     setCheckoutDraft(checkoutSettings);
@@ -439,6 +441,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         bonusPoints,
         totalPoints: bonusPoints,
         nextTier: nextTierInfo,
+        orders: info.orders,
       };
     }).sort((a, b) => b.totalSpent - a.totalSpent);
   }, [orders, memberProfiles, customLoyaltyData, loyaltyTiersConfig]);
@@ -1678,6 +1681,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       {/* Admin Override Actions */}
                       <div className="flex items-center gap-2 pt-2 lg:pt-0 shrink-0">
                         <button
+                          type="button"
+                          onClick={() => setExpandedMemberId((id) => id === member.id ? null : member.id)}
+                          className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 text-xs font-bold rounded-xl cursor-pointer"
+                        >
+                          {expandedMemberId === member.id ? 'Захиалга хаах' : `Захиалга (${member.orderCount})`}
+                        </button>
+                        <button
                           onClick={() => {
                             setBonusTarget({
                               email: member.email || member.id,
@@ -1708,6 +1718,21 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                           <span>VIP Зэрэглэл</span>
                         </button>
                       </div>
+                      {expandedMemberId === member.id && (
+                        <div className="w-full lg:col-span-3 rounded-xl border border-blue-100 bg-blue-50/40 p-3 text-xs">
+                          <p className="font-bold text-stone-800 mb-2">Гишүүний захиалгын түүх</p>
+                          {member.orders.length === 0 ? (
+                            <p className="text-stone-500">Захиалга бүртгэгдээгүй байна.</p>
+                          ) : member.orders.map((order) => (
+                            <div key={order.orderId} className="flex flex-wrap justify-between gap-2 border-t border-blue-100 py-2 first:border-t-0">
+                              <span className="font-mono font-bold text-stone-700">#{order.orderId}</span>
+                              <span>{order.items.reduce((sum, item) => sum + item.quantity, 0)} бараа · {formatMNT(order.total)}</span>
+                              <span className="font-bold text-blue-700">{order.status === 'delivered' ? 'Хүргэгдсэн' : order.status === 'shipping' ? 'Хүргэлтэд' : order.status === 'confirmed' ? 'Баталгаажсан' : order.status === 'cancelled' ? 'Цуцалсан' : 'Шинэ'}</span>
+                              <span className="text-stone-500">{order.date}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
