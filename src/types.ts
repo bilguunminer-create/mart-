@@ -93,6 +93,7 @@ export interface UserProfile {
   id: string;
   supabaseUserId?: string;
   accessToken?: string;
+  refreshToken?: string;
   name: string;
   email: string;
   phone?: string;
