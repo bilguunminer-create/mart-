@@ -726,16 +726,8 @@ export const resetStoredLoyaltyTiers = (): LoyaltyTier[] => {
 };
 
 export const getStoredCashbackPct = (): number => {
-  try {
-    const saved = localStorage.getItem('usk_loyalty_cashback_pct');
-    if (saved !== null) {
-      const val = parseFloat(saved);
-      if (!isNaN(val) && val >= 0) return val;
-    }
-  } catch {
-    // fallback
-  }
-  return 1; // Default 1%
+  // Standard members do not earn cashback. Only configured VIP tiers receive benefits.
+  return 0;
 };
 
 export const saveStoredCashbackPct = (pct: number): void => {
