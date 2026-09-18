@@ -36,6 +36,7 @@ export const UserProfileModal: React.FC<Props> = ({ isOpen, onClose, user, onSav
     if (!token) return;
 
     if (type === 'recovery') {
+      sessionStorage.setItem('usk_recovery_token', token);
       setRecoveryToken(token); setMode('reset');
       window.history.replaceState({}, document.title, window.location.pathname);
       return;
@@ -126,7 +127,8 @@ export const UserProfileModal: React.FC<Props> = ({ isOpen, onClose, user, onSav
         if (!recoveryToken) throw new Error('Сэргээх холбоос хүчингүй эсвэл хугацаа дууссан байна.');
         if (password.length < 8) throw new Error('Нууц үг хамгийн багадаа 8 тэмдэгттэй байна.');
         if (password !== passwordConfirm) throw new Error('Нууц үгүүд таарахгүй байна.');
-        await updatePassword(recoveryToken, password);
+        await updatePassword(recoveryToken || sessionStorage.getItem('usk_recovery_token') || '', password);
+        sessionStorage.removeItem('usk_recovery_token');
         setMessage('Нууц үг шинэчлэгдлээ. Шинэ нууц үгээрээ нэвтэрнэ үү.');
         setMode('login'); setPassword(''); setPasswordConfirm('');
         return;
