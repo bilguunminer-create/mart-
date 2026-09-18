@@ -127,7 +127,12 @@ export default function App() {
   // Renew an expired access token automatically. Older sessions without a refresh
   // token will be asked to sign in again instead of showing a raw JWT error.
   useEffect(() => {
-    if (!currentUser?.refreshToken) return;
+    if (!currentUser) return;
+    if (!currentUser.refreshToken) {
+      setCurrentUser(null);
+      localStorage.removeItem('usk_current_user');
+      return;
+    }
     let active = true;
     refreshSession(currentUser.refreshToken)
       .then((session) => {
