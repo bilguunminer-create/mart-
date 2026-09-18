@@ -368,13 +368,24 @@ export default function App() {
   };
 
   const handleUpdateOrderStatus = (orderId: string, status: 'new' | 'confirmed' | 'shipping' | 'delivered' | 'cancelled') => {
-    setOrders((prev) => prev.map((o) => (o.orderId === orderId ? { ...o, status } : o)));
-    const databaseStatus = status === 'delivered' ? 'Дууссан' : status === 'cancelled' ? 'Цуцалсан' : status === 'shipping' ? 'Хүргэлтэд' : status === 'confirmed' ? 'Баталгаажсан' : 'Шинэ';
-    if (currentUser?.accessToken) {
-      void updateStoreOrderStatus(currentUser.accessToken, orderId, databaseStatus)
-        .catch(() => showToast('Төв санд төлөв шинэчлэх боломжгүй байна.'));
+    if (!currentUser?.accessToken) {
+      showToast('Төлөв хадгалахын тулд админ и-мэйлээр нэвтэрнэ үү.');
+      return;
     }
-    showToast(`Захиалга #${orderId} төлөв шинэчлэгдлээ`);
+
+    const databaseStatus = status === 'delivered' ? 'Дууссан' : status === 'cancelled' ? 'Цуцалсан' : status === 'shipping' ? 'Хүргэлтэд' : status === 'confirmed' ? 'Баталгаажсан' : 'Шинэ';
+
+    void updateStoreOrderStatus(currentUser.accessToken, orderId, databaseStatus)
+      .then(() => {
+        setOrders((prev) => prev.map((o) => (o.orderId === orderId ? { ...o, status } : o)));
+        showToast(`Захиалга #${orderId} төлөв төв санд хадгалагдлаа`);
+      })
+      .catch((error) => {
+        const message = error instanceof Error ? error.message : '';
+        showToast(message.includes('permission') || message.includes('policy')
+          ? 'Энэ эрхээр захиалгын төлөв шинэчлэх боломжгүй байна. Админ и-мэйлээр дахин нэвтэрнэ үү.'
+          : 'Төв санд төлөв шинэчлэх боломжгүй байна. Дахин оролдоно уу.');
+      });
   };
 
   const handleResetProducts = () => {
