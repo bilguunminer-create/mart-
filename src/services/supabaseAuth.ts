@@ -20,7 +20,7 @@ async function request<T>(path: string, init: RequestInit = {}, token?: string):
 }
 
 function temporaryPassword() {
-  return Array.from({ length: 3 }, () => crypto.randomUUID()).join('');
+  return crypto.randomUUID();
 }
 
 /** Creates a pending account. Supabase sends the confirmation OTP configured in its email template. */
