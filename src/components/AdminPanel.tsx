@@ -111,7 +111,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   checkoutSettings = { deliveryFee: 3000, bankName: '', accountNumber: '', iban: '', accountHolder: '' },
   onSaveCheckoutSettings
 }) => {
-  const [activeTab, setActiveTab] = useState<'products' | 'orders' | 'loyalty' | 'stats' | 'settings'>('products');
+  const [activeTab, setActiveTab] = useState<'products' | 'orders' | 'loyalty' | 'stats' | 'settings'>('loyalty');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedOrigin, setSelectedOrigin] = useState<'ALL' | 'KR' | 'US'>('ALL');
