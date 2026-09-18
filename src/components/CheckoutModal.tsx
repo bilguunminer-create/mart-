@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { X, CheckCircle2, QrCode, CreditCard, Banknote, Truck, ShieldCheck, Copy, Check, Printer, Award, Phone, Mail } from 'lucide-react';
 import { CartItem, LoyaltyTier, OrderDetails, UserProfile } from '../types';
 import { STORE_CONFIG, LOYALTY_TIERS, formatMNT, getStoredLoyaltyTiers, calculateLoyaltyTierBySpent } from '../data/storeData';
+import { getLoyaltyWallet } from '../services/supabaseAuth';
 
 interface CheckoutModalProps {
   isOpen: boolean;
@@ -33,6 +34,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const [copied, setCopied] = useState(false);
   const [completedOrder, setCompletedOrder] = useState<OrderDetails | null>(null);
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
+  const [walletPoints, setWalletPoints] = useState(0);
+  const [usePoints, setUsePoints] = useState(false);
 
   // Sync with currentUser when opened
   useEffect(() => {
@@ -46,8 +49,17 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   }, [isOpen, currentUser]);
 
   useEffect(() => {
-    if (isOpen) setCompletedOrder(null);
-  }, [isOpen]);
+    if (!isOpen) return;
+    setCompletedOrder(null);
+    setUsePoints(false);
+    if (!currentUser?.accessToken) {
+      setWalletPoints(0);
+      return;
+    }
+    getLoyaltyWallet(currentUser.accessToken)
+      .then((wallet) => setWalletPoints(Math.max(0, wallet.available_points || 0)))
+      .catch(() => setWalletPoints(0));
+  }, [isOpen, currentUser?.accessToken]);
 
   // Clean phone and email inputs for real-time order history tracking
   const cleanPhone = phone.replace(/\D/g, '').slice(-8);
@@ -100,7 +112,9 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const isGoldVIP = accountLoyaltyTier?.id === 'gold';
   const qualifiesForFreeDelivery = itemsPriceAfterDailyDeal >= STORE_CONFIG.free_delivery_threshold || isGoldVIP;
   const deliveryFee = qualifiesForFreeDelivery || items.length === 0 ? 0 : STORE_CONFIG.delivery_fee;
-  const total = Math.max(0, itemsPriceAfterDailyDeal - loyaltyDiscountAmount + deliveryFee);
+  const totalBeforePoints = Math.max(0, itemsPriceAfterDailyDeal - loyaltyDiscountAmount + deliveryFee);
+  const pointsDiscount = usePoints ? Math.min(walletPoints, totalBeforePoints) : 0;
+  const total = totalBeforePoints - pointsDiscount;
 
   const handleCopyAccount = (text: string) => {
     navigator.clipboard.writeText(text);
@@ -143,6 +157,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
       subtotal,
       dailyDiscount: dailyDiscountTotal,
       loyaltyDiscount: loyaltyDiscountAmount,
+      pointsDiscount,
       deliveryFee,
       total,
       date: new Date().toLocaleString('mn-MN')
@@ -371,6 +386,21 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   </div>
                 )}
 
+                {walletPoints > 0 && (
+                  <label className="flex items-start gap-3 p-3 rounded-2xl border border-emerald-200 bg-emerald-50 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={usePoints}
+                      onChange={(event) => setUsePoints(event.target.checked)}
+                      className="mt-0.5 h-4 w-4 accent-emerald-600"
+                    />
+                    <span className="text-xs text-emerald-950">
+                      <strong className="block">Хуримтлуулсан оноогоо энэ захиалгад ашиглах</strong>
+                      <span>Боломжит оноо: {formatMNT(walletPoints)}. Сонгохгүй бол оноо таны дансанд хадгалагдана.</span>
+                    </span>
+                  </label>
+                )}
+
                 <div>
                   <label className="block text-xs font-semibold text-stone-700 mb-1">
                     Бүс нутаг, Аймаг / Хот
@@ -514,6 +544,13 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                       Лояалти хөнгөлөлт ({accountLoyaltyTier.name} {accountLoyaltyTier.discount_pct}%):
                     </span>
                     <span className="font-black text-rose-600">-{formatMNT(loyaltyDiscountAmount)}</span>
+                  </div>
+                )}
+
+                {pointsDiscount > 0 && (
+                  <div className="flex justify-between text-emerald-800 font-bold bg-emerald-50 p-2 rounded-lg border border-emerald-200">
+                    <span>Хуримтлуулсан оноо ашигласан:</span>
+                    <span className="font-black">-{formatMNT(pointsDiscount)}</span>
                   </div>
                 )}
 
