@@ -124,6 +124,7 @@ export default function App() {
         setMemberProfiles(profiles);
         setOrders(remoteOrders.map((order) => ({
           orderId: order.id,
+          customerId: order.customer_id,
           customerName: order.customer_name,
           phone: order.phone,
           address: order.address,
