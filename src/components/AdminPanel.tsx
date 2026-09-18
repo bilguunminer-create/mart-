@@ -122,6 +122,18 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     setCheckoutDraft(checkoutSettings);
   }, [checkoutSettings.deliveryFee, checkoutSettings.bankName, checkoutSettings.accountNumber, checkoutSettings.iban, checkoutSettings.accountHolder]);
 
+  const openLoyaltyMembers = () => {
+    window.location.hash = 'admin-loyalty';
+    setActiveTab('loyalty');
+    window.requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: 'smooth' }));
+  };
+
+  useEffect(() => {
+    if (window.location.hash === '#admin-loyalty') {
+      setActiveTab('loyalty');
+    }
+  }, []);
+
   // Product Form Modal state
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
@@ -669,10 +681,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             <button
               id="admin-tab-loyalty"
               type="button"
-              onClick={() => {
-                setActiveTab('loyalty');
-                window.requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: 'smooth' }));
-              }}
+              onClick={openLoyaltyMembers}
               className={`py-3 px-4 text-xs font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
                 activeTab === 'loyalty'
                   ? 'border-amber-500 text-amber-400'
@@ -1373,10 +1382,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
-                    onClick={() => {
-                      setActiveTab('loyalty');
-                      window.requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: 'smooth' }));
-                    }}
+                    onClick={openLoyaltyMembers}
                     className="text-xs bg-amber-500 hover:bg-amber-600 text-white font-bold px-3 py-1.5 rounded-xl cursor-pointer transition-all flex items-center gap-1.5 shadow-xs w-fit"
                   >
                     <Users className="w-3.5 h-3.5" />
