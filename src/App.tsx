@@ -229,9 +229,10 @@ export default function App() {
   // Open the password form immediately so the member can finish the reset.
   useEffect(() => {
     const hash = new URLSearchParams(window.location.hash.slice(1));
-    if (hash.get('type') === 'recovery' && hash.get('access_token')) {
-      setIsProfileOpen(true);
-    }
+    const query = new URLSearchParams(window.location.search);
+    const type = hash.get('type') || query.get('type');
+    const token = hash.get('access_token') || query.get('access_token');
+    if (type === 'recovery' && token) setIsProfileOpen(true);
   }, []);
 
   // Toast message
