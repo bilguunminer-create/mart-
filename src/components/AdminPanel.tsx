@@ -465,7 +465,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   // Inventory and product stats
   const totalProducts = products.length;
   const inStockCount = products.filter(p => p.in_stock && (p.stock_quantity === undefined || p.stock_quantity > 0)).length;
-  const lowStockCount = products.filter(p => p.in_stock && p.stock_quantity !== undefined && p.stock_quantity > 0 && p.stock_quantity <= 5).length;
+  const lowStockCount = products.filter(p => p.in_stock && p.stock_quantity === 1).length;
   const outOfStockCount = products.filter(p => !p.in_stock || (p.stock_quantity !== undefined && p.stock_quantity <= 0)).length;
   const totalStockUnits = products.reduce((sum, p) => sum + (p.stock_quantity ?? (p.in_stock ? 18 : 0)), 0);
 
@@ -478,7 +478,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     const matchesOrigin = selectedOrigin === 'ALL' || prod.origin === selectedOrigin;
     
     const isOut = !prod.in_stock || (prod.stock_quantity !== undefined && prod.stock_quantity <= 0);
-    const isLow = prod.in_stock && prod.stock_quantity !== undefined && prod.stock_quantity > 0 && prod.stock_quantity <= 5;
+    const isLow = prod.in_stock && prod.stock_quantity === 1;
     const isIn = prod.in_stock && (prod.stock_quantity === undefined || prod.stock_quantity > 0);
 
     const matchesStock = stockFilter === 'all' 
