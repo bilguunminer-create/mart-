@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { X, User, Mail, MapPin, Phone, LogOut, KeyRound } from 'lucide-react';
 import { UserProfile, OrderDetails, LoyaltyTier } from '../types';
 import { formatMNT } from '../data/storeData';
-import { AuthSession, signIn, requestSignupOtp, verifySignupOtp, sendPasswordReset, updatePassword, getProfile, saveProfile } from '../services/supabaseAuth';
+import { AuthSession, signIn, requestSignupOtp, verifySignupOtp, sendPasswordReset, updatePassword, getProfile, saveProfile, getStoreOrders } from '../services/supabaseAuth';
 
 interface Props {
   isOpen: boolean; onClose: () => void; user: UserProfile | null;
@@ -26,6 +26,7 @@ export const UserProfileModal: React.FC<Props> = ({ isOpen, onClose, user, onSav
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const [recoveryToken, setRecoveryToken] = useState('');
+  const [remoteOrders, setRemoteOrders] = useState<OrderDetails[]>([]);
 
   useEffect(() => {
     const hash = new URLSearchParams(window.location.hash.slice(1));
@@ -58,14 +59,41 @@ export const UserProfileModal: React.FC<Props> = ({ isOpen, onClose, user, onSav
     }
   }, []);
 
+  useEffect(() => {
+    if (!isOpen || !user?.accessToken) return;
+    let active = true;
+    getStoreOrders(user.accessToken).then((rows) => {
+      if (!active) return;
+      setRemoteOrders(rows.map((order) => ({
+        orderId: order.id,
+        customerName: order.customer_name,
+        phone: order.phone,
+        address: order.address,
+        district: 'Өмнөговь, Даланзадгад',
+        notes: order.note || '',
+        paymentMethod: 'cod',
+        items: (order.items || []).map((item) => ({ type: 'product', id: item.productId, name: item.title, price: item.price, originalPrice: item.price, image: '', quantity: item.quantity })),
+        subtotal: order.subtotal,
+        dailyDiscount: order.daily_discount,
+        loyaltyDiscount: order.vip_discount,
+        deliveryFee: order.delivery_fee,
+        total: order.total,
+        date: new Date(order.created_at).toLocaleString('mn-MN'),
+        status: order.status === 'Дууссан' ? 'delivered' : order.status === 'Цуцалсан' ? 'cancelled' : order.status === 'Хүргэлтэд' ? 'shipping' : order.status === 'Баталгаажсан' ? 'confirmed' : 'new',
+      })));
+    }).catch(() => { if (active) setRemoteOrders([]); });
+    return () => { active = false; };
+  }, [isOpen, user?.accessToken]);
+
   const ownOrders = useMemo(() => {
     const emailMatch = user?.email?.trim().toLowerCase();
     const phoneMatch = user?.phone?.replace(/\D/g, '').slice(-8);
-    return orders.filter((order) =>
+    const mergedOrders = [...remoteOrders, ...orders.filter(order => !remoteOrders.some(remote => remote.orderId === order.orderId))];
+    return mergedOrders.filter((order) =>
       (emailMatch && order.email?.trim().toLowerCase() === emailMatch) ||
       (phoneMatch && order.phone?.replace(/\D/g, '').slice(-8) === phoneMatch)
     );
-  }, [orders, user]);
+  }, [orders, remoteOrders, user]);
   if (!isOpen) return null;
 
   const switchMode = (next: Mode) => {
