@@ -45,6 +45,10 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     }
   }, [isOpen, currentUser]);
 
+  useEffect(() => {
+    if (isOpen) setCompletedOrder(null);
+  }, [isOpen]);
+
   // Clean phone and email inputs for real-time order history tracking
   const cleanPhone = phone.replace(/\D/g, '').slice(-8);
   const cleanEmail = email.trim().toLowerCase();
@@ -61,7 +65,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
   const accountSpent = useMemo(() => {
     return accountOrders
-      .filter((o) => o.status !== 'cancelled')
+      .filter((o) => o.status === 'delivered')
       .reduce((sum, o) => sum + (o.total || 0), 0);
   }, [accountOrders]);
 
@@ -221,7 +225,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
             <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl text-xs text-emerald-950 space-y-1.5 shadow-2xs">
               <div className="flex items-center gap-2 font-bold text-emerald-800">
                 <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                <span>Худалдан авалт лояалти дансанд амжилттай бүртгэгдлээ</span>
+                <span>Захиалга бүртгэгдлээ. Хүргэгдэж дууссаны дараа лояалти дүнд нэмэгдэнэ</span>
               </div>
               <p className="text-stone-700 leading-relaxed">
                 Таны <strong className="font-mono text-stone-900">{completedOrder.phone}</strong> {completedOrder.email ? `болон ${completedOrder.email} хаягт` : 'дугаарт'} энэхүү <strong className="text-stone-900">{formatMNT(completedOrder.total)}</strong>-ийн худалдан авалт амжилттай бүртгэгдэж, нийт хуримтлагдсан дүн <strong className="text-emerald-700">{formatMNT(accountSpent + completedOrder.total)}</strong> болж ахилаа.
