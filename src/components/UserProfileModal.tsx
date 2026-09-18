@@ -30,8 +30,9 @@ export const UserProfileModal: React.FC<Props> = ({ isOpen, onClose, user, onSav
 
   useEffect(() => {
     const hash = new URLSearchParams(window.location.hash.slice(1));
-    const token = hash.get('access_token');
-    const type = hash.get('type');
+    const query = new URLSearchParams(window.location.search);
+    const token = hash.get('access_token') || query.get('access_token');
+    const type = hash.get('type') || query.get('type');
     if (!token) return;
 
     if (type === 'recovery') {
