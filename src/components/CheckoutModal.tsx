@@ -10,7 +10,7 @@ interface CheckoutModalProps {
   orders: OrderDetails[];
   currentUser?: UserProfile | null;
   dailyDiscountTotal: number;
-  onOrderSuccess: (order: OrderDetails) => void;
+  onOrderSuccess: (order: OrderDetails) => Promise<void> | void;
 }
 
 export const CheckoutModal: React.FC<CheckoutModalProps> = ({
@@ -125,7 +125,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmitOrder = (e: React.FormEvent) => {
+  const handleSubmitOrder = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validateForm()) return;
 
@@ -148,8 +148,12 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
       date: new Date().toLocaleString('mn-MN')
     };
 
-    setCompletedOrder(newOrder);
-    onOrderSuccess(newOrder);
+    try {
+      await onOrderSuccess(newOrder);
+      setCompletedOrder(newOrder);
+    } catch (error: any) {
+      setErrors({ form: error?.message || 'Захиалгыг төв санд хадгалах боломжгүй байна.' });
+    }
   };
 
   return (
@@ -268,6 +272,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
             </div>
 
             <form onSubmit={handleSubmitOrder} className="p-6 space-y-6 max-h-[80vh] overflow-y-auto">
+              {errors.form && <p className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs font-bold text-rose-700">{errors.form}</p>}
               {/* Recipient Details */}
               <div className="space-y-3">
                 <h4 className="font-bold text-sm text-stone-900 flex items-center gap-2">
