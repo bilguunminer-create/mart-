@@ -135,6 +135,11 @@ export async function getStoreCustomerProfiles(token: string) {
   );
 }
 
+export async function hasStoreAdminAccess(token: string) {
+  const rows = await request<Array<{ email: string }>>('/rest/v1/allowed_accounts?select=email', { method: 'GET' }, token);
+  return rows.length > 0;
+}
+
 export async function updateStoreOrderStatus(token: string, orderId: string, status: string) {
   await request('/rest/v1/rpc/store_order_status', {
     method: 'POST',
