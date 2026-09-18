@@ -138,8 +138,11 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
         };
       }
 
-      if (!res.ok && !data.previewCode) {
-        throw new Error(data.error || 'И-мэйл илгээхэд алдаа гарлаа.');
+      if (!res.ok || (!data.token && !data.previewCode)) {
+        throw new Error(data.error || 'И-мэйл баталгаажуулах код үүсгэж чадсангүй. Дахин оролдоно уу.');
+      }
+      if (data.isRealEmailSent === false && !data.previewCode) {
+        throw new Error('И-мэйл илгээх тохиргоо идэвхгүй байна. Админтай холбогдоно уу.');
       }
 
       setGeneratedOtp(data.previewCode || '');

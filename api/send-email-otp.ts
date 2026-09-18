@@ -99,11 +99,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const payload = `${cleanEmail}:${code}:${expiresAt}`;
     const token = crypto.createHmac('sha256', secret).update(payload).digest('hex');
 
+    const verificationToken = `${expiresAt}.${token}`;
+    res.setHeader('Set-Cookie', `usk_otp_token=${encodeURIComponent(verificationToken)}; Path=/api/verify-email-otp; HttpOnly; Secure; SameSite=Strict; Max-Age=600`);
+
     return res.status(200).json({
       success: true,
       isRealEmailSent: Boolean(smtpUser && smtpPass),
-      token: `${expiresAt}.${token}`,
-      message: `${cleanEmail} хаяг руу баталгаажуулах код амжилттай илгээгдлээ! Та и-мэйл хайрцгаа (Inbox болон Spam) шалгана уу.`,
+      token: verificationToken,
+      message: smtpUser && smtpPass
+        ? `${cleanEmail} хаяг руу код илгээгдлээ. Зөвхөн хамгийн сүүлд илгээгдсэн 6 оронтой кодыг 10 минутын дотор оруулна уу.`
+        : 'И-мэйл илгээх тохиргоо идэвхгүй байна.',
     });
   } catch (error: any) {
     console.error('[Send OTP Error]:', error);

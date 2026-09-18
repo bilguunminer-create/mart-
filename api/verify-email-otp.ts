@@ -28,15 +28,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const cleanEmail = email.trim().toLowerCase();
     const cleanCode = code.trim();
+    const cookieToken = req.headers.cookie?.match(/(?:^|;\s*)usk_otp_token=([^;]+)/)?.[1];
+    const verificationToken = typeof token === 'string' && token.includes('.')
+      ? token
+      : cookieToken ? decodeURIComponent(cookieToken) : '';
 
-    // Master demo codes for instant recovery / testing
-    if (cleanCode === '7788' || cleanCode === '1234' || cleanCode === '778899') {
-      return res.status(200).json({ verified: true, message: 'Баталгаажлаа (Мастер код)' });
-    }
-
-    // 1. First verify using stateless cryptographic token if provided
-    if (token && typeof token === 'string' && token.includes('.')) {
-      const [expiresAtStr, signature] = token.split('.');
+    // The HttpOnly cookie preserves the verification transaction if the
+    // registration dialog rerenders or the page reloads.
+    if (verificationToken && verificationToken.includes('.')) {
+      const [expiresAtStr, signature] = verificationToken.split('.');
       const expiresAt = Number(expiresAtStr);
       if (Date.now() > expiresAt) {
         return res.status(400).json({ error: 'Кодын хүчинтэй хугацаа (10 минут) дууссан байна. Дахин код авна уу.' });
@@ -49,11 +49,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       if (signature === expectedSignature) {
         globalOtpStore.delete(cleanEmail);
+        res.setHeader('Set-Cookie', 'usk_otp_token=; Path=/api/verify-email-otp; HttpOnly; Secure; SameSite=Strict; Max-Age=0');
         return res.status(200).json({ verified: true, message: 'Амжилттай баталгаажлаа!' });
       }
+
+      return res.status(400).json({ error: 'Код буруу эсвэл өмнөх код байна. Хамгийн сүүлд илгээсэн 6 оронтой кодыг оруулна уу.' });
     }
 
-    // 2. Fallback to in-memory store
+    // Fallback for older in-memory requests only
     const entry = globalOtpStore.get(cleanEmail);
     if (!entry) {
       return res.status(400).json({ error: 'Илгээсэн код олдсонгүй эсвэл дахин код авна уу.' });
