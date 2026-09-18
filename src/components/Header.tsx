@@ -102,29 +102,6 @@ export const Header: React.FC<HeaderProps> = ({
               <span>{STORE_CONFIG.phone}</span>
             </a>
 
-            {/* Admin link only visible when admin is actively logged in */}
-            {isAdminActive && (
-              <>
-                <span className="text-stone-500">|</span>
-                <button
-                  id="admin-header-top-btn"
-                  onClick={onOpenAdmin}
-                  className="flex items-center gap-1 hover:text-rose-300 text-rose-400 transition-colors text-xs cursor-pointer font-bold"
-                >
-                  <ShieldCheck className="w-3.5 h-3.5" />
-                  <span>Админ удирдлага</span>
-                </button>
-                {onLogoutAdmin && (
-                  <button
-                    onClick={onLogoutAdmin}
-                    className="text-stone-400 hover:text-rose-300 text-[11px] cursor-pointer"
-                    title="Админаас гарах"
-                  >
-                    (Гарах)
-                  </button>
-                )}
-              </>
-            )}
           </div>
         </div>
       </div>
@@ -257,29 +234,6 @@ export const Header: React.FC<HeaderProps> = ({
               </button>
             )}
 
-            {/* Admin Center Button ONLY visible when logged in as admin */}
-            {isAdminActive && (
-              <div className="flex items-center gap-1">
-                <button
-                  id="admin-action-btn"
-                  onClick={onOpenAdmin}
-                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white border border-rose-600 shadow-xs transition-all cursor-pointer"
-                  title="Админ удирдлагын цонх нээх"
-                >
-                  <ShieldCheck className="w-4 h-4 text-white" />
-                  <span className="hidden sm:inline">Админ удирдлага</span>
-                </button>
-                {onLogoutAdmin && (
-                  <button
-                    onClick={onLogoutAdmin}
-                    className="p-2 bg-stone-100 hover:bg-stone-200 text-stone-600 rounded-xl border border-stone-200 transition-colors cursor-pointer"
-                    title="Админ горимоос гарах (Хэрэглэгчийн харагдац руу буцах)"
-                  >
-                    <LogOut className="w-3.5 h-3.5" />
-                  </button>
-                )}
-              </div>
-            )}
 
             {/* Cart Button */}
             <button
