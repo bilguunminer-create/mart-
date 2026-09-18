@@ -64,7 +64,9 @@ export default function App() {
     }).catch(() => { /* The built-in catalog remains visible if the network is unavailable. */ });
   }, []);
 
-  // Orders are loaded from Supabase after a user signs in.\n  const [orders, setOrders] = useState<OrderDetails[]>([]);\n
+  // Orders are loaded from Supabase after a user signs in.
+  const [orders, setOrders] = useState<OrderDetails[]>([]);
+
   const [memberProfiles, setMemberProfiles] = useState<Array<{ user_id: string; name: string; phone: string; address: string; created_at?: string }>>([]);
 
   // Admin states
