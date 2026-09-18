@@ -152,6 +152,16 @@ export async function getStoreSettings() {
 }
 
 
+export async function saveStoreSettings(token: string, data: Record<string, unknown>) {
+  const settings = await getStoreSettings();
+  const nextData = { ...settings.data, ...data };
+  await request('/rest/v1/store_settings?id=eq.true', {
+    method: 'PATCH',
+    body: JSON.stringify({ data: nextData, version: settings.version + 1, updated_at: new Date().toISOString() }),
+  }, token);
+  return nextData;
+}
+
 export async function saveStoreProducts(token: string, products: Array<Record<string, unknown>>) {
   const settings = await getStoreSettings();
   const normalized = products.map((product) => {
