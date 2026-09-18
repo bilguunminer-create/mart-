@@ -232,7 +232,7 @@ export default function App() {
     const query = new URLSearchParams(window.location.search);
     const type = hash.get('type') || query.get('type');
     const token = hash.get('access_token') || query.get('access_token');
-    if (type === 'recovery' && token) setIsProfileOpen(true);
+    if ((type === 'recovery' && token) || sessionStorage.getItem('usk_recovery_token')) setIsProfileOpen(true);
   }, []);
 
   // Toast message
