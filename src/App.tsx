@@ -110,7 +110,11 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(() => {
     try {
       const saved = localStorage.getItem('usk_current_user');
-      return saved ? JSON.parse(saved) : null;
+      if (!saved) return null;
+      const profile = JSON.parse(saved) as UserProfile;
+      // Old browser-only profiles cannot access the central database. Force them
+      // through the real email/password login once, then retain only the Supabase session.
+      return profile.accessToken && profile.supabaseUserId ? profile : null;
     } catch {
       return null;
     }
