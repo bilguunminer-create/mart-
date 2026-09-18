@@ -42,7 +42,7 @@ import { UserProfileModal } from './components/UserProfileModal';
 import { GoogleFormsModal } from './components/GoogleFormsModal';
 import { StoreHeroBanner } from './components/StoreHeroBanner';
 import { BeeEmblemLogo } from './components/BeeEmblemLogo';
-import { getStoreCustomerProfiles, getStoreOrders, getStoreSettings, saveStoreOrder, updateStoreOrderStatus } from './services/supabaseAuth';
+import { getStoreCustomerProfiles, getStoreOrders, getStoreSettings, saveStoreOrder, saveStoreProducts, updateStoreOrderStatus } from './services/supabaseAuth';
 
 export default function App() {
   // Today's day of week (0 = Sunday, 1 = Monday, ...)
@@ -266,6 +266,15 @@ export default function App() {
   };
 
   // Admin Action Handlers
+  const persistProducts = (nextProducts: Product[]) => {
+    if (!currentUser?.accessToken) {
+      showToast('Каталогийн өөрчлөлтийг хадгалахын тулд админ и-мэйлээрээ нэвтэрнэ үү.');
+      return;
+    }
+    void saveStoreProducts(currentUser.accessToken, nextProducts)
+      .catch(() => showToast('Supabase каталогийн өөрчлөлтийг хадгалах боломжгүй байна.'));
+  };
+
   const handleOpenAdmin = () => {
     if (!currentUser?.accessToken) {
       setIsProfileOpen(true);
@@ -294,18 +303,16 @@ export default function App() {
   const handleSaveProduct = (product: Product) => {
     setProducts((prev) => {
       const exists = prev.some((p) => p.id === product.id);
-      if (exists) {
-        return prev.map((p) => (p.id === product.id ? product : p));
-      } else {
-        return [product, ...prev];
-      }
+      const next = exists ? prev.map((p) => (p.id === product.id ? product : p)) : [product, ...prev];
+      persistProducts(next);
+      return next;
     });
-    showToast(`"${product.name}" барааны мэдээлэл хадгалагдлаа!`);
+    showToast(`"${product.name}" Supabase-д хадгалагдлаа!`);
   };
 
   const handleDeleteProduct = (productId: string) => {
-    setProducts((prev) => prev.filter((p) => p.id !== productId));
-    showToast('Бараа амжилттай устгагдлаа');
+    setProducts((prev) => { const next = prev.filter((p) => p.id !== productId); persistProducts(next); return next; });
+    showToast('Бараа Supabase каталогоос хасагдлаа');
   };
 
   const handleToggleStock = (productId: string) => {
