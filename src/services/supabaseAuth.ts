@@ -1,7 +1,7 @@
 const SUPABASE_URL = 'https://rebtikccivjcsxieeyxe.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_6cFfPZrw3hfRy-RqefprLQ_c94gv3Ik';
 
-type AuthSession = { access_token: string; user: { id: string; email?: string; email_confirmed_at?: string | null } };
+export type AuthSession = { access_token: string; user: { id: string; email?: string; email_confirmed_at?: string | null } };
 type Profile = { name: string; phone?: string; address?: string };
 
 async function request<T>(path: string, init: RequestInit = {}, token?: string): Promise<T> {
@@ -19,10 +19,28 @@ async function request<T>(path: string, init: RequestInit = {}, token?: string):
   return data as T;
 }
 
-export async function signUp(email: string, password: string, profile: Profile) {
+function temporaryPassword() {
+  return Array.from({ length: 3 }, () => crypto.randomUUID()).join('');
+}
+
+/** Creates a pending account. Supabase sends the confirmation OTP configured in its email template. */
+export async function requestSignupOtp(email: string, profile: Profile) {
   return request<{ user: AuthSession['user']; session: AuthSession | null }>('/auth/v1/signup', {
     method: 'POST',
-    body: JSON.stringify({ email, password, data: { name: profile.name }, options: { emailRedirectTo: window.location.origin } }),
+    body: JSON.stringify({
+      email,
+      password: temporaryPassword(),
+      data: { name: profile.name },
+      options: { emailRedirectTo: window.location.origin },
+    }),
+  });
+}
+
+/** Exchanges the six-digit confirmation token for an authenticated session. */
+export async function verifySignupOtp(email: string, token: string) {
+  return request<AuthSession>('/auth/v1/verify', {
+    method: 'POST',
+    body: JSON.stringify({ email, token, type: 'email' }),
   });
 }
 
