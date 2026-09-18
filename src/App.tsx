@@ -42,7 +42,7 @@ import { UserProfileModal } from './components/UserProfileModal';
 import { GoogleFormsModal } from './components/GoogleFormsModal';
 import { StoreHeroBanner } from './components/StoreHeroBanner';
 import { BeeEmblemLogo } from './components/BeeEmblemLogo';
-import { getStoreCustomerProfiles, getStoreOrders, getStoreSettings, saveStoreOrder, saveStoreProducts, saveStoreSettings, hasStoreAdminAccess, updateStoreOrderStatus } from './services/supabaseAuth';
+import { getStoreCustomerProfiles, getStoreOrders, getStoreSettings, saveStoreOrder, saveStoreProducts, saveStoreSettings, hasStoreAdminAccess, refreshSession, updateStoreOrderStatus } from './services/supabaseAuth';
 
 export default function App() {
   // Today's day of week (0 = Sunday, 1 = Monday, ...)
@@ -123,6 +123,26 @@ export default function App() {
       return null;
     }
   });
+
+  // Renew an expired access token automatically. Older sessions without a refresh
+  // token will be asked to sign in again instead of showing a raw JWT error.
+  useEffect(() => {
+    if (!currentUser?.refreshToken) return;
+    let active = true;
+    refreshSession(currentUser.refreshToken)
+      .then((session) => {
+        if (!active) return;
+        const next = { ...currentUser, accessToken: session.access_token, refreshToken: session.refresh_token || currentUser.refreshToken };
+        setCurrentUser(next);
+        localStorage.setItem('usk_current_user', JSON.stringify(next));
+      })
+      .catch(() => {
+        if (!active) return;
+        setCurrentUser(null);
+        localStorage.removeItem('usk_current_user');
+      });
+    return () => { active = false; };
+  }, []);
 
   // Load the account's central data after every real Supabase sign-in.
   // Store administrators already listed in allowed_accounts receive the full list through RLS.
