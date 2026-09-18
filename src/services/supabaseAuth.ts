@@ -82,7 +82,7 @@ export async function updatePassword(token: string, password: string) {
 
 export async function saveStoreOrder(token: string, order: {
   customerName: string; phone: string; address: string; notes: string;
-  total: number; items: Array<{ id: string; quantity: number }>;
+  total: number; pointsToUse?: number; items: Array<{ id: string; quantity: number }>;
 }) {
   const payload = {
     requestId: crypto.randomUUID(),
@@ -91,14 +91,22 @@ export async function saveStoreOrder(token: string, order: {
     phone: order.phone.replace(/\D/g, '').slice(-8),
     address: order.address,
     note: order.notes || '',
+    pointsToUse: Math.max(0, Math.floor(order.pointsToUse || 0)),
     items: order.items.map(item => ({ productId: item.id, quantity: item.quantity })),
   };
-  return request('/rest/v1/rpc/store_checkout', {
+  return request('/rest/v1/rpc/store_checkout_with_points', {
     method: 'POST',
     body: JSON.stringify({ payload, save_order: true }),
   }, token);
 }
 
+
+export type LoyaltyWallet = { available_points: number; lifetime_earned: number };
+
+export async function getLoyaltyWallet(token: string) {
+  const rows = await request<LoyaltyWallet[]>('/rest/v1/rpc/get_loyalty_wallet', { method: 'POST', body: '{}' }, token);
+  return rows[0] || { available_points: 0, lifetime_earned: 0 };
+}
 
 export type StoreCustomerProfile = {
   user_id: string; name: string; phone: string; address: string; created_at?: string;
