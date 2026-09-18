@@ -2,7 +2,7 @@ const SUPABASE_URL = 'https://rebtikccivjcsxieeyxe.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_6cFfPZrw3hfRy-RqefprLQ_c94gv3Ik';
 const APP_URL = 'https://uskmart.vercel.app';
 
-export type AuthSession = { access_token: string; user: { id: string; email?: string; email_confirmed_at?: string | null } };
+export type AuthSession = { access_token: string; refresh_token?: string; user: { id: string; email?: string; email_confirmed_at?: string | null } };
 type Profile = { name: string; phone?: string; address?: string };
 
 async function request<T>(path: string, init: RequestInit = {}, token?: string): Promise<T> {
@@ -49,6 +49,13 @@ export async function signIn(email: string, password: string) {
   return request<AuthSession>('/auth/v1/token?grant_type=password', {
     method: 'POST',
     body: JSON.stringify({ email, password }),
+  });
+}
+
+export async function refreshSession(refreshToken: string) {
+  return request<AuthSession>('/auth/v1/token?grant_type=refresh_token', {
+    method: 'POST',
+    body: JSON.stringify({ refresh_token: refreshToken }),
   });
 }
 
