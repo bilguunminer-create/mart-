@@ -295,6 +295,11 @@ export default function App() {
 
   // Admin Action Handlers
   const handleOpenAdmin = () => {
+    if (!currentUser?.accessToken) {
+      setIsProfileOpen(true);
+      showToast('Төв гишүүн, захиалгын мэдээлэл харахын тулд эхлээд админ и-мэйлээрээ нэвтэрнэ үү.');
+      return;
+    }
     if (isAdminAuthenticated) {
       setIsAdminOpen(true);
     } else {
