@@ -1361,13 +1361,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 </div>
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={() => setIsRulesModalOpen(true)}
-                    className="text-xs bg-stone-100 hover:bg-stone-200 text-stone-800 font-bold px-3 py-1.5 rounded-xl cursor-pointer transition-all flex items-center gap-1.5 border border-stone-300"
-                  >
-                    <Edit3 className="w-3.5 h-3.5" />
-                    <span>Дүрэм засах</span>
-                  </button>
-                  <button
                     onClick={() => setActiveTab('loyalty')}
                     className="text-xs bg-amber-500 hover:bg-amber-600 text-white font-bold px-3 py-1.5 rounded-xl cursor-pointer transition-all flex items-center gap-1.5 shadow-xs w-fit"
                   >
@@ -1381,8 +1374,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 {loyaltyTiersConfig.map((tier) => (
                   <div 
                     key={tier.id} 
-                    onClick={() => setIsRulesModalOpen(true)}
-                    className="p-3.5 rounded-xl border border-stone-200 hover:border-amber-400 bg-stone-50/60 hover:bg-white transition-all cursor-pointer space-y-1.5 group"
+                    className="p-3.5 rounded-xl border border-stone-200 bg-stone-50/60 space-y-1.5"
                   >
                     <div className="flex items-center justify-between">
                       <span className="font-black text-xs text-stone-900 flex items-center gap-1.5">
@@ -1428,8 +1420,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               {loyaltyTiersConfig.map((tier) => (
                 <div 
                   key={tier.id}
-                  onClick={() => setIsRulesModalOpen(true)}
-                  className="bg-white hover:bg-amber-50/20 p-4 rounded-2xl border border-stone-200 hover:border-amber-400 shadow-xs cursor-pointer transition-all"
+                  className="bg-white p-4 rounded-2xl border border-stone-200 shadow-xs"
                 >
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-xs text-stone-800 font-semibold truncate">{tier.badge} ({tier.discount_pct}%)</span>
@@ -1480,11 +1471,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
                 <button
                   type="button"
-                  onClick={() => setIsRulesModalOpen(true)}
+                  onClick={() => setActiveTab('settings')}
                   className="px-4 py-2.5 bg-amber-400 hover:bg-amber-300 text-stone-950 text-xs font-black rounded-xl cursor-pointer shadow-md transition-all flex items-center gap-2 shrink-0 self-start sm:self-auto"
                 >
-                  <Edit3 className="w-4 h-4" />
-                  <span>Дүрэм, болзол & урамшуулал засах</span>
+                  <Settings className="w-4 h-4" />
+                  <span>Үндсэн тохиргоо руу очих</span>
                 </button>
               </div>
 
@@ -1492,8 +1483,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 {loyaltyTiersConfig.map((tier) => (
                   <div 
                     key={tier.id}
-                    onClick={() => setIsRulesModalOpen(true)}
-                    className="bg-stone-800/80 hover:bg-stone-800 p-3 rounded-xl border border-stone-700 hover:border-amber-400 transition-all cursor-pointer flex items-center justify-between group"
+                    className="bg-stone-800/80 p-3 rounded-xl border border-stone-700 flex items-center justify-between"
                   >
                     <div>
                       <div className="font-bold text-amber-300 flex items-center gap-1">
@@ -1507,7 +1497,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     </div>
                     <div className="flex flex-col items-end gap-1 shrink-0 ml-2">
                       <span className="text-xs font-black text-white bg-stone-700 px-2 py-1 rounded-lg">{tier.discount_pct}%</span>
-                      <span className="text-[10px] text-amber-400 font-bold opacity-0 group-hover:opacity-100 transition-opacity">Засах ✏️</span>
+                      
                     </div>
                   </div>
                 ))}
