@@ -1,15 +1,15 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { X, User, Mail, Lock, MapPin, Phone, LogOut, Award, KeyRound } from 'lucide-react';
 import { UserProfile, OrderDetails, LoyaltyTier } from '../types';
 import { formatMNT } from '../data/storeData';
-import { signIn, signUp, sendPasswordReset, getProfile, saveProfile } from '../services/supabaseAuth';
+import { signIn, signUp, sendPasswordReset, updatePassword, getProfile, saveProfile } from '../services/supabaseAuth';
 
 interface Props {
   isOpen: boolean; onClose: () => void; user: UserProfile | null;
   onSaveUser: (user: UserProfile) => void; onLogoutUser: () => void;
   orders: OrderDetails[]; activeLoyalty: LoyaltyTier | null; totalSpent: number;
 }
-type Mode = 'login' | 'signup' | 'recover';
+type Mode = 'login' | 'signup' | 'recover' | 'reset';
 
 export const UserProfileModal: React.FC<Props> = ({ isOpen, onClose, user, onSaveUser, onLogoutUser, orders, activeLoyalty, totalSpent }) => {
   const [mode, setMode] = useState<Mode>('login');
@@ -20,6 +20,17 @@ export const UserProfileModal: React.FC<Props> = ({ isOpen, onClose, user, onSav
   const [address, setAddress] = useState(user?.address || '');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
+  const [recoveryToken, setRecoveryToken] = useState('');
+
+  useEffect(() => {
+    const token = new URLSearchParams(window.location.hash.slice(1)).get('access_token');
+    const recovery = new URLSearchParams(window.location.hash.slice(1)).get('type');
+    if (token && recovery === 'recovery') {
+      setRecoveryToken(token);
+      setMode('reset');
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, []);
 
   const ownOrders = useMemo(() => orders.filter(o => o.email?.trim().toLowerCase() === user?.email?.trim().toLowerCase()), [orders, user]);
   if (!isOpen) return null;
@@ -30,6 +41,14 @@ export const UserProfileModal: React.FC<Props> = ({ isOpen, onClose, user, onSav
     event.preventDefault(); setBusy(true); setMessage('');
     const cleanEmail = email.trim().toLowerCase();
     try {
+      if (mode === 'reset') {
+        if (!recoveryToken) throw new Error('Сэргээх холбоос хүчингүй эсвэл хугацаа дууссан байна.');
+        await updatePassword(recoveryToken, password);
+        setMessage('Нууц үг шинэчлэгдлээ. Шинэ нууц үгээрээ нэвтэрнэ үү.');
+        setPassword('');
+        setMode('login');
+        return;
+      }
       if (mode === 'recover') {
         await sendPasswordReset(cleanEmail);
         setMessage('Хэрэв энэ и-мэйл бүртгэлтэй бол нууц үг сэргээх холбоос илгээгдэнэ.');
@@ -78,7 +97,7 @@ export const UserProfileModal: React.FC<Props> = ({ isOpen, onClose, user, onSav
       <label className="block text-sm font-bold">И-мэйл<input type="email" value={email} onChange={e=>setEmail(e.target.value)} required className="mt-1 w-full rounded-xl border p-3"/></label>
       {mode !== 'recover' && <label className="block text-sm font-bold">Нууц үг<input type="password" value={password} onChange={e=>setPassword(e.target.value)} minLength={8} required className="mt-1 w-full rounded-xl border p-3"/></label>}
       {mode === 'signup' && <><label className="block text-sm font-bold">Утас<input value={phone} onChange={e=>setPhone(e.target.value)} className="mt-1 w-full rounded-xl border p-3"/></label><label className="block text-sm font-bold">Хаяг<input value={address} onChange={e=>setAddress(e.target.value)} className="mt-1 w-full rounded-xl border p-3"/></label></>}
-      <button disabled={busy} className="w-full rounded-xl bg-stone-900 p-3 font-bold text-white">{busy?'Түр хүлээнэ үү…':mode==='login'?'Нэвтрэх':mode==='signup'?'Бүртгүүлэх':'Сэргээх холбоос илгээх'}</button>
+      <button disabled={busy} className="w-full rounded-xl bg-stone-900 p-3 font-bold text-white">{busy?'Түр хүлээнэ үү…':mode==='login'?'Нэвтрэх':mode==='signup'?'Бүртгүүлэх':mode==='reset'?'Шинэ нууц үг хадгалах':'Сэргээх холбоос илгээх'}</button>
       <div className="flex justify-between text-xs font-bold text-amber-800"><button type="button" onClick={()=>switchMode('login')}>Нэвтрэх</button><button type="button" onClick={()=>switchMode('signup')}>Шинэ бүртгэл</button><button type="button" onClick={()=>switchMode('recover')}>Нууц үгээ мартсан</button></div>
     </form> : <><section className="mb-5 rounded-2xl bg-amber-50 p-4"><p className="font-black">{activeLoyalty ? activeLoyalty.badge+' '+activeLoyalty.name : 'Энгийн гишүүн'}</p><p className="text-sm">Нийт худалдан авалт: <b>{formatMNT(totalSpent)}</b> · {ownOrders.length} захиалга</p></section>
       <form onSubmit={updateProfile} className="space-y-4"><p className="text-sm text-stone-600"><Mail className="mr-1 inline h-4 w-4"/>{user.email}</p><label className="block text-sm font-bold">Нэр<input value={name} onChange={e=>setName(e.target.value)} required className="mt-1 w-full rounded-xl border p-3"/></label><label className="block text-sm font-bold">Утас<input value={phone} onChange={e=>setPhone(e.target.value)} className="mt-1 w-full rounded-xl border p-3"/></label><label className="block text-sm font-bold">Хаяг<input value={address} onChange={e=>setAddress(e.target.value)} className="mt-1 w-full rounded-xl border p-3"/></label><button disabled={busy} className="w-full rounded-xl bg-stone-900 p-3 font-bold text-white">Мэдээлэл хадгалах</button></form>
