@@ -28,7 +28,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const [district, setDistrict] = useState('Өмнөговь, Даланзадгад');
   const [address, setAddress] = useState('');
   const [notes, setNotes] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState<'qpay' | 'bank' | 'cod'>('qpay');
+  const [paymentMethod, setPaymentMethod] = useState<'qpay' | 'bank' | 'cod'>('bank');
   const [selectedBank, setSelectedBank] = useState('khan');
   const [copied, setCopied] = useState(false);
   const [completedOrder, setCompletedOrder] = useState<OrderDetails | null>(null);
@@ -424,45 +424,10 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   Төлбөрийн хэлбэр сонгох
                 </h4>
 
-                <div className="grid grid-cols-3 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setPaymentMethod('qpay')}
-                    className={`p-3 rounded-xl border-2 flex flex-col items-center gap-1.5 transition-all cursor-pointer ${
-                      paymentMethod === 'qpay'
-                        ? 'border-rose-600 bg-rose-50/50 text-rose-700 font-bold'
-                        : 'border-stone-200 text-stone-600 hover:border-stone-300'
-                    }`}
-                  >
-                    <QrCode className="w-5 h-5 text-rose-600" />
-                    <span className="text-xs">QPay QR</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setPaymentMethod('bank')}
-                    className={`p-3 rounded-xl border-2 flex flex-col items-center gap-1.5 transition-all cursor-pointer ${
-                      paymentMethod === 'bank'
-                        ? 'border-rose-600 bg-rose-50/50 text-rose-700 font-bold'
-                        : 'border-stone-200 text-stone-600 hover:border-stone-300'
-                    }`}
-                  >
-                    <CreditCard className="w-5 h-5 text-indigo-600" />
-                    <span className="text-xs">Дансаар</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setPaymentMethod('cod')}
-                    className={`p-3 rounded-xl border-2 flex flex-col items-center gap-1.5 transition-all cursor-pointer ${
-                      paymentMethod === 'cod'
-                        ? 'border-rose-600 bg-rose-50/50 text-rose-700 font-bold'
-                        : 'border-stone-200 text-stone-600 hover:border-stone-300'
-                    }`}
-                  >
-                    <Banknote className="w-5 h-5 text-emerald-600" />
-                    <span className="text-xs">Бэлнээр / Карт</span>
-                  </button>
+                <div className="rounded-2xl border-2 border-indigo-500 bg-indigo-50/60 p-4 text-center">
+                  <CreditCard className="mx-auto mb-2 h-6 w-6 text-indigo-600" />
+                  <p className="font-bold text-indigo-950">Дансаар шилжүүлэх</p>
+                  <p className="mt-1 text-xs text-indigo-800">QPay болон ПОС төлбөр түр идэвхгүй байна.</p>
                 </div>
 
                 {/* QPay Details */}
