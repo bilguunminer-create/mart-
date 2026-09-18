@@ -30,9 +30,31 @@ export const UserProfileModal: React.FC<Props> = ({ isOpen, onClose, user, onSav
   useEffect(() => {
     const hash = new URLSearchParams(window.location.hash.slice(1));
     const token = hash.get('access_token');
-    if (token && hash.get('type') === 'recovery') {
+    const type = hash.get('type');
+    if (!token) return;
+
+    if (type === 'recovery') {
       setRecoveryToken(token); setMode('reset');
       window.history.replaceState({}, document.title, window.location.pathname);
+      return;
+    }
+
+    // Supabase's default confirmation email returns a signed-in session in the URL hash.
+    // Keep it in memory and let the new member choose their permanent password.
+    if (type === 'signup' || type === 'email') {
+      try {
+        const encodedPayload = token.split('.')[1];
+        const payload = JSON.parse(atob(encodedPayload.replace(/-/g, '+').replace(/_/g, '/')));
+        if (payload.sub) {
+          setSignupSession({ access_token: token, user: { id: payload.sub, email: payload.email } });
+          setEmail(payload.email || '');
+          setMode('signup'); setSignupStep('password');
+          setMessage('И-мэйл баталгаажлаа. Одоо өөрийн нууц үгээ үүсгэнэ үү.');
+          window.history.replaceState({}, document.title, window.location.pathname);
+        }
+      } catch {
+        setMessage('Баталгаажуулах холбоосыг дахин илгээнэ үү.');
+      }
     }
   }, []);
 
