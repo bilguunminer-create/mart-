@@ -1235,16 +1235,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       </span>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         {order.items.map((item, idx) => (
-                          <div key={idx} className="flex items-center gap-2.5 bg-white p-2 rounded-lg border border-stone-200/60">
-                            <img
-                              src={item.image}
-                              alt={item.name}
-                              className="w-10 h-10 object-cover rounded-md border border-stone-200 shrink-0"
-                            />
-                            <div className="text-xs truncate flex-1">
+                          <div key={idx} className="flex items-center gap-2.5 bg-white p-2.5 rounded-lg border border-stone-200/60">
+                            <span className="w-12 h-10 shrink-0 rounded-md bg-stone-900 text-amber-300 flex items-center justify-center text-[10px] font-black">#{String(item.id).slice(-6).toUpperCase()}</span>
+                            <div className="text-xs min-w-0 flex-1">
                               <p className="font-bold text-stone-900 truncate">{item.name}</p>
                               <p className="text-[11px] text-stone-500">
-                                {formatMNT(item.price)} x <strong className="text-stone-800">{item.quantity}</strong> = {formatMNT(item.price * item.quantity)}
+                                Нэгж: {formatMNT(item.price)} · Тоо: <strong className="text-stone-800">{item.quantity}</strong> · Нийт: {formatMNT(item.price * item.quantity)}
                               </p>
                             </div>
                           </div>
