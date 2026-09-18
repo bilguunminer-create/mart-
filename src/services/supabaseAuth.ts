@@ -98,3 +98,38 @@ export async function saveStoreOrder(token: string, order: {
     body: JSON.stringify({ payload, save_order: true }),
   }, token);
 }
+
+
+export type StoreCustomerProfile = {
+  user_id: string; name: string; phone: string; address: string; created_at?: string;
+};
+
+export type StoreOrderRecord = {
+  id: string; customer_id: string; customer_name: string; phone: string; address: string;
+  note: string; items: Array<{ productId: string; title: string; quantity: number; price: number }>;
+  subtotal: number; daily_discount: number; vip_discount: number; delivery_fee: number;
+  total: number; created_at: string; status: string;
+};
+
+export async function getStoreOrders(token: string) {
+  return request<StoreOrderRecord[]>(
+    '/rest/v1/store_orders?select=id,customer_id,customer_name,phone,address,note,items,subtotal,daily_discount,vip_discount,delivery_fee,total,created_at,status&order=created_at.desc',
+    { method: 'GET' },
+    token,
+  );
+}
+
+export async function getStoreCustomerProfiles(token: string) {
+  return request<StoreCustomerProfile[]>(
+    '/rest/v1/customer_profiles?select=user_id,name,phone,address,created_at&order=created_at.desc',
+    { method: 'GET' },
+    token,
+  );
+}
+
+export async function updateStoreOrderStatus(token: string, orderId: string, status: string) {
+  await request('/rest/v1/rpc/store_order_status', {
+    method: 'POST',
+    body: JSON.stringify({ order_id: orderId, next_status: status }),
+  }, token);
+}
