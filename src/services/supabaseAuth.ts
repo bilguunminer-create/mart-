@@ -71,7 +71,7 @@ export async function saveProfile(token: string, userId: string, profile: Profil
   await request('/rest/v1/customer_profiles?on_conflict=user_id', {
     method: 'POST',
     headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
-    body: JSON.stringify({ user_id: userId, name: profile.name, phone: profile.phone || '', address: profile.address || '' }),
+    body: JSON.stringify({ user_id: userId, name: profile.name, phone: (profile.phone || '').replace(/\\D/g, '').slice(-8), address: profile.address || '' }),
   }, token);
 }
 
