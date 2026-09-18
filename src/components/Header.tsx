@@ -87,13 +87,13 @@ export const Header: React.FC<HeaderProps> = ({
             <button
               onClick={onOpenLoyalty}
               className="flex items-center gap-1 hover:text-amber-300 transition-colors text-xs cursor-pointer"
-              title={user ? 'Лояалти зэрэглэл & оноо харах' : 'Лояалти хөтөлбөр - И-мэйл хаягаараа үнэгүй нэвтэрч харна уу'}
+              title={user ? 'Лояалти зэрэглэл & оноо харах' : 'Гишүүнчлэл нь таны Бүртгэлтэй автоматаар холбогдоно'}
             >
               <Award className="w-3.5 h-3.5 text-amber-400" />
               <span>
                 {user 
-                  ? (activeLoyalty ? `${activeLoyalty.name} (${activeLoyalty.discount_pct}%)` : 'Лояалти гишүүнчлэл') 
-                  : 'Лояалти (Нэвтрэх)'}
+                  ? (activeLoyalty ? `${activeLoyalty.name} (${activeLoyalty.discount_pct}%)` : 'Гишүүнчлэл') 
+                  : 'Гишүүнчлэл'}
               </span>
             </button>
             <span className="text-stone-500">|</span>
@@ -194,8 +194,8 @@ export const Header: React.FC<HeaderProps> = ({
               }`}
               title={
                 user 
-                  ? (activeLoyalty ? `${activeLoyalty.name} (${activeLoyalty.discount_pct}% хөнгөлөлттэй)` : 'Лояалти гишүүнчлэл') 
-                  : 'Лояалти Гишүүнчлэлийн Хөтөлбөр - И-мэйл хаягаараа нэвтэрсний дараа харагдана'
+                  ? (activeLoyalty ? `${activeLoyalty.name} (${activeLoyalty.discount_pct}% хөнгөлөлттэй)` : 'Гишүүнчлэл') 
+                  : 'Гишүүнчлэл нь таны Бүртгэлтэй автоматаар холбогдоно'
               }
             >
               <Award className="w-3.5 h-3.5 text-amber-500" />
@@ -210,7 +210,7 @@ export const Header: React.FC<HeaderProps> = ({
                 </>
               ) : (
                 <>
-                  <span className="hidden sm:inline">Лояалти (Нэвтрэх)</span>
+                  <span className="hidden sm:inline">Гишүүнчлэл</span>
                   <span className="sm:hidden">Лояалти</span>
                 </>
               )}
