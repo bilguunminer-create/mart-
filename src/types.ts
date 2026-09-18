@@ -82,6 +82,7 @@ export interface OrderDetails {
   subtotal: number;
   dailyDiscount: number;
   loyaltyDiscount: number;
+  pointsDiscount?: number;
   deliveryFee: number;
   total: number;
   date: string;
