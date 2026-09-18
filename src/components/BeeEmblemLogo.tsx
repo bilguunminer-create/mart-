@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { DEFAULT_STORE_LOGO } from '../data/brandAssets';
 
 export const BeeEmblemLogo: React.FC<{ 
   className?: string; 
@@ -11,7 +12,7 @@ export const BeeEmblemLogo: React.FC<{
 }) => {
   const [customLogo, setCustomLogo] = useState<string | null>(() => {
     try {
-      return localStorage.getItem('usk_custom_logo') || null;
+      return localStorage.getItem('usk_custom_logo') || DEFAULT_STORE_LOGO;
     } catch {
       return null;
     }

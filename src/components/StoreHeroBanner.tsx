@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { MapPin, Clock, Phone, Sparkles } from 'lucide-react';
 import { BeeEmblemLogo } from './BeeEmblemLogo';
+import { DEFAULT_STORE_BANNER } from '../data/brandAssets';
 
 interface StoreHeroBannerProps {
   onExploreClick?: () => void;
@@ -9,7 +10,7 @@ interface StoreHeroBannerProps {
 export const StoreHeroBanner: React.FC<StoreHeroBannerProps> = ({ onExploreClick }) => {
   const [customBanner, setCustomBanner] = useState<string | null>(() => {
     try {
-      return localStorage.getItem('usk_custom_banner') || null;
+      return localStorage.getItem('usk_custom_banner') || DEFAULT_STORE_BANNER;
     } catch {
       return null;
     }
