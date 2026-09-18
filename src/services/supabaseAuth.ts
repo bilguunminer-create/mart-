@@ -142,3 +142,19 @@ export async function getStoreSettings() {
   if (!rows[0]) throw new Error('Дэлгүүрийн тохиргоо олдсонгүй.');
   return rows[0];
 }
+
+
+export async function saveStoreProducts(token: string, products: Array<Record<string, unknown>>) {
+  const settings = await getStoreSettings();
+  const normalized = products.map((product) => {
+    const stock = Number(product.stock_quantity ?? product.stock ?? (product.in_stock ? 15 : 0));
+    const { stock_quantity, ...rest } = product;
+    return { ...rest, stock: Math.max(0, stock), in_stock: Boolean(product.in_stock) && stock > 0, published: product.published ?? true };
+  });
+  const nextData = { ...settings.data, products: normalized };
+  await request('/rest/v1/store_settings?id=eq.true', {
+    method: 'PATCH',
+    headers: { Prefer: 'return=minimal' },
+    body: JSON.stringify({ data: nextData, version: settings.version + 1, updated_at: new Date().toISOString() }),
+  }, token);
+}
