@@ -154,18 +154,31 @@ async function startServer() {
         });
 
         console.log(`[Email OTP] Real email sent to ${cleanEmail}`);
+        
+        const crypto = await import("crypto");
+        const secret = "usk-mart-static-otp-v1";
+        const payload = `${cleanEmail}:${code}:${expiresAt}`;
+        const token = crypto.createHmac("sha256", secret).update(payload).digest("hex");
+
         return res.json({
           success: true,
           isRealEmailSent: true,
+          token: `${expiresAt}.${token}`,
           message: `${cleanEmail} хаяг руу баталгаажуулах код амжилттай илгээгдлээ! Та и-мэйл хайрцгаа (Inbox болон Spam) шалгана уу.`,
         });
       } else {
         // Test / Instant Preview Mode
         console.log(`[Email OTP Preview Mode] Code for ${cleanEmail} is: ${code}`);
+        const crypto = await import("crypto");
+        const secret = "usk-mart-static-otp-v1";
+        const payload = `${cleanEmail}:${code}:${expiresAt}`;
+        const token = crypto.createHmac("sha256", secret).update(payload).digest("hex");
+
         return res.json({
           success: true,
           isRealEmailSent: false,
           previewCode: code,
+          token: `${expiresAt}.${token}`,
           message: `Баталгаажуулах код бэлтгэгдлээ. (Туршилтын горимд код: ${code})`,
         });
       }
@@ -178,9 +191,9 @@ async function startServer() {
   });
 
   // Verify Email OTP endpoint
-  app.post("/api/verify-email-otp", (req, res) => {
+  app.post("/api/verify-email-otp", async (req, res) => {
     try {
-      const { email, code } = req.body;
+      const { email, code, token } = req.body;
       if (!email || !code) {
         return res.status(400).json({ error: "И-мэйл болон код шаардлагатай." });
       }
@@ -191,6 +204,25 @@ async function startServer() {
       // Check master demo codes
       if (cleanCode === "7788" || cleanCode === "1234" || cleanCode === "778899") {
         return res.json({ verified: true, message: "Баталгаажлаа (Мастер код)" });
+      }
+
+      // 1. First check stateless cryptographic token if present
+      if (token && typeof token === "string" && token.includes(".")) {
+        const [expiresAtStr, signature] = token.split(".");
+        const expiresAt = Number(expiresAtStr);
+        if (Date.now() > expiresAt) {
+          return res.status(400).json({ error: "Кодын хүчинтэй хугацаа (10 минут) дууссан байна. Дахин код авна уу." });
+        }
+
+        const crypto = await import("crypto");
+        const secret = "usk-mart-static-otp-v1";
+        const expectedPayload = `${cleanEmail}:${cleanCode}:${expiresAt}`;
+        const expectedSignature = crypto.createHmac("sha256", secret).update(expectedPayload).digest("hex");
+
+        if (signature === expectedSignature) {
+          otpStore.delete(cleanEmail);
+          return res.json({ verified: true, message: "Амжилттай баталгаажлаа!" });
+        }
       }
 
       const entry = otpStore.get(cleanEmail);

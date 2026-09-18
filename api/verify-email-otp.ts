@@ -21,7 +21,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const { email, code } = req.body || {};
+    const { email, code, token } = req.body || {};
     if (!email || !code) {
       return res.status(400).json({ error: 'И-мэйл болон код шаардлагатай.' });
     }
@@ -34,6 +34,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json({ verified: true, message: 'Баталгаажлаа (Мастер код)' });
     }
 
+    // 1. First verify using stateless cryptographic token if provided
+    if (token && typeof token === 'string' && token.includes('.')) {
+      const [expiresAtStr, signature] = token.split('.');
+      const expiresAt = Number(expiresAtStr);
+      if (Date.now() > expiresAt) {
+        return res.status(400).json({ error: 'Кодын хүчинтэй хугацаа (10 минут) дууссан байна. Дахин код авна уу.' });
+      }
+
+      const crypto = await import('crypto');
+      const secret = 'usk-mart-static-otp-v1';
+      const expectedPayload = `${cleanEmail}:${cleanCode}:${expiresAt}`;
+      const expectedSignature = crypto.createHmac('sha256', secret).update(expectedPayload).digest('hex');
+
+      if (signature === expectedSignature) {
+        globalOtpStore.delete(cleanEmail);
+        return res.status(200).json({ verified: true, message: 'Амжилттай баталгаажлаа!' });
+      }
+    }
+
+    // 2. Fallback to in-memory store
     const entry = globalOtpStore.get(cleanEmail);
     if (!entry) {
       return res.status(400).json({ error: 'Илгээсэн код олдсонгүй эсвэл дахин код авна уу.' });

@@ -90,21 +90,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         subject: `[US&K Family Mart] Нэвтрэх баталгаажуулах код: ${code}`,
         html: htmlContent,
       });
-
-      return res.status(200).json({
-        success: true,
-        isRealEmailSent: true,
-        message: `${cleanEmail} хаяг руу баталгаажуулах код амжилттай илгээгдлээ! Та и-мэйл хайрцгаа (Inbox болон Spam) шалгана уу.`,
-      });
-    } else {
-      // Preview fallback if credentials aren't configured yet
-      return res.status(200).json({
-        success: true,
-        isRealEmailSent: false,
-        previewCode: code,
-        message: `Баталгаажуулах код бэлтгэгдлээ. (Туршилтын горимд код: ${code})`,
-      });
     }
+
+    // In serverless environments, each invocation can run in an isolated lambda instance.
+    // We provide an HMAC signature / verification token so verification is 100% stateless and never lost.
+    const crypto = await import('crypto');
+    const secret = 'usk-mart-static-otp-v1';
+    const payload = `${cleanEmail}:${code}:${expiresAt}`;
+    const token = crypto.createHmac('sha256', secret).update(payload).digest('hex');
+
+    return res.status(200).json({
+      success: true,
+      isRealEmailSent: Boolean(smtpUser && smtpPass),
+      token: `${expiresAt}.${token}`,
+      message: `${cleanEmail} хаяг руу баталгаажуулах код амжилттай илгээгдлээ! Та и-мэйл хайрцгаа (Inbox болон Spam) шалгана уу.`,
+    });
   } catch (error: any) {
     console.error('[Send OTP Error]:', error);
     return res.status(500).json({

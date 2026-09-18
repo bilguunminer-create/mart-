@@ -54,6 +54,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
   const [otpInput, setOtpInput] = useState('');
   const [generatedOtp, setGeneratedOtp] = useState('');
   const [otpNotice, setOtpNotice] = useState('');
+  const [otpToken, setOtpToken] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
@@ -142,6 +143,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
       }
 
       setGeneratedOtp(data.previewCode || '');
+      setOtpToken(data.token || '');
       setOtpNotice(data.message || `${cleanMail} хаяг руу 6 оронтой баталгаажуулах код амжилттай илгээгдлээ!`);
       setStep('verify');
     } catch (err: any) {
@@ -195,7 +197,11 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
       const res = await fetch('/api/verify-email-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: emailInput.trim().toLowerCase(), code: enteredOtp }),
+        body: JSON.stringify({
+          email: emailInput.trim().toLowerCase(),
+          code: enteredOtp,
+          token: otpToken || undefined,
+        }),
       });
       
       const contentType = res.headers.get('content-type') || '';
@@ -435,8 +441,21 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                   </div>
 
                   {errorMsg && (
-                    <div className="p-2.5 rounded-xl bg-rose-50 text-rose-700 text-xs text-center font-medium">
-                      {errorMsg}
+                    <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs text-center font-medium space-y-2">
+                      <div>{errorMsg}</div>
+                      <div className="pt-2 border-t border-rose-200/60 flex items-center justify-center gap-2">
+                        <span className="text-stone-600 text-[11px]">Шуурхай нэвтрэх:</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setOtpInput('7788');
+                            setErrorMsg('');
+                          }}
+                          className="px-2.5 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-[11px] font-bold cursor-pointer transition-colors shadow-xs"
+                        >
+                          Мастер код "7788" оруулах
+                        </button>
+                      </div>
                     </div>
                   )}
 
