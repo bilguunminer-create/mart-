@@ -42,6 +42,7 @@ import { UserProfileModal } from './components/UserProfileModal';
 import { GoogleFormsModal } from './components/GoogleFormsModal';
 import { StoreHeroBanner } from './components/StoreHeroBanner';
 import { BeeEmblemLogo } from './components/BeeEmblemLogo';
+import { saveStoreOrder } from './services/supabaseAuth';
 
 export default function App() {
   // Today's day of week (0 = Sunday, 1 = Monday, ...)
@@ -1129,6 +1130,20 @@ export default function App() {
             );
           }
 
+          if (currentUser?.accessToken) {
+            void saveStoreOrder(currentUser.accessToken, {
+              customerName: newOrder.customerName,
+              phone: newOrder.phone,
+              address: newOrder.address,
+              notes: newOrder.notes,
+              total: newOrder.total,
+              items: newOrder.items.map((item) => ({ id: item.id, quantity: item.quantity })),
+            }).catch(() => {
+              showToast('Захиалга төв санд хадгалагдсангүй. Холболтоо шалгаад дахин оролдоно уу.');
+            });
+          } else {
+            showToast('Захиалгаа төв санд хадгалахын тулд эхлээд бүртгэлдээ нэвтэрнэ үү.');
+          }
           setOrders((prev) => [newOrder, ...prev]);
           setCart([]);
           showToast(`Захиалга #${order.orderId} амжилттай бүртгэгдлээ! Таны бүртгэл дээр түүх хадгалагдлаа.${promotionMsg}`);
