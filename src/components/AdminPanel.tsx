@@ -1473,10 +1473,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           </div>
         )}
 
-            </div>
-          </div>
-        )}
-
         {/* Legacy loyalty analytics kept disabled while the central member view is active. */}
         {false && activeTab === 'loyalty' && (
           <div className="space-y-6">
