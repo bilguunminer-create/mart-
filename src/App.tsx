@@ -42,7 +42,7 @@ import { UserProfileModal } from './components/UserProfileModal';
 import { GoogleFormsModal } from './components/GoogleFormsModal';
 import { StoreHeroBanner } from './components/StoreHeroBanner';
 import { BeeEmblemLogo } from './components/BeeEmblemLogo';
-import { getStoreCustomerProfiles, getStoreOrders, getStoreSettings, saveStoreOrder, saveStoreProducts, saveStoreSettings, updateStoreOrderStatus } from './services/supabaseAuth';
+import { getStoreCustomerProfiles, getStoreOrders, getStoreSettings, saveStoreOrder, saveStoreProducts, saveStoreSettings, hasStoreAdminAccess, updateStoreOrderStatus } from './services/supabaseAuth';
 
 export default function App() {
   // Today's day of week (0 = Sunday, 1 = Monday, ...)
@@ -311,20 +311,35 @@ export default function App() {
       .catch(() => showToast('Supabase каталогийн өөрчлөлтийг хадгалах боломжгүй байна.'));
   };
 
-  const handleOpenAdmin = () => {
+  const handleOpenAdmin = async () => {
     if (!currentUser?.accessToken) {
       setIsProfileOpen(true);
       showToast('Төв гишүүн, захиалгын мэдээлэл харахын тулд эхлээд админ и-мэйлээрээ нэвтэрнэ үү.');
       return;
     }
-    if (isAdminAuthenticated) {
-      setIsAdminOpen(true);
-    } else {
-      setIsAdminLoginOpen(true);
+
+    try {
+      if (!await hasStoreAdminAccess(currentUser.accessToken)) {
+        setIsProfileOpen(true);
+        showToast('Энэ бүртгэл админ эрхгүй байна. uskfamilymart@gmail.com эсвэл bilguunminer@gmail.com хаягаар нэвтэрнэ үү.');
+        return;
+      }
+    } catch {
+      showToast('Админ эрхийг төв сангаас шалгах боломжгүй байна.');
+      return;
     }
+
+    if (isAdminAuthenticated) setIsAdminOpen(true);
+    else setIsAdminLoginOpen(true);
   };
 
-  const handleAdminLoginSuccess = () => {
+  const handleAdminLoginSuccess = async () => {
+    if (!currentUser?.accessToken || !await hasStoreAdminAccess(currentUser.accessToken)) {
+      setIsAdminLoginOpen(false);
+      setIsProfileOpen(true);
+      showToast('Админ и-мэйлээр дахин нэвтэрч байж төв сангийн гишүүдийг харна.');
+      return;
+    }
     setIsAdminAuthenticated(true);
     try {
       sessionStorage.setItem('usk_admin_auth', 'true');
