@@ -193,6 +193,15 @@ export default function App() {
   const [isFormsOpen, setIsFormsOpen] = useState(false);
   const [detailProduct, setDetailProduct] = useState<Product | null>(null);
 
+  // Supabase recovery links contain a short-lived session in the URL hash.
+  // Open the password form immediately so the member can finish the reset.
+  useEffect(() => {
+    const hash = new URLSearchParams(window.location.hash.slice(1));
+    if (hash.get('type') === 'recovery' && hash.get('access_token')) {
+      setIsProfileOpen(true);
+    }
+  }, []);
+
   // Toast message
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
