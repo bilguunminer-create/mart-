@@ -661,7 +661,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
             <button
               id="admin-tab-loyalty"
-              onClick={() => setActiveTab('loyalty')}
+              type="button"
+              onClick={() => {
+                setActiveTab('loyalty');
+                window.requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: 'smooth' }));
+              }}
               className={`py-3 px-4 text-xs font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
                 activeTab === 'loyalty'
                   ? 'border-amber-500 text-amber-400'
@@ -1361,7 +1365,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 </div>
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={() => setActiveTab('loyalty')}
+                    type="button"
+                    onClick={() => {
+                      setActiveTab('loyalty');
+                      window.requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: 'smooth' }));
+                    }}
                     className="text-xs bg-amber-500 hover:bg-amber-600 text-white font-bold px-3 py-1.5 rounded-xl cursor-pointer transition-all flex items-center gap-1.5 shadow-xs w-fit"
                   >
                     <Users className="w-3.5 h-3.5" />
@@ -1445,7 +1453,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 <div className="text-xl sm:text-2xl font-black text-rose-900">
                   {loyaltyMembers.reduce((sum, m) => sum + m.totalPoints, 0).toLocaleString()}
                 </div>
-                <p className="text-[10px] text-rose-600/80 mt-1">{cashbackPctConfig}% буцаан олголт + бонус</p>
+                <p className="text-[10px] text-rose-600/80 mt-1">Админы олгосон бонус оноо</p>
               </div>
             </div>
 
@@ -1552,7 +1560,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 </div>
                 <div className="text-xs text-stone-500 flex items-center gap-1">
                   <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
-                  <span>1% Оноо худалдан авалт бүрээс автоматаар олгогдоно</span>
+                  <span>Оноо зөвхөн админаас олгосон бонусоор нэмэгдэнэ</span>
                 </div>
               </div>
 
@@ -1595,7 +1603,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                               </span>
                             ) : (
                               <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-stone-100 text-stone-600">
-                                Стандарт гишүүн (1% оноо)
+                                Стандарт гишүүн
                               </span>
                             )}
                           </div>
