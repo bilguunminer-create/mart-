@@ -123,16 +123,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   }, [checkoutSettings.deliveryFee, checkoutSettings.bankName, checkoutSettings.accountNumber, checkoutSettings.iban, checkoutSettings.accountHolder]);
 
   const openLoyaltyMembers = () => {
-    window.location.hash = 'admin-loyalty';
     setActiveTab('loyalty');
     window.requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: 'smooth' }));
   };
-
-  useEffect(() => {
-    if (window.location.hash === '#admin-loyalty') {
-      setActiveTab('loyalty');
-    }
-  }, []);
 
   // Product Form Modal state
   const [isFormOpen, setIsFormOpen] = useState(false);
