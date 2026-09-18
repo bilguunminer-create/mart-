@@ -68,6 +68,8 @@ interface AdminPanelProps {
   onChangePin: (newPin: string) => void;
   onOpenForms?: () => void;
   onQuickUpdateStock?: (productId: string, amount: number, isAbsolute?: boolean) => void;
+  checkoutSettings?: { deliveryFee: number; bankName: string; accountNumber: string; iban: string; accountHolder: string };
+  onSaveCheckoutSettings?: (settings: { deliveryFee: number; bankName: string; accountNumber: string; iban: string; accountHolder: string }) => Promise<void> | void;
 }
 
 export interface LoyaltyMember {
@@ -104,13 +106,21 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   adminPin,
   onChangePin,
   onOpenForms,
-  onQuickUpdateStock
+  onQuickUpdateStock,
+  checkoutSettings = { deliveryFee: 3000, bankName: '', accountNumber: '', iban: '', accountHolder: '' },
+  onSaveCheckoutSettings
 }) => {
   const [activeTab, setActiveTab] = useState<'products' | 'orders' | 'loyalty' | 'stats' | 'settings'>('products');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedOrigin, setSelectedOrigin] = useState<'ALL' | 'KR' | 'US'>('ALL');
   const [stockFilter, setStockFilter] = useState<'all' | 'in_stock' | 'low_stock' | 'out_of_stock'>('all');
+  const [checkoutDraft, setCheckoutDraft] = useState(checkoutSettings);
+  const [checkoutSettingsMessage, setCheckoutSettingsMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    setCheckoutDraft(checkoutSettings);
+  }, [checkoutSettings.deliveryFee, checkoutSettings.bankName, checkoutSettings.accountNumber, checkoutSettings.iban, checkoutSettings.accountHolder]);
 
   // Product Form Modal state
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -1841,6 +1851,51 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   </p>
                 </div>
               </div>
+            </div>
+
+            {/* Delivery & bank transfer settings */}
+            <div className="bg-white p-6 rounded-2xl border border-stone-200 shadow-xs space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center font-bold">
+                  <Truck className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="font-extrabold text-stone-900 text-sm">Хүргэлт ба дансаар төлөх тохиргоо</h4>
+                  <p className="text-xs text-stone-500">Энд хадгалсан мэдээлэл хэрэглэгчийн захиалга төлөх хэсэгт гарна.</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <label className="text-xs font-bold text-stone-700">Хүргэлтийн төлбөр (₮)
+                  <input type="number" min="0" value={checkoutDraft.deliveryFee}
+                    onChange={(e) => setCheckoutDraft((value) => ({ ...value, deliveryFee: Math.max(0, Number(e.target.value) || 0) }))}
+                    className="mt-1.5 w-full px-3 py-2 border border-stone-300 rounded-xl bg-stone-50" />
+                </label>
+                <label className="text-xs font-bold text-stone-700">Банкны нэр
+                  <input value={checkoutDraft.bankName} onChange={(e) => setCheckoutDraft((value) => ({ ...value, bankName: e.target.value }))}
+                    placeholder="Жишээ: Хаан банк" className="mt-1.5 w-full px-3 py-2 border border-stone-300 rounded-xl bg-stone-50" />
+                </label>
+                <label className="text-xs font-bold text-stone-700">Дансны дугаар
+                  <input value={checkoutDraft.accountNumber} onChange={(e) => setCheckoutDraft((value) => ({ ...value, accountNumber: e.target.value }))}
+                    placeholder="0000 0000 0000" className="mt-1.5 w-full px-3 py-2 border border-stone-300 rounded-xl bg-stone-50" />
+                </label>
+                <label className="text-xs font-bold text-stone-700">IBAN
+                  <input value={checkoutDraft.iban} onChange={(e) => setCheckoutDraft((value) => ({ ...value, iban: e.target.value }))}
+                    placeholder="MN..." className="mt-1.5 w-full px-3 py-2 border border-stone-300 rounded-xl bg-stone-50" />
+                </label>
+                <label className="text-xs font-bold text-stone-700 sm:col-span-2">Данс эзэмшигчийн нэр
+                  <input value={checkoutDraft.accountHolder} onChange={(e) => setCheckoutDraft((value) => ({ ...value, accountHolder: e.target.value }))}
+                    placeholder="Компанийн нэр / данс эзэмшигч" className="mt-1.5 w-full px-3 py-2 border border-stone-300 rounded-xl bg-stone-50" />
+                </label>
+              </div>
+              {checkoutSettingsMessage && <p className="text-xs font-bold text-emerald-700">{checkoutSettingsMessage}</p>}
+              <button type="button" onClick={() => {
+                if (!onSaveCheckoutSettings) return;
+                Promise.resolve(onSaveCheckoutSettings(checkoutDraft))
+                  .then(() => setCheckoutSettingsMessage('Төв санд хадгаллаа.'))
+                  .catch(() => setCheckoutSettingsMessage('Хадгалах эрх эсвэл холболтын алдаа гарлаа.'));
+              }} className="px-4 py-2.5 bg-stone-900 text-white text-xs font-bold rounded-xl cursor-pointer">
+                Хүргэлт, дансны мэдээлэл хадгалах
+              </button>
             </div>
 
             {/* Admin Security & Session Status */}
