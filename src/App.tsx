@@ -152,6 +152,27 @@ export default function App() {
     return () => { active = false; };
   }, [currentUser?.accessToken]);
 
+  // Log out a customer after 30 minutes without activity.
+  useEffect(() => {
+    if (!currentUser) return;
+    let timer: ReturnType<typeof setTimeout>;
+    const logout = () => {
+      setCurrentUser(null);
+      localStorage.removeItem('usk_current_user');
+      showToast('30 минут идэвхгүй байсан тул таны бүртгэлээс гарлаа.');
+    };
+    const reset = () => {
+      clearTimeout(timer);
+      timer = setTimeout(logout, 30 * 60 * 1000);
+    };
+    ['mousemove', 'keydown', 'click', 'touchstart', 'scroll'].forEach((event) => window.addEventListener(event, reset, { passive: true }));
+    reset();
+    return () => {
+      clearTimeout(timer);
+      ['mousemove', 'keydown', 'click', 'touchstart', 'scroll'].forEach((event) => window.removeEventListener(event, reset));
+    };
+  }, [currentUser?.id]);
+
   // Current user's normalized phone number and email
   const userPhoneClean = currentUser?.phone ? currentUser.phone.replace(/\D/g, '').slice(-8) : '';
   const userEmailClean = currentUser?.email ? currentUser.email.trim().toLowerCase() : '';
