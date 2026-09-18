@@ -332,7 +332,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     setTimeout(() => setBrandingStatusMsg(null), 3000);
   };
 
-  // Group all orders by customer's email (or phone) to generate automated loyalty members
+  // Group all orders by the Supabase user ID. This keeps a profile and all of
+  // its orders in one member record, even if the user changes name, phone, or email.
   const loyaltyMembers = useMemo<LoyaltyMember[]>(() => {
     const memberMap: Record<string, {
       name: string;
@@ -350,32 +351,37 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       };
     });
 
-    orders.forEach((o) => {
-      const emailKey = o.email ? o.email.trim().toLowerCase() : (o.phone ? `tel_${o.phone.replace(/\D/g, '')}` : 'unknown');
-      if (!memberMap[emailKey]) {
-        memberMap[emailKey] = {
-          name: o.customerName || 'Хэрэглэгч',
-          email: o.email ? o.email.trim().toLowerCase() : '',
-          phone: o.phone || '',
-          orders: []
+    orders.forEach((order) => {
+      const memberId = order.customerId || (order.email
+        ? `email_${order.email.trim().toLowerCase()}`
+        : order.phone
+          ? `tel_${order.phone.replace(/\D/g, '')}`
+          : `order_${order.orderId}`);
+
+      if (!memberMap[memberId]) {
+        memberMap[memberId] = {
+          name: order.customerName || 'Хэрэглэгч',
+          email: order.email ? order.email.trim().toLowerCase() : '',
+          phone: order.phone || '',
+          orders: [],
         };
       }
-      memberMap[emailKey].orders.push(o);
-      if (o.customerName && memberMap[emailKey].name === 'Хэрэглэгч') {
-        memberMap[emailKey].name = o.customerName;
+
+      memberMap[memberId].orders.push(order);
+      if (order.customerName && memberMap[memberId].name === 'Хэрэглэгч') {
+        memberMap[memberId].name = order.customerName;
       }
-      if (o.phone && !memberMap[emailKey].phone) {
-        memberMap[emailKey].phone = o.phone;
+      if (order.phone) {
+        memberMap[memberId].phone = order.phone;
       }
     });
 
     return Object.entries(memberMap).map(([id, info]) => {
-      const validOrders = info.orders.filter((o) => o.status === 'delivered');
-      const totalSpent = validOrders.reduce((sum, o) => sum + (o.total || 0), 0);
-      const deliveredCount = info.orders.filter((o) => o.status === 'delivered').length;
+      const validOrders = info.orders.filter((order) => order.status === 'delivered');
+      const totalSpent = validOrders.reduce((sum, order) => sum + (order.total || 0), 0);
+      const deliveredCount = validOrders.length;
       const lastOrder = info.orders[0]?.date || 'Огноогүй';
 
-      // Automatic Tier logic according to current active tiers config (descending by threshold)
       const sortedTiers = [...loyaltyTiersConfig].sort((a, b) => b.threshold - a.threshold);
       let autoTier: LoyaltyTier | null = null;
       for (const tier of sortedTiers) {
@@ -385,33 +391,24 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         }
       }
 
-      // Check admin manual override
       const override = customLoyaltyData[info.email || id];
-      let effectiveTier = autoTier;
-      if (override?.forceTier) {
-        effectiveTier = loyaltyTiersConfig.find((t) => t.id === override.forceTier) || autoTier;
-      }
-
-      // Dynamic Cash points calculation + bonus points
-      const cashPoints = Math.round(totalSpent * (cashbackPctConfig / 100));
+      const effectiveTier = override?.forceTier
+        ? loyaltyTiersConfig.find((tier) => tier.id === override.forceTier) || autoTier
+        : autoTier;
       const bonusPoints = override?.bonusPoints || 0;
-      const totalPoints = cashPoints + bonusPoints;
 
-      // Next tier progress calculation (ascending by threshold)
       const ascTiers = [...loyaltyTiersConfig].sort((a, b) => a.threshold - b.threshold);
-      let nextTierInfo: LoyaltyMember['nextTier'] = null;
-      const nextTierTarget = ascTiers.find((t) => totalSpent < t.threshold);
-      if (nextTierTarget) {
-        const prevThresholdIndex = ascTiers.indexOf(nextTierTarget) - 1;
-        const prevThreshold = prevThresholdIndex >= 0 ? ascTiers[prevThresholdIndex].threshold : 0;
-        const span = nextTierTarget.threshold - prevThreshold;
-        const progress = Math.max(0, totalSpent - prevThreshold);
-        nextTierInfo = {
+      const nextTierTarget = ascTiers.find((tier) => totalSpent < tier.threshold);
+      const nextTierInfo = nextTierTarget ? (() => {
+        const previousTier = ascTiers[ascTiers.indexOf(nextTierTarget) - 1];
+        const previousThreshold = previousTier?.threshold || 0;
+        const span = nextTierTarget.threshold - previousThreshold;
+        return {
           name: nextTierTarget.name.split(' ')[0],
           remaining: nextTierTarget.threshold - totalSpent,
-          progressPct: span > 0 ? Math.min(100, Math.round((progress / span) * 100)) : 100
+          progressPct: span > 0 ? Math.min(100, Math.round(((totalSpent - previousThreshold) / span) * 100)) : 100,
         };
-      }
+      })() : null;
 
       return {
         id,
@@ -423,13 +420,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         deliveredCount,
         lastOrderDate: lastOrder,
         tier: effectiveTier,
-        cashPoints,
+        cashPoints: 0,
         bonusPoints,
-        totalPoints,
-        nextTier: nextTierInfo
+        totalPoints: bonusPoints,
+        nextTier: nextTierInfo,
       };
     }).sort((a, b) => b.totalSpent - a.totalSpent);
-  }, [orders, memberProfiles, customLoyaltyData, loyaltyTiersConfig, cashbackPctConfig]);
+  }, [orders, memberProfiles, customLoyaltyData, loyaltyTiersConfig]);
 
   // Filtered loyalty members
   const filteredLoyaltyMembers = useMemo(() => {
@@ -1641,7 +1638,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                             <span className="text-[10px] text-stone-500">оноо</span>
                           </div>
                           <span className="block text-[10px] text-stone-400">
-                            1%: {member.cashPoints.toLocaleString()} {member.bonusPoints > 0 && `| Бонус: +${member.bonusPoints.toLocaleString()}`}
+                            {member.bonusPoints > 0 ? `Бонус: +${member.bonusPoints.toLocaleString()}` : 'Бонус оноо олгогдоогүй'}
                           </span>
                         </div>
 
