@@ -42,7 +42,7 @@ import { UserProfileModal } from './components/UserProfileModal';
 import { GoogleFormsModal } from './components/GoogleFormsModal';
 import { StoreHeroBanner } from './components/StoreHeroBanner';
 import { BeeEmblemLogo } from './components/BeeEmblemLogo';
-import { saveStoreOrder } from './services/supabaseAuth';
+import { getStoreCustomerProfiles, getStoreOrders, saveStoreOrder, updateStoreOrderStatus } from './services/supabaseAuth';
 
 export default function App() {
   // Today's day of week (0 = Sunday, 1 = Monday, ...)
@@ -75,6 +75,8 @@ export default function App() {
       return [];
     }
   });
+
+  const [memberProfiles, setMemberProfiles] = useState<Array<{ user_id: string; name: string; phone: string; address: string; created_at?: string }>>([]);
 
   // Admin states
   const [isAdminOpen, setIsAdminOpen] = useState(false);
@@ -120,6 +122,45 @@ export default function App() {
     }
   });
 
+  // Load the account's central data after every real Supabase sign-in.
+  // Store administrators already listed in allowed_accounts receive the full list through RLS.
+  useEffect(() => {
+    if (!currentUser?.accessToken) return;
+    let active = true;
+    Promise.all([getStoreOrders(currentUser.accessToken), getStoreCustomerProfiles(currentUser.accessToken)])
+      .then(([remoteOrders, profiles]) => {
+        if (!active) return;
+        setMemberProfiles(profiles);
+        setOrders(remoteOrders.map((order) => ({
+          orderId: order.id,
+          customerName: order.customer_name,
+          phone: order.phone,
+          address: order.address,
+          district: 'Өмнөговь, Даланзадгад',
+          notes: order.note || '',
+          paymentMethod: 'cod',
+          items: (order.items || []).map((item) => ({
+            type: 'product',
+            id: item.productId,
+            name: item.title,
+            price: item.price,
+            originalPrice: item.price,
+            image: '',
+            quantity: item.quantity,
+          })),
+          subtotal: order.subtotal,
+          dailyDiscount: order.daily_discount,
+          loyaltyDiscount: order.vip_discount,
+          deliveryFee: order.delivery_fee,
+          total: order.total,
+          date: new Date(order.created_at).toLocaleString('mn-MN'),
+          status: order.status === 'Дууссан' ? 'delivered' : order.status === 'Цуцалсан' ? 'cancelled' : order.status === 'Хүргэлтэд' ? 'shipping' : order.status === 'Баталгаажсан' ? 'confirmed' : 'new',
+        })));
+      })
+      .catch(() => { if (active) setMemberProfiles([]); });
+    return () => { active = false; };
+  }, [currentUser?.accessToken]);
+
   // Current user's normalized phone number and email
   const userPhoneClean = currentUser?.phone ? currentUser.phone.replace(/\D/g, '').slice(-8) : '';
   const userEmailClean = currentUser?.email ? currentUser.email.trim().toLowerCase() : '';
@@ -137,7 +178,7 @@ export default function App() {
   // Total spent accumulated strictly on this logged-in account
   const userTotalSpent = useMemo(() => {
     return userOrders
-      .filter((o) => o.status !== 'cancelled')
+      .filter((o) => o.status === 'delivered')
       .reduce((sum, o) => sum + (o.total || 0), 0);
   }, [userOrders]);
 
@@ -328,9 +369,12 @@ export default function App() {
   };
 
   const handleUpdateOrderStatus = (orderId: string, status: 'new' | 'confirmed' | 'shipping' | 'delivered' | 'cancelled') => {
-    setOrders((prev) =>
-      prev.map((o) => (o.orderId === orderId ? { ...o, status } : o))
-    );
+    setOrders((prev) => prev.map((o) => (o.orderId === orderId ? { ...o, status } : o)));
+    const databaseStatus = status === 'delivered' ? 'Дууссан' : status === 'cancelled' ? 'Цуцалсан' : status === 'shipping' ? 'Хүргэлтэд' : status === 'confirmed' ? 'Баталгаажсан' : 'Шинэ';
+    if (currentUser?.accessToken) {
+      void updateStoreOrderStatus(currentUser.accessToken, orderId, databaseStatus)
+        .catch(() => showToast('Төв санд төлөв шинэчлэх боломжгүй байна.'));
+    }
     showToast(`Захиалга #${orderId} төлөв шинэчлэгдлээ`);
   };
 
@@ -1196,6 +1240,7 @@ export default function App() {
         <AdminPanel
           products={products}
           orders={orders}
+          memberProfiles={memberProfiles}
           onSaveProduct={handleSaveProduct}
           onDeleteProduct={handleDeleteProduct}
           onToggleStock={handleToggleStock}
