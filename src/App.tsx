@@ -1160,6 +1160,7 @@ export default function App() {
             address: order.address,
             notes: order.notes,
             total: order.total,
+            pointsToUse: order.pointsDiscount || 0,
             items: order.items.map((item) => ({ id: item.id, quantity: item.quantity })),
           });
           const newOrder: OrderDetails = {
