@@ -42,7 +42,7 @@ import { UserProfileModal } from './components/UserProfileModal';
 import { GoogleFormsModal } from './components/GoogleFormsModal';
 import { StoreHeroBanner } from './components/StoreHeroBanner';
 import { BeeEmblemLogo } from './components/BeeEmblemLogo';
-import { getStoreCustomerProfiles, getStoreOrders, getStoreSettings, saveStoreOrder, saveStoreProducts, updateStoreOrderStatus } from './services/supabaseAuth';
+import { getStoreCustomerProfiles, getStoreOrders, getStoreSettings, saveStoreOrder, saveStoreProducts, saveStoreSettings, updateStoreOrderStatus } from './services/supabaseAuth';
 
 export default function App() {
   // Today's day of week (0 = Sunday, 1 = Monday, ...)
@@ -52,6 +52,9 @@ export default function App() {
 
   // The public catalog is loaded from Supabase. PRODUCTS is only the first render fallback.
   const [products, setProducts] = useState<Product[]>(PRODUCTS);
+  const [checkoutSettings, setCheckoutSettings] = useState<{ deliveryFee: number; bankName: string; accountNumber: string; iban: string; accountHolder: string }>({
+    deliveryFee: 3000, bankName: '', accountNumber: '', iban: '', accountHolder: '',
+  });
   useEffect(() => {
     getStoreSettings().then((settings) => {
       const remoteProducts = settings.data.products;
@@ -61,6 +64,14 @@ export default function App() {
         stock_quantity: Number(product.stock ?? 0),
         in_stock: Boolean(product.in_stock) && Number(product.stock ?? 0) > 0,
       })) as Product[]);
+      const bank = settings.data.bank_accounts as Record<string, unknown> | undefined;
+      setCheckoutSettings({
+        deliveryFee: Number(settings.data.delivery_fee ?? 3000),
+        bankName: String(bank?.bankName ?? ''),
+        accountNumber: String(bank?.accountNumber ?? ''),
+        iban: String(bank?.iban ?? ''),
+        accountHolder: String(bank?.accountHolder ?? ''),
+      });
     }).catch(() => { /* The built-in catalog remains visible if the network is unavailable. */ });
   }, []);
 
@@ -1261,6 +1272,26 @@ export default function App() {
           onChangePin={handleChangePin}
           onOpenForms={() => setIsFormsOpen(true)}
           onQuickUpdateStock={handleQuickUpdateStock}
+          checkoutSettings={checkoutSettings}
+          onSaveCheckoutSettings={async (settings) => {
+            if (!currentUser?.accessToken) throw new Error('Админ и-мэйлээр нэвтэрнэ үү.');
+            const data = await saveStoreSettings(currentUser.accessToken, {
+              delivery_fee: settings.deliveryFee,
+              bank_accounts: {
+                bankName: settings.bankName,
+                accountNumber: settings.accountNumber,
+                iban: settings.iban,
+                accountHolder: settings.accountHolder,
+              },
+            });
+            setCheckoutSettings({
+              deliveryFee: Number(data.delivery_fee ?? settings.deliveryFee),
+              bankName: settings.bankName,
+              accountNumber: settings.accountNumber,
+              iban: settings.iban,
+              accountHolder: settings.accountHolder,
+            });
+          }}
         />
       )}
 
