@@ -1,5 +1,6 @@
 const SUPABASE_URL = 'https://rebtikccivjcsxieeyxe.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_6cFfPZrw3hfRy-RqefprLQ_c94gv3Ik';
+const APP_URL = 'https://uskmart.vercel.app';
 
 export type AuthSession = { access_token: string; user: { id: string; email?: string; email_confirmed_at?: string | null } };
 type Profile = { name: string; phone?: string; address?: string };
@@ -31,7 +32,7 @@ export async function requestSignupOtp(email: string, profile: Profile) {
       email,
       password: temporaryPassword(),
       data: { name: profile.name },
-      options: { emailRedirectTo: window.location.origin },
+      options: { emailRedirectTo: APP_URL },
     }),
   });
 }
@@ -54,7 +55,7 @@ export async function signIn(email: string, password: string) {
 export async function sendPasswordReset(email: string) {
   return request('/auth/v1/recover', {
     method: 'POST',
-    body: JSON.stringify({ email, redirect_to: window.location.origin }),
+    body: JSON.stringify({ email, redirect_to: APP_URL }),
   });
 }
 
