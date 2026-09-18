@@ -742,6 +742,7 @@ export default function App() {
             const el = document.getElementById('products-grid-section');
             if (el) el.scrollIntoView({ behavior: 'smooth' });
           }}
+          products={products}
         />
 
         {/* Daily Deal Hero Banner */}
