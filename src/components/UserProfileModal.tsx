@@ -58,7 +58,14 @@ export const UserProfileModal: React.FC<Props> = ({ isOpen, onClose, user, onSav
     }
   }, []);
 
-  const ownOrders = useMemo(() => orders.filter(o => o.email?.trim().toLowerCase() === user?.email?.trim().toLowerCase()), [orders, user]);
+  const ownOrders = useMemo(() => {
+    const emailMatch = user?.email?.trim().toLowerCase();
+    const phoneMatch = user?.phone?.replace(/\D/g, '').slice(-8);
+    return orders.filter((order) =>
+      (emailMatch && order.email?.trim().toLowerCase() === emailMatch) ||
+      (phoneMatch && order.phone?.replace(/\D/g, '').slice(-8) === phoneMatch)
+    );
+  }, [orders, user]);
   if (!isOpen) return null;
 
   const switchMode = (next: Mode) => {
