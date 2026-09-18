@@ -114,7 +114,7 @@ export const UserProfileModal: React.FC<Props> = ({ isOpen, onClose, user, onSav
   const profileFromSession = async (session: AuthSession, fallback: { name: string; phone: string; address: string }) => {
     const existing = await getProfile(session.access_token, session.user.id);
     return {
-      id: session.user.id, supabaseUserId: session.user.id, accessToken: session.access_token,
+      id: session.user.id, supabaseUserId: session.user.id, accessToken: session.access_token, refreshToken: session.refresh_token,
       name: existing?.name || fallback.name || email.split('@')[0], email: email.trim().toLowerCase(),
       phone: existing?.phone || fallback.phone, address: existing?.address || fallback.address,
       district: 'Өмнөговь, Даланзадгад', createdAt: new Date().toLocaleDateString('mn-MN'),
