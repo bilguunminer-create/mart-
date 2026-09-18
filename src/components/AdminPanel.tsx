@@ -111,7 +111,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   checkoutSettings = { deliveryFee: 3000, bankName: '', accountNumber: '', iban: '', accountHolder: '' },
   onSaveCheckoutSettings
 }) => {
-  const [activeTab, setActiveTab] = useState<'products' | 'orders' | 'loyalty' | 'stats' | 'settings'>('loyalty');
+  const [activeTab, setActiveTab] = useState<'products' | 'orders' | 'loyalty' | 'stats' | 'settings'>('products');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedOrigin, setSelectedOrigin] = useState<'ALL' | 'KR' | 'US'>('ALL');
@@ -1418,6 +1418,48 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
         {/* ================= LOYALTY TAB ================= */}
         {activeTab === 'loyalty' && (
+          <div className="space-y-5">
+            <div className="bg-stone-900 text-white p-5 rounded-2xl">
+              <h3 className="font-black text-lg">Лояалти гишүүд</h3>
+              <p className="text-sm text-stone-300 mt-1">Бүртгэлтэй гишүүд болон тухайн гишүүний төв санд хадгалагдсан захиалгууд.</p>
+            </div>
+            <div className="bg-white rounded-2xl border border-stone-200 overflow-hidden">
+              {memberProfiles.length === 0 ? (
+                <div className="p-8 text-center text-stone-500">
+                  <p className="font-bold">Гишүүний мэдээлэл татагдсангүй.</p>
+                  <p className="text-xs mt-1">Админ и-мэйлээр нэвтэрсэн эсэхээ шалгаад хуудсаа шинэчилнэ үү.</p>
+                </div>
+              ) : memberProfiles.map((profile) => {
+                const profileOrders = orders.filter((order) => order.customerId === profile.user_id);
+                return (
+                  <div key={profile.user_id} className="p-5 border-b border-stone-100 last:border-b-0">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <p className="font-black text-stone-900">{profile.name || 'Хэрэглэгч'}</p>
+                        <p className="text-xs text-stone-500">{profile.phone || 'Утас бүртгээгүй'} · {profile.address || 'Хаяг бүртгээгүй'}</p>
+                      </div>
+                      <span className="px-3 py-1 rounded-full bg-blue-50 text-blue-700 font-bold text-xs">{profileOrders.length} захиалга</span>
+                    </div>
+                    <div className="mt-3 space-y-2">
+                      {profileOrders.length === 0 ? <p className="text-xs text-stone-400">Захиалга бүртгэгдээгүй.</p> : profileOrders.map((order) => (
+                        <div key={order.orderId} className="flex flex-wrap gap-x-4 gap-y-1 bg-stone-50 rounded-xl p-3 text-xs">
+                          <span className="font-mono font-bold">#{order.orderId}</span>
+                          <span>{formatMNT(order.total)}</span>
+                          <span>{order.items.reduce((sum, item) => sum + item.quantity, 0)} бараа</span>
+                          <span className="font-bold text-emerald-700">{order.status === 'delivered' ? 'Хүргэгдсэн' : order.status === 'shipping' ? 'Хүргэлтэд' : order.status === 'confirmed' ? 'Баталгаажсан' : order.status === 'cancelled' ? 'Цуцалсан' : 'Шинэ'}</span>
+                          <span className="text-stone-500">{order.date}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Legacy loyalty analytics kept disabled while the central member view is active. */}
+        {false && activeTab === 'loyalty' && (
           <div className="space-y-6">
             {/* Loyalty Metric Cards */}
             <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
