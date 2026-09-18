@@ -29,6 +29,14 @@ export const UserProfileModal: React.FC<Props> = ({ isOpen, onClose, user, onSav
   const [remoteOrders, setRemoteOrders] = useState<OrderDetails[]>([]);
 
   useEffect(() => {
+    if (!user) return;
+    setName(user.name || '');
+    setEmail(user.email || '');
+    setPhone(user.phone || '');
+    setAddress(user.address || '');
+  }, [user?.id, user?.name, user?.email, user?.phone, user?.address]);
+
+  useEffect(() => {
     const hash = new URLSearchParams(window.location.hash.slice(1));
     const query = new URLSearchParams(window.location.search);
     const token = hash.get('access_token') || query.get('access_token');
