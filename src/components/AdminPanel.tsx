@@ -650,7 +650,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               }`}
             >
               <Package className="w-4 h-4" />
-              <span>Бараа бүтээгдэхүүн</span>
+              <span>Бараа & үлдэгдэл</span>
               <span className="px-1.5 py-0.2 rounded-full bg-stone-800 text-[10px] text-stone-300">
                 {totalProducts}
               </span>
@@ -666,7 +666,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               }`}
             >
               <ShoppingBag className="w-4 h-4" />
-              <span>Ирсэн захиалгууд</span>
+              <span>Захиалга & хүргэлт</span>
               {newOrdersCount > 0 && (
                 <span className="px-1.5 py-0.2 rounded-full bg-rose-600 text-[10px] text-white font-bold animate-pulse">
                   {newOrdersCount} шинэ
@@ -685,7 +685,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               }`}
             >
               <Award className="w-4 h-4 text-amber-400" />
-              <span>Лояалти гишүүд</span>
+              <span>Гишүүд & лояалти</span>
               <span className="px-1.5 py-0.2 rounded-full bg-amber-500/20 text-amber-300 text-[10px] font-bold">
                 {loyaltyMembers.length}
               </span>
@@ -701,7 +701,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               }`}
             >
               <TrendingUp className="w-4 h-4" />
-              <span>Хяналтын тойм</span>
+              <span>Тайлан & хяналт</span>
             </button>
 
             <button
@@ -714,7 +714,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               }`}
             >
               <ShieldCheck className="w-4 h-4 text-emerald-400" />
-              <span>Тохиргоо & Хамгаалалт</span>
+              <span>Тохиргоо, төлбөр & хамгаалалт</span>
               {adminPin === '1234' && (
                 <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" title="Анхдагч ПИН ашиглаж байна" />
               )}
