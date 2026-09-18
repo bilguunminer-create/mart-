@@ -60,3 +60,22 @@ export async function saveProfile(token: string, userId: string, profile: Profil
 export async function updatePassword(token: string, password: string) {
   await request('/auth/v1/user', { method: 'PUT', body: JSON.stringify({ password }) }, token);
 }
+
+export async function saveStoreOrder(token: string, order: {
+  customerName: string; phone: string; address: string; notes: string;
+  total: number; items: Array<{ id: string; quantity: number }>;
+}) {
+  const payload = {
+    requestId: crypto.randomUUID(),
+    expectedTotal: Math.round(order.total),
+    name: order.customerName,
+    phone: order.phone.replace(/\D/g, '').slice(-8),
+    address: order.address,
+    note: order.notes || '',
+    items: order.items.map(item => ({ productId: item.id, quantity: item.quantity })),
+  };
+  return request('/rest/v1/rpc/store_checkout', {
+    method: 'POST',
+    body: JSON.stringify({ payload, save_order: true }),
+  }, token);
+}
