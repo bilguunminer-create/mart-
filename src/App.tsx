@@ -203,7 +203,7 @@ export default function App() {
       })
       .catch(() => { if (active) setMemberProfiles([]); });
     return () => { active = false; };
-  }, [currentUser?.accessToken]);
+  }, [currentUser?.accessToken, isAdminAuthenticated]);
 
   // Log out a customer after 30 minutes without activity.
   useEffect(() => {
