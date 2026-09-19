@@ -9,7 +9,10 @@
     "start": "node dist/server.cjs",
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "native:build": "npm run build && npx cap sync",
+    "native:android": "npm run native:build && npx cap open android",
+    "native:ios": "npm run native:build && npx cap open ios"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
@@ -23,7 +26,12 @@
     "nodemailer": "^10.0.10",
     "react": "^19.0.1",
     "react-dom": "^19.0.1",
-    "vite": "^6.2.3"
+    "vite": "^6.2.3",
+    "@capacitor/core": "^7.4.3",
+    "@capacitor/android": "^7.4.3",
+    "@capacitor/ios": "^7.4.3",
+    "@capacitor/camera": "^7.0.2",
+    "@capacitor/push-notifications": "^7.0.2"
   },
   "devDependencies": {
     "@types/express": "^4.17.21",
