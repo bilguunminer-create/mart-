@@ -110,8 +110,10 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const loyaltyDiscountAmount = Math.round((itemsPriceAfterDailyDeal * loyaltyDiscountPct) / 100);
 
   const isGoldVIP = accountLoyaltyTier?.id === 'gold';
-  const qualifiesForFreeDelivery = itemsPriceAfterDailyDeal >= STORE_CONFIG.free_delivery_threshold || isGoldVIP;
-  const deliveryFee = qualifiesForFreeDelivery || items.length === 0 ? 0 : STORE_CONFIG.delivery_fee;
+  const isDalanzadgadDelivery = district === 'Өмнөговь, Даланзадгад';
+  const qualifiesForFreeDelivery = isDalanzadgadDelivery && (itemsPriceAfterDailyDeal >= STORE_CONFIG.free_delivery_threshold || isGoldVIP);
+  // Home delivery is available only inside Dalanzadgad. Other soums are handed to the selected vehicle.
+  const deliveryFee = !isDalanzadgadDelivery || qualifiesForFreeDelivery || items.length === 0 ? 0 : STORE_CONFIG.delivery_fee;
   const totalBeforePoints = Math.max(0, itemsPriceAfterDailyDeal - loyaltyDiscountAmount + deliveryFee);
   const pointsDiscount = usePoints ? Math.min(walletPoints, totalBeforePoints) : 0;
   const total = totalBeforePoints - pointsDiscount;
@@ -151,7 +153,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
       email: email.trim().toLowerCase() || undefined,
       address,
       district,
-      notes,
+      notes: isDalanzadgadDelivery ? notes : `УНААНД ТАВЬЖ ӨГӨХ ЗАХИАЛГА. ${notes}`.trim(),
       paymentMethod,
       items: [...items],
       subtotal,
@@ -387,18 +389,25 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 )}
 
                 {walletPoints > 0 && (
-                  <label className="flex items-start gap-3 p-3 rounded-2xl border border-emerald-200 bg-emerald-50 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={usePoints}
-                      onChange={(event) => setUsePoints(event.target.checked)}
-                      className="mt-0.5 h-4 w-4 accent-emerald-600"
-                    />
-                    <span className="text-xs text-emerald-950">
-                      <strong className="block">Хуримтлуулсан оноогоо энэ захиалгад ашиглах</strong>
-                      <span>Боломжит оноо: {formatMNT(walletPoints)}. Сонгохгүй бол оноо таны дансанд хадгалагдана.</span>
-                    </span>
-                  </label>
+                  <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-3 space-y-2">
+                    <div className="text-xs text-emerald-950">
+                      <strong className="block">Бонус оноо: {formatMNT(walletPoints)}</strong>
+                      <span>Бонусоо энэ захиалгад ашиглах эсэхээ сонгоно уу.</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button type="button" onClick={() => setUsePoints(true)}
+                        className={`rounded-xl border px-3 py-2 text-xs font-bold transition-colors ${usePoints ? 'border-emerald-600 bg-emerald-600 text-white' : 'border-emerald-200 bg-white text-emerald-800'}`}>
+                        Ашиглах
+                      </button>
+                      <button type="button" onClick={() => setUsePoints(false)}
+                        className={`rounded-xl border px-3 py-2 text-xs font-bold transition-colors ${!usePoints ? 'border-stone-700 bg-stone-800 text-white' : 'border-stone-200 bg-white text-stone-700'}`}>
+                        Хадгалах
+                      </button>
+                    </div>
+                    <p className="text-[11px] text-emerald-800">
+                      {usePoints ? `Энэ захиалгад ${formatMNT(pointsDiscount)} бонус оноо ашиглана.` : 'Бонус оноо таны дансанд бүрэн хадгалагдана.'}
+                    </p>
+                  </div>
                 )}
 
                 <div>
@@ -410,13 +419,17 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                     onChange={(e) => setDistrict(e.target.value)}
                     className="w-full px-3.5 py-2 text-xs border border-stone-300 rounded-xl focus:outline-none focus:border-rose-500 bg-white"
                   >
-                    <option value="Өмнөговь, Даланзадгад">Өмнөговь, Даланзадгад (Шуурхай хүргэлт)</option>
-                    <option value="Өмнөговь, Ханбогд (Оюутолгой)">Өмнөговь, Ханбогд (Оюутолгой бүс)</option>
-                    <option value="Өмнөговь, Цогтцэций (Тавантолгой)">Өмнөговь, Цогтцэций (Тавантолгой)</option>
-                    <option value="Улаанбаатар хот">Улаанбаатар хот (Бүх дүүрэгт)</option>
-                    <option value="Бусад аймаг, сум">Бусад аймаг, орон нутгийн унаанд тавих</option>
+                    <option value="Өмнөговь, Даланзадгад">Өмнөговь, Даланзадгад — Гэрийн хүргэлт</option>
+                    <option value="Бусад сум, суурин">Бусад сум, суурин — Унаанд тавьж өгнө</option>
                   </select>
                 </div>
+
+                {!isDalanzadgadDelivery && (
+                  <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-950">
+                    <strong className="block">Унаанд тавьж өгнө</strong>
+                    Гэрийн хүргэлт зөвхөн Даланзадгад хотод хийгдэнэ. Унааны нэр, цаг, жолоочийн утас эсвэл буудлын мэдээллийг доорх тайлбарт бичнэ үү. Унааны тээврийн төлбөрийг унаатайгаа тохирно.
+                  </div>
+                )}
 
                 <div>
                   <label className="block text-xs font-semibold text-stone-700 mb-1">
