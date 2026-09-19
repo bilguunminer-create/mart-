@@ -68,6 +68,8 @@ interface AdminPanelProps {
   onChangePin: (currentPin: string, newPin: string) => Promise<void>;
   onOpenForms?: () => void;
   onQuickUpdateStock?: (productId: string, amount: number, isAbsolute?: boolean) => void;
+  featuredProductId?: string;
+  onSaveFeaturedProduct?: (productId: string) => Promise<void> | void;
   checkoutSettings?: { deliveryFee: number; freeDeliveryThreshold: number; bankName: string; accountNumber: string; iban: string; accountHolder: string; storePhone: string; storeEmail: string; facebookUrl: string; storeAddress: string; unpaidCancellationMinutes: number };
   onSaveCheckoutSettings?: (settings: { deliveryFee: number; freeDeliveryThreshold: number; bankName: string; accountNumber: string; iban: string; accountHolder: string; storePhone: string; storeEmail: string; facebookUrl: string; storeAddress: string; unpaidCancellationMinutes: number }) => Promise<void> | void;
 }
@@ -108,6 +110,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   onChangePin,
   onOpenForms,
   onQuickUpdateStock,
+  featuredProductId = '',
+  onSaveFeaturedProduct,
   checkoutSettings = { deliveryFee: 3000, freeDeliveryThreshold: 100000, bankName: '', accountNumber: '', iban: '', accountHolder: '', storePhone: '', storeEmail: '', facebookUrl: '', storeAddress: '', unpaidCancellationMinutes: 60 },
   onSaveCheckoutSettings
 }) => {
@@ -119,6 +123,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [checkoutDraft, setCheckoutDraft] = useState(checkoutSettings);
   const [checkoutSettingsMessage, setCheckoutSettingsMessage] = useState<string | null>(null);
   const [expandedMemberId, setExpandedMemberId] = useState<string | null>(null);
+  const [featuredProductDraft, setFeaturedProductDraft] = useState(featuredProductId);
+
+  useEffect(() => {
+    setCheckoutDraft(checkoutSettings);
+  }, [featuredProductId]);
+
+  useEffect(() => { setFeaturedProductDraft(featuredProductId); }, [featuredProductId]);
 
   useEffect(() => {
     setCheckoutDraft(checkoutSettings);
@@ -1935,6 +1946,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   </p>
                 </div>
               </div>
+            </div>
+
+            <div className="bg-white p-6 rounded-2xl border border-stone-200 shadow-xs space-y-3">
+              <div><h4 className="font-extrabold text-stone-900 text-sm">Өнөөдрийн онцлох бараа</h4><p className="text-xs text-stone-500">Сонгосон бараа нүүр хуудсанд багцуудын өмнө онцгойлон гарна.</p></div>
+              <select value={featuredProductDraft} onChange={e=>setFeaturedProductDraft(e.target.value)} className="w-full rounded-xl border border-stone-300 bg-stone-50 px-3 py-2 text-sm">
+                <option value="">Онцлох бараа сонгоогүй</option>{products.filter(p=>p.published!==false && p.in_stock).map(p=><option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+              <button type="button" onClick={()=>{ if(onSaveFeaturedProduct) Promise.resolve(onSaveFeaturedProduct(featuredProductDraft)); }} className="rounded-xl bg-amber-500 px-4 py-2 text-xs font-bold text-stone-950">Онцлох барааг хадгалах</button>
             </div>
 
             {/* Delivery & bank transfer settings */}
