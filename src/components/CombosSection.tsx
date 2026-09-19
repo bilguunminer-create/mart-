@@ -1,16 +1,20 @@
 import React from 'react';
 import { Package, Sparkles, Check, ShoppingBag } from 'lucide-react';
 import { COMBOS, formatMNT, PRODUCTS } from '../data/storeData';
-import { ComboPack } from '../types';
+import { ComboPack, Product } from '../types';
 
 interface CombosSectionProps {
   onAddComboToCart: (combo: ComboPack) => void;
   onOpenProductDetail: (productId: string) => void;
+  combos?: ComboPack[];
+  products?: Product[];
 }
 
 export const CombosSection: React.FC<CombosSectionProps> = ({
   onAddComboToCart,
-  onOpenProductDetail
+  onOpenProductDetail,
+  combos = COMBOS,
+  products = PRODUCTS
 }) => {
   return (
     <section className="my-8">
@@ -30,7 +34,7 @@ export const CombosSection: React.FC<CombosSectionProps> = ({
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-        {COMBOS.map((combo) => {
+        {combos.map((combo) => {
           const discountPct = Math.round(((combo.orig_price - combo.price) / combo.orig_price) * 100);
           
           return (
@@ -74,7 +78,7 @@ export const CombosSection: React.FC<CombosSectionProps> = ({
                     </span>
                     <div className="flex flex-wrap gap-1.5">
                       {combo.items.map((itemId) => {
-                        const itemProduct = PRODUCTS.find((p) => p.id === itemId);
+                        const itemProduct = products.find((p) => p.id === itemId);
                         if (!itemProduct) return null;
                         return (
                           <button
