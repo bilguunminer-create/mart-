@@ -69,6 +69,7 @@ interface AdminPanelProps {
   onOpenForms?: () => void;
   onQuickUpdateStock?: (productId: string, amount: number, isAbsolute?: boolean) => void;
   featuredProductId?: string;
+  onSaveCombo?: (combo: import('../types').ComboPack) => Promise<void> | void;
   onSaveFeaturedProduct?: (productId: string) => Promise<void> | void;
   checkoutSettings?: { deliveryFee: number; freeDeliveryThreshold: number; bankName: string; accountNumber: string; iban: string; accountHolder: string; storePhone: string; storeEmail: string; facebookUrl: string; storeAddress: string; unpaidCancellationMinutes: number };
   onSaveCheckoutSettings?: (settings: { deliveryFee: number; freeDeliveryThreshold: number; bankName: string; accountNumber: string; iban: string; accountHolder: string; storePhone: string; storeEmail: string; facebookUrl: string; storeAddress: string; unpaidCancellationMinutes: number }) => Promise<void> | void;
@@ -112,6 +113,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   onQuickUpdateStock,
   featuredProductId = '',
   onSaveFeaturedProduct,
+  onSaveCombo,
   checkoutSettings = { deliveryFee: 3000, freeDeliveryThreshold: 100000, bankName: '', accountNumber: '', iban: '', accountHolder: '', storePhone: '', storeEmail: '', facebookUrl: '', storeAddress: '', unpaidCancellationMinutes: 60 },
   onSaveCheckoutSettings
 }) => {
@@ -148,13 +150,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     const image = window.prompt('Багцын зургийн холбоос (хоосон бол эхний барааны зураг):', selected[0].image) || selected[0].image;
     const description = window.prompt('Багцын тайлбар:', selected.map(p => p.name).join(' + ')) || selected.map(p => p.name).join(' + ');
     const stock = Math.min(...selected.map(p => Number(p.stock_quantity ?? 0)));
-    onSaveProduct({
+    const combo = {
       id: 'COMBO-' + crypto.randomUUID().slice(0, 8).toUpperCase(),
       name: name.trim(), category: 'combo', category_name: 'Багц бүтээгдэхүүн', origin: 'KR',
       country: 'Багц', flag: '🎁', price: Math.round(price), weight: `${selected.length} бараа`,
       badge: 'Багц', badge_color: 'bg-indigo-600', image, description,
       in_stock: stock > 0, stock_quantity: stock, rating: 5, day_deal: -1, published: false,
-    });
+    };
+    if (onSaveCombo) { void onSaveCombo({ id: combo.id, name: combo.name, badge: combo.badge, price: combo.price, orig_price: total, image: combo.image, description: combo.description, items: selected.map(p => p.id) }); } else { onSaveProduct(combo); }
     setComboProductIds([]);
     alert('Багц үүслээ. Админ нийтэлсний дараа хэрэглэгчдэд харагдана.');
   };
