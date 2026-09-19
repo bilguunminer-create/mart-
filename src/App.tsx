@@ -168,7 +168,7 @@ export default function App() {
   useEffect(() => {
     if (!currentUser?.accessToken) return;
     let active = true;
-    Promise.all([getStoreOrders(currentUser.accessToken), getStoreCustomerProfiles(currentUser.accessToken)])
+    const loadCentralData = () => Promise.all([getStoreOrders(currentUser.accessToken), getStoreCustomerProfiles(currentUser.accessToken)])
       .then(([remoteOrders, profiles]) => {
         if (!active) return;
         setMemberProfiles(profiles);
