@@ -45,6 +45,9 @@ import { BeeEmblemLogo } from './components/BeeEmblemLogo';
 import { getStoreCustomerProfiles, getStoreOrders, getStoreSettings, saveStoreOrder, saveStoreProducts, saveStoreSettings, hasStoreAdminAccess, refreshSession, updateStoreOrderStatus } from './services/supabaseAuth';
 
 export default function App() {
+  // The installed admin PWA starts with ?admin=1 and exposes only the secured admin flow.
+  const isAdminApp = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('admin') === '1';
+
   // Today's day of week (0 = Sunday, 1 = Monday, ...)
   const [selectedDay, setSelectedDay] = useState<number>(() => {
     return new Date().getDay();
@@ -376,6 +379,12 @@ export default function App() {
     setIsAdminOpen(true);
     showToast('Админ системд амжилттай нэвтэрлээ!');
   };
+
+  // The dedicated installed admin app opens the secured management screen directly.
+  useEffect(() => {
+    if (!isAdminApp) return;
+    void handleOpenAdmin();
+  }, [isAdminApp, currentUser?.accessToken, isAdminAuthenticated]);
 
   const handleSaveProduct = (product: Product) => {
     setProducts((prev) => {
