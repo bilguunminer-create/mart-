@@ -61,6 +61,7 @@ interface AdminPanelProps {
   onDeleteProduct: (productId: string) => void;
   onToggleStock: (productId: string) => void;
   onUpdateOrderStatus: (orderId: string, status: 'new' | 'confirmed' | 'shipping' | 'delivered' | 'cancelled') => void;
+  onConfirmPayment: (orderId: string) => Promise<void>;
   onResetProducts: () => void;
   onClose: () => void;
   onLogout?: () => void;
@@ -100,6 +101,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   onDeleteProduct,
   onToggleStock,
   onUpdateOrderStatus,
+  onConfirmPayment,
   onResetProducts,
   onClose,
   onLogout,
@@ -1217,10 +1219,18 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                         <p className="text-sm font-black text-rose-600">
                           Нийт: {formatMNT(order.total)}
                         </p>
-                        {order.paymentStatus === 'Төлбөр шалгуулж байна' && (
-                          <span className="inline-flex rounded-full bg-amber-100 px-2 py-1 text-[10px] font-black text-amber-900">
-                            ТӨЛБӨР ШАЛГАХ
+                        {order.paymentStatus === 'Төлбөр баталгаажсан' ? (
+                          <span className="inline-flex rounded-full bg-emerald-100 px-2 py-1 text-[10px] font-black text-emerald-800">
+                            ТӨЛБӨР БАТАЛГААЖСАН
                           </span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => { void onConfirmPayment(order.orderId); }}
+                            className="rounded-lg bg-emerald-600 px-2.5 py-1.5 text-[10px] font-black text-white hover:bg-emerald-700"
+                          >
+                            Төлбөр баталгаажуулах
+                          </button>
                         )}
                       </div>
                     </div>
