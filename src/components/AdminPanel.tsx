@@ -69,7 +69,7 @@ interface AdminPanelProps {
   onOpenForms?: () => void;
   onQuickUpdateStock?: (productId: string, amount: number, isAbsolute?: boolean) => void;
   checkoutSettings?: { deliveryFee: number; freeDeliveryThreshold: number; bankName: string; accountNumber: string; iban: string; accountHolder: string; storePhone: string; storeEmail: string; facebookUrl: string; storeAddress: string; unpaidCancellationMinutes: number };
-  onSaveCheckoutSettings?: (settings: { deliveryFee: number; bankName: string; accountNumber: string; iban: string; accountHolder: string; storePhone: string; storeEmail: string; facebookUrl: string; storeAddress: string; unpaidCancellationMinutes: number }) => Promise<void> | void;
+  onSaveCheckoutSettings?: (settings: { deliveryFee: number; freeDeliveryThreshold: number; bankName: string; accountNumber: string; iban: string; accountHolder: string; storePhone: string; storeEmail: string; facebookUrl: string; storeAddress: string; unpaidCancellationMinutes: number }) => Promise<void> | void;
 }
 
 export interface LoyaltyMember {
