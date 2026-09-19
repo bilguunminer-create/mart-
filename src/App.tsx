@@ -1461,6 +1461,10 @@ export default function App() {
                 accountHolder: settings.accountHolder,
               },
               store_phone: settings.storePhone,
+              store_email: settings.storeEmail,
+              facebook_url: settings.facebookUrl,
+              store_address: settings.storeAddress,
+              unpaid_cancellation_minutes: settings.unpaidCancellationMinutes,
             });
             setCheckoutSettings({
               deliveryFee: Number(data.delivery_fee ?? settings.deliveryFee),
@@ -1470,6 +1474,10 @@ export default function App() {
               iban: settings.iban,
               accountHolder: settings.accountHolder,
               storePhone: settings.storePhone,
+              storeEmail: settings.storeEmail,
+              facebookUrl: settings.facebookUrl,
+              storeAddress: settings.storeAddress,
+              unpaidCancellationMinutes: settings.unpaidCancellationMinutes,
             });
           }}
         />
