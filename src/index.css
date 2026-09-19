@@ -6,19 +6,33 @@
   text-size-adjust: 100%;
 }
 
-html, body, #root {
+html {
   width: 100%;
   min-width: 320px;
   min-height: 100%;
-  overflow-x: hidden;
+  overflow-x: clip;
+  overflow-y: auto;
+  touch-action: pan-y pinch-zoom;
+}
+
+body, #root {
+  width: 100%;
+  min-width: 320px;
+  min-height: 100%;
+  max-width: 100%;
 }
 
 body {
   margin: 0;
-  overscroll-behavior-y: contain;
+  overflow-x: clip;
+  overflow-y: auto;
+  overscroll-behavior-y: auto;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y pinch-zoom;
 }
 
 img, video, canvas {
+  display: block;
   max-width: 100%;
   height: auto;
 }
@@ -29,11 +43,16 @@ button, input, select, textarea {
 }
 
 @media (max-width: 640px) {
+  html, body, #root {
+    min-width: 0;
+  }
+
   input, select, textarea {
     font-size: 16px;
   }
 
   .fixed.inset-0 {
     -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
   }
 }
