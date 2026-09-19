@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   Sparkles, 
   Truck, 
@@ -292,6 +292,34 @@ export default function App() {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isFormsOpen, setIsFormsOpen] = useState(false);
   const [detailProduct, setDetailProduct] = useState<Product | null>(null);
+  const overlayHistoryRef = useRef(false);
+
+  // Browser back closes the current site panel first, instead of leaving the store.
+  useEffect(() => {
+    const overlayOpen = isCartOpen || isCheckoutOpen || isLoyaltyOpen || isProfileOpen
+      || isFormsOpen || Boolean(detailProduct) || isAdminOpen || isAdminLoginOpen || isDirectFormOpen;
+    const closeOverlay = () => {
+      setIsCartOpen(false);
+      setIsCheckoutOpen(false);
+      setIsLoyaltyOpen(false);
+      setIsProfileOpen(false);
+      setIsFormsOpen(false);
+      setDetailProduct(null);
+      setIsAdminOpen(false);
+      setIsAdminLoginOpen(false);
+      setIsDirectFormOpen(false);
+      overlayHistoryRef.current = false;
+    };
+    const onPopState = () => {
+      if (overlayHistoryRef.current) closeOverlay();
+    };
+    if (overlayOpen && !overlayHistoryRef.current) {
+      window.history.pushState({ uskOverlay: true }, '', window.location.href);
+      overlayHistoryRef.current = true;
+    }
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, [isCartOpen, isCheckoutOpen, isLoyaltyOpen, isProfileOpen, isFormsOpen, detailProduct, isAdminOpen, isAdminLoginOpen, isDirectFormOpen]);
 
   // Supabase recovery links contain a short-lived session in the URL hash.
   // Open the password form immediately so the member can finish the reset.
