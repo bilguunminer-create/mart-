@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { 
   PRODUCTS, 
+  COMBOS,
   CATEGORIES, 
   DAILY_DEALS, 
   LOYALTY_TIERS, 
