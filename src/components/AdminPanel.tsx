@@ -136,6 +136,29 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     setCheckoutDraft(checkoutSettings);
   }, [checkoutSettings.deliveryFee, checkoutSettings.freeDeliveryThreshold, checkoutSettings.bankName, checkoutSettings.accountNumber, checkoutSettings.iban, checkoutSettings.accountHolder, checkoutSettings.storePhone, checkoutSettings.storeEmail, checkoutSettings.facebookUrl, checkoutSettings.storeAddress, checkoutSettings.unpaidCancellationMinutes]);
 
+  const createComboProduct = () => {
+    const selected = products.filter(product => comboProductIds.includes(product.id));
+    if (selected.length < 2) { alert('Багцад дор хаяж 2 бараа сонгоно уу.'); return; }
+    const name = window.prompt('Багцын нэр:', selected.map(p => p.name).join(' + '));
+    if (!name?.trim()) return;
+    const total = selected.reduce((sum, product) => sum + product.price, 0);
+    const priceText = window.prompt('Багцын зарах үнэ (₮):', String(total));
+    const price = Number(priceText);
+    if (!Number.isFinite(price) || price <= 0) { alert('Үнэ зөв оруулна уу.'); return; }
+    const image = window.prompt('Багцын зургийн холбоос (хоосон бол эхний барааны зураг):', selected[0].image) || selected[0].image;
+    const description = window.prompt('Багцын тайлбар:', selected.map(p => p.name).join(' + ')) || selected.map(p => p.name).join(' + ');
+    const stock = Math.min(...selected.map(p => Number(p.stock_quantity ?? 0)));
+    onSaveProduct({
+      id: 'COMBO-' + crypto.randomUUID().slice(0, 8).toUpperCase(),
+      name: name.trim(), category: 'combo', category_name: 'Багц бүтээгдэхүүн', origin: 'KR',
+      country: 'Багц', flag: '🎁', price: Math.round(price), weight: `${selected.length} бараа`,
+      badge: 'Багц', badge_color: 'bg-indigo-600', image, description,
+      in_stock: stock > 0, stock_quantity: stock, rating: 5, day_deal: -1, published: false,
+    });
+    setComboProductIds([]);
+    alert('Багц үүслээ. Админ нийтэлсний дараа хэрэглэгчдэд харагдана.');
+  };
+
   const openLoyaltyMembers = () => {
     setActiveTab('loyalty');
     window.requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: 'smooth' }));
@@ -900,7 +923,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 </select>
                 <button type="button" onClick={()=>onSaveFeaturedProduct && void onSaveFeaturedProduct(featuredProductDraft)} className="text-[11px] font-black text-amber-800">Хадгалах</button>
               </div>
-              <button type="button" onClick={()=>alert(comboProductIds.length<2?'Багцад дор хаяж 2 бараа сонгоно уу.':'Сонгосон бараануудаар багц бэлтгэх горим нээгдэнэ. Нэр, үнэ, зураг оруулж хадгална уу.')} className="px-3 py-2.5 border border-indigo-200 bg-indigo-50 text-indigo-800 text-xs font-bold rounded-xl">Багц үүсгэх ({comboProductIds.length})</button>
+              <button type="button" onClick={createComboProduct} className="px-3 py-2.5 border border-indigo-200 bg-indigo-50 text-indigo-800 text-xs font-bold rounded-xl">Багц үүсгэх ({comboProductIds.length})</button>
 
               {/* Add Product Button */}
               <button
