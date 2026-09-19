@@ -138,16 +138,16 @@ export type StoreOrderRecord = {
 
 export async function getStoreOrders(token: string) {
   return request<StoreOrderRecord[]>(
-    '/rest/v1/store_orders?select=id,customer_id,customer_name,phone,address,note,items,subtotal,daily_discount,vip_discount,delivery_fee,total,created_at,status,payment_status,payment_reported_at&order=created_at.desc',
-    { method: 'GET' },
+    '/rest/v1/rpc/read_store_orders',
+    { method: 'POST', body: '{}' },
     token,
   );
 }
 
 export async function getStoreCustomerProfiles(token: string) {
   return request<StoreCustomerProfile[]>(
-    '/rest/v1/customer_profiles?select=user_id,name,phone,address,avatar_url,created_at&order=created_at.desc',
-    { method: 'GET' },
+    '/rest/v1/rpc/read_store_profiles',
+    { method: 'POST', body: '{}' },
     token,
   );
 }
