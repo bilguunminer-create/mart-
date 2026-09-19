@@ -42,6 +42,7 @@ import { UserProfileModal } from './components/UserProfileModal';
 import { GoogleFormsModal } from './components/GoogleFormsModal';
 import { StoreHeroBanner } from './components/StoreHeroBanner';
 import { BeeEmblemLogo } from './components/BeeEmblemLogo';
+import { InventoryCameraModal } from './components/InventoryCameraModal';
 import { getStoreCustomerProfiles, getStoreOrders, getStoreSettings, saveStoreOrder, saveStoreProducts, saveStoreSettings, hasStoreAdminAccess, refreshSession, reportStoreOrderPayment, updateStoreOrderStatus, verifyAdminPin, changeAdminPin } from './services/supabaseAuth';
 
 export default function App() {
@@ -101,6 +102,7 @@ export default function App() {
   });
   const [directEditProduct, setDirectEditProduct] = useState<Product | null>(null);
   const [isDirectFormOpen, setIsDirectFormOpen] = useState(false);
+  const [isInventoryOpen, setIsInventoryOpen] = useState(false);
 
   // Cart state persisted in localStorage
   const [cart, setCart] = useState<CartItem[]>(() => {
@@ -763,6 +765,13 @@ export default function App() {
                 className="bg-rose-600 hover:bg-rose-700 text-white px-3 py-1 rounded-lg font-bold text-[11px] flex items-center gap-1 shadow-xs cursor-pointer transition-all"
               >
                 <span>+ Шинэ бараа оруулах</span>
+              </button>
+              <button
+                id="inventory-camera-strip-btn"
+                onClick={() => setIsInventoryOpen(true)}
+                className="bg-amber-400 hover:bg-amber-300 text-stone-950 px-3 py-1 rounded-lg font-bold text-[11px] flex items-center gap-1 shadow-xs cursor-pointer transition-all"
+              >
+                <span>📷 Агуулах</span>
               </button>
               <button
                 id="admin-open-panel-strip-btn"
@@ -1432,6 +1441,18 @@ export default function App() {
               accountHolder: settings.accountHolder,
               storePhone: settings.storePhone,
             });
+          }}
+        />
+      )}
+
+      {isInventoryOpen && currentUser?.accessToken && (
+        <InventoryCameraModal
+          isOpen={isInventoryOpen}
+          onClose={() => setIsInventoryOpen(false)}
+          accessToken={currentUser.accessToken}
+          onChanged={() => {
+            setIsInventoryOpen(false);
+            window.location.reload();
           }}
         />
       )}
