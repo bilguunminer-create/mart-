@@ -11,6 +11,7 @@ interface CheckoutModalProps {
   orders: OrderDetails[];
   currentUser?: UserProfile | null;
   dailyDiscountTotal: number;
+  paymentSettings: { deliveryFee: number; bankName: string; accountNumber: string; iban: string; accountHolder: string };
   onOrderSuccess: (order: OrderDetails) => Promise<void> | void;
 }
 
@@ -21,6 +22,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   orders,
   currentUser,
   dailyDiscountTotal,
+  paymentSettings,
   onOrderSuccess
 }) => {
   const [customerName, setCustomerName] = useState('');
@@ -113,7 +115,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const isDalanzadgadDelivery = district === 'Өмнөговь, Даланзадгад';
   const qualifiesForFreeDelivery = isDalanzadgadDelivery && (itemsPriceAfterDailyDeal >= STORE_CONFIG.free_delivery_threshold || isGoldVIP);
   // Home delivery is available only inside Dalanzadgad. Other soums are handed to the selected vehicle.
-  const deliveryFee = !isDalanzadgadDelivery || qualifiesForFreeDelivery || items.length === 0 ? 0 : STORE_CONFIG.delivery_fee;
+  const deliveryFee = !isDalanzadgadDelivery || qualifiesForFreeDelivery || items.length === 0 ? 0 : paymentSettings.deliveryFee;
   const totalBeforePoints = Math.max(0, itemsPriceAfterDailyDeal - loyaltyDiscountAmount + deliveryFee);
   const pointsDiscount = usePoints ? Math.min(walletPoints, totalBeforePoints) : 0;
   const total = totalBeforePoints - pointsDiscount;
@@ -499,30 +501,46 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
                 {/* Bank Transfer Details */}
                 {paymentMethod === 'bank' && (
-                  <div className="bg-stone-50 rounded-2xl p-4 border border-stone-200 space-y-2 text-xs">
-                    <div className="flex justify-between items-center bg-white p-3 rounded-xl border border-stone-200">
-                      <div>
-                        <span className="text-stone-400 block text-[10px]">Хүлээн авагч банк:</span>
-                        <span className="font-black text-stone-800">Хаан Банк (US&K Family Mart)</span>
-                      </div>
-                      <div>
-                        <span className="text-stone-400 block text-[10px]">Дансны дугаар:</span>
-                        <div className="flex items-center gap-2">
-                          <span className="font-mono font-black text-sm text-stone-900">5084 1122 3344</span>
-                          <button
-                            type="button"
-                            onClick={() => handleCopyAccount('508411223344')}
-                            className="text-stone-500 hover:text-stone-900 p-1 cursor-pointer"
-                            title="Данс хуулах"
-                          >
-                            {copied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
-                          </button>
+                  <div className="bg-stone-50 rounded-2xl p-4 border border-stone-200 space-y-3 text-xs">
+                    {paymentSettings.bankName || paymentSettings.accountNumber || paymentSettings.iban || paymentSettings.accountHolder ? (
+                      <>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-white p-3 rounded-xl border border-stone-200">
+                          <div>
+                            <span className="text-stone-400 block text-[10px]">Хүлээн авагч банк:</span>
+                            <span className="font-black text-stone-800">{paymentSettings.bankName || 'Банкны нэр оруулаагүй'}</span>
+                          </div>
+                          <div>
+                            <span className="text-stone-400 block text-[10px]">Данс эзэмшигч:</span>
+                            <span className="font-bold text-stone-800">{paymentSettings.accountHolder || 'Оруулаагүй'}</span>
+                          </div>
+                          {paymentSettings.accountNumber && (
+                            <div>
+                              <span className="text-stone-400 block text-[10px]">Дансны дугаар:</span>
+                              <div className="flex items-center gap-2">
+                                <span className="font-mono font-black text-sm text-stone-900">{paymentSettings.accountNumber}</span>
+                                <button type="button" onClick={() => handleCopyAccount(paymentSettings.accountNumber.replace(/\s/g, ''))}
+                                  className="text-stone-500 hover:text-stone-900 p-1 cursor-pointer" title="Данс хуулах">
+                                  {copied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                          {paymentSettings.iban && (
+                            <div>
+                              <span className="text-stone-400 block text-[10px]">IBAN:</span>
+                              <span className="font-mono font-bold text-stone-900 break-all">{paymentSettings.iban}</span>
+                            </div>
+                          )}
                         </div>
-                      </div>
-                    </div>
-                    <p className="text-[11px] text-stone-500">
-                      Гүйлгээний утга дээр өөрийн утасны дугаарыг бичнэ үү. Төлбөр орсон даруйд хүргэлт баталгаажна.
-                    </p>
+                        <p className="text-[11px] text-stone-500">
+                          Гүйлгээний утга дээр өөрийн утасны дугаарыг бичнэ үү. Төлбөр орсныг админ баталгаажуулсны дараа захиалга үргэлжилнэ.
+                        </p>
+                      </>
+                    ) : (
+                      <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-amber-900">
+                        Дансны мэдээллийг админ хараахан оруулаагүй байна.
+                      </p>
+                    )}
                   </div>
                 )}
 
