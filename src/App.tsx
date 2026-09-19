@@ -1424,6 +1424,7 @@ export default function App() {
         onAddToCart={(prod, qty) => {
           handleAddToCart(prod, qty);
         }}
+        freeDeliveryThreshold={checkoutSettings.freeDeliveryThreshold}
       />
 
       {/* Admin Panel Full Screen Dashboard */}
