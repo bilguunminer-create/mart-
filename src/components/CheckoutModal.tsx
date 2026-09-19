@@ -11,7 +11,7 @@ interface CheckoutModalProps {
   orders: OrderDetails[];
   currentUser?: UserProfile | null;
   dailyDiscountTotal: number;
-  paymentSettings: { deliveryFee: number; bankName: string; accountNumber: string; iban: string; accountHolder: string };
+  paymentSettings: { deliveryFee: number; freeDeliveryThreshold: number; bankName: string; accountNumber: string; iban: string; accountHolder: string };
   onReportPayment?: (orderId: string) => Promise<void>;
   onOrderSuccess: (order: OrderDetails) => Promise<OrderDetails | void> | OrderDetails | void;
 }
@@ -118,7 +118,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
   const isGoldVIP = accountLoyaltyTier?.id === 'gold';
   const isDalanzadgadDelivery = district === 'Өмнөговь, Даланзадгад';
-  const qualifiesForFreeDelivery = isDalanzadgadDelivery && (itemsPriceAfterDailyDeal >= STORE_CONFIG.free_delivery_threshold || isGoldVIP);
+  const qualifiesForFreeDelivery = isDalanzadgadDelivery && (itemsPriceAfterDailyDeal >= paymentSettings.freeDeliveryThreshold || isGoldVIP);
   // Home delivery is available only inside Dalanzadgad. Other soums are handed to the selected vehicle.
   const deliveryFee = !isDalanzadgadDelivery || qualifiesForFreeDelivery || items.length === 0 ? 0 : paymentSettings.deliveryFee;
   const totalBeforePoints = Math.max(0, itemsPriceAfterDailyDeal - loyaltyDiscountAmount + deliveryFee);
