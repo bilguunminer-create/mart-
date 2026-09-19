@@ -68,8 +68,8 @@ interface AdminPanelProps {
   onChangePin: (currentPin: string, newPin: string) => Promise<void>;
   onOpenForms?: () => void;
   onQuickUpdateStock?: (productId: string, amount: number, isAbsolute?: boolean) => void;
-  checkoutSettings?: { deliveryFee: number; freeDeliveryThreshold: number; bankName: string; accountNumber: string; iban: string; accountHolder: string; storePhone: string };
-  onSaveCheckoutSettings?: (settings: { deliveryFee: number; bankName: string; accountNumber: string; iban: string; accountHolder: string; storePhone: string }) => Promise<void> | void;
+  checkoutSettings?: { deliveryFee: number; freeDeliveryThreshold: number; bankName: string; accountNumber: string; iban: string; accountHolder: string; storePhone: string; storeEmail: string; facebookUrl: string; storeAddress: string; unpaidCancellationMinutes: number };
+  onSaveCheckoutSettings?: (settings: { deliveryFee: number; bankName: string; accountNumber: string; iban: string; accountHolder: string; storePhone: string; storeEmail: string; facebookUrl: string; storeAddress: string; unpaidCancellationMinutes: number }) => Promise<void> | void;
 }
 
 export interface LoyaltyMember {
@@ -108,7 +108,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   onChangePin,
   onOpenForms,
   onQuickUpdateStock,
-  checkoutSettings = { deliveryFee: 3000, freeDeliveryThreshold: 100000, bankName: '', accountNumber: '', iban: '', accountHolder: '', storePhone: '' },
+  checkoutSettings = { deliveryFee: 3000, freeDeliveryThreshold: 100000, bankName: '', accountNumber: '', iban: '', accountHolder: '', storePhone: '', storeEmail: '', facebookUrl: '', storeAddress: '', unpaidCancellationMinutes: 60 },
   onSaveCheckoutSettings
 }) => {
   const [activeTab, setActiveTab] = useState<'products' | 'orders' | 'loyalty' | 'stats' | 'settings'>('products');
@@ -122,7 +122,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
   useEffect(() => {
     setCheckoutDraft(checkoutSettings);
-  }, [checkoutSettings.deliveryFee, checkoutSettings.freeDeliveryThreshold, checkoutSettings.bankName, checkoutSettings.accountNumber, checkoutSettings.iban, checkoutSettings.accountHolder]);
+  }, [checkoutSettings.deliveryFee, checkoutSettings.freeDeliveryThreshold, checkoutSettings.bankName, checkoutSettings.accountNumber, checkoutSettings.iban, checkoutSettings.accountHolder, checkoutSettings.storePhone, checkoutSettings.storeEmail, checkoutSettings.facebookUrl, checkoutSettings.storeAddress, checkoutSettings.unpaidCancellationMinutes]);
 
   const openLoyaltyMembers = () => {
     setActiveTab('loyalty');
@@ -1963,6 +1963,18 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 <label className="text-xs font-bold text-stone-700">Дэлгүүрийн холбоо барих утас
                   <input type="tel" value={checkoutDraft.storePhone} onChange={(e) => setCheckoutDraft((value) => ({ ...value, storePhone: e.target.value }))}
                     placeholder="Жишээ: 7700-1122" className="mt-1.5 w-full px-3 py-2 border border-stone-300 rounded-xl bg-stone-50" />
+                </label>
+                <label className="text-xs font-bold text-stone-700">Дэлгүүрийн и-мэйл
+                  <input type="email" value={checkoutDraft.storeEmail} onChange={(e) => setCheckoutDraft((value) => ({ ...value, storeEmail: e.target.value }))} className="mt-1.5 w-full px-3 py-2 border border-stone-300 rounded-xl bg-stone-50" />
+                </label>
+                <label className="text-xs font-bold text-stone-700">Facebook page холбоос
+                  <input value={checkoutDraft.facebookUrl} onChange={(e) => setCheckoutDraft((value) => ({ ...value, facebookUrl: e.target.value }))} className="mt-1.5 w-full px-3 py-2 border border-stone-300 rounded-xl bg-stone-50" />
+                </label>
+                <label className="text-xs font-bold text-stone-700 sm:col-span-2">Дэлгүүрийн хаяг
+                  <input value={checkoutDraft.storeAddress} onChange={(e) => setCheckoutDraft((value) => ({ ...value, storeAddress: e.target.value }))} className="mt-1.5 w-full px-3 py-2 border border-stone-300 rounded-xl bg-stone-50" />
+                </label>
+                <label className="text-xs font-bold text-stone-700">Төлбөр хүлээх хугацаа (минут)
+                  <input type="number" min="5" value={checkoutDraft.unpaidCancellationMinutes} onChange={(e) => setCheckoutDraft((value) => ({ ...value, unpaidCancellationMinutes: Math.max(5, Number(e.target.value) || 60) }))} className="mt-1.5 w-full px-3 py-2 border border-stone-300 rounded-xl bg-stone-50" />
                 </label>
                 <label className="text-xs font-bold text-stone-700">Банкны нэр
                   <input value={checkoutDraft.bankName} onChange={(e) => setCheckoutDraft((value) => ({ ...value, bankName: e.target.value }))}
