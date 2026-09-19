@@ -1,20 +1,22 @@
 import React, { useState } from 'react';
 import { X, Star, ShoppingBag, Plus, Minus, Truck, ShieldCheck, Check } from 'lucide-react';
 import { Product } from '../types';
-import { formatMNT, DAILY_DEALS, STORE_CONFIG } from '../data/storeData';
+import { formatMNT, DAILY_DEALS } from '../data/storeData';
 
 interface ProductDetailModalProps {
   product: Product | null;
   onClose: () => void;
   selectedDay: number;
   onAddToCart: (product: Product, quantity: number) => void;
+  freeDeliveryThreshold: number;
 }
 
 export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   product,
   onClose,
   selectedDay,
-  onAddToCart
+  onAddToCart,
+  freeDeliveryThreshold
 }) => {
   const [quantity, setQuantity] = useState(1);
   const [addedAnimation, setAddedAnimation] = useState(false);
@@ -132,7 +134,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
           <div className="grid grid-cols-2 gap-3 text-xs text-stone-600 pt-1">
             <div className="flex items-center gap-2 bg-stone-50 p-2.5 rounded-xl border border-stone-100">
               <Truck className="w-4 h-4 text-rose-500 shrink-0" />
-              <span>{formatMNT(STORE_CONFIG.free_delivery_threshold)}-өөс дээш үнэгүй</span>
+              <span>{formatMNT(freeDeliveryThreshold)}-өөс дээш үнэгүй</span>
             </div>
             <div className="flex items-center gap-2 bg-stone-50 p-2.5 rounded-xl border border-stone-100">
               <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
