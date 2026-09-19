@@ -43,6 +43,19 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const [isReportingPayment, setIsReportingPayment] = useState(false);
   const [paymentReported, setPaymentReported] = useState(false);
 
+  const printReceipt = () => {
+    if (!completedOrder || completedOrder.paymentStatus !== 'Төлбөр баталгаажсан') return;
+    const rows = completedOrder.items.map((item) =>
+      '<tr><td>' + item.name.replace(/</g, '&lt;') + ' × ' + item.quantity + '</td><td style="text-align:right">' + formatMNT(item.price * item.quantity) + '</td></tr>'
+    ).join('');
+    const receipt = window.open('', '_blank', 'width=420,height=720');
+    if (!receipt) return;
+    receipt.document.write('<!doctype html><html><head><title>Захиалгын баримт</title><style>body{font-family:Arial,sans-serif;color:#18181b;padding:24px;max-width:360px;margin:auto}h1{font-size:20px;margin:0 0 4px}p{font-size:12px;margin:6px 0}table{width:100%;border-collapse:collapse;margin:16px 0;font-size:12px}td{padding:7px 0;border-bottom:1px solid #ddd}.total{font-size:18px;font-weight:800;text-align:right;margin-top:12px}.ok{color:#047857;font-weight:700}@media print{body{padding:0}}</style></head><body><h1>US&K Family Mart</h1><p>Захиалгын баримт · #' + completedOrder.orderId + '</p><p>Огноо: ' + completedOrder.date + '</p><p>Харилцагч: ' + completedOrder.customerName + ' · ' + completedOrder.phone + '</p><p class="ok">Төлбөр баталгаажсан</p><table>' + rows + '</table><p>Хүргэлт: ' + (completedOrder.deliveryFee === 0 ? 'ҮНЭГҮЙ' : formatMNT(completedOrder.deliveryFee)) + '</p><p class="total">Нийт: ' + formatMNT(completedOrder.total) + '</p><p>Баярлалаа.</p></body></html>');
+    receipt.document.close();
+    receipt.focus();
+    receipt.print();
+  };
+
   // Sync with currentUser when opened
   useEffect(() => {
     if (isOpen && currentUser) {
@@ -256,7 +269,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 <span>Захиалга бүртгэгдлээ. Хүргэгдэж дууссаны дараа лояалти дүнд нэмэгдэнэ</span>
               </div>
               <p className="text-stone-700 leading-relaxed">
-                Таны <strong className="font-mono text-stone-900">{completedOrder.phone}</strong> {completedOrder.email ? `болон ${completedOrder.email} хаягт` : 'дугаарт'} энэхүү <strong className="text-stone-900">{formatMNT(completedOrder.total)}</strong>-ийн худалдан авалт амжилттай бүртгэгдэж, нийт хуримтлагдсан дүн <strong className="text-emerald-700">{formatMNT(accountSpent + completedOrder.total)}</strong> болж ахилаа.
+                Таны захиалга төв санд бүртгэгдлээ. Төлбөр админаар баталгаажсаны дараа захиалгын баримтыг нэг хуудас хэлбэрээр хэвлэх боломж нээгдэнэ.
               </p>
             </div>
 
@@ -282,11 +295,13 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
             {/* Actions */}
             <div className="flex gap-3">
               <button
-                onClick={() => window.print()}
-                className="flex-1 flex items-center justify-center gap-2 py-3 px-4 bg-stone-100 hover:bg-stone-200 text-stone-800 font-bold rounded-xl text-xs transition-colors cursor-pointer"
+                type="button"
+                disabled={completedOrder.paymentStatus !== 'Төлбөр баталгаажсан'}
+                onClick={printReceipt}
+                className="flex-1 flex items-center justify-center gap-2 py-3 px-4 bg-stone-100 hover:bg-stone-200 text-stone-800 font-bold rounded-xl text-xs transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-45"
               >
                 <Printer className="w-4 h-4" />
-                <span>Баримт хэвлэх</span>
+                <span>{completedOrder.paymentStatus === 'Төлбөр баталгаажсан' ? 'Баримт хэвлэх' : 'Төлбөр баталгаажсаны дараа хэвлэнэ'}</span>
               </button>
 
               <button
