@@ -110,11 +110,11 @@ export const Header: React.FC<HeaderProps> = ({
 
       {/* Main Bar */}
       <div className="max-w-7xl mx-auto px-4 py-3.5">
-        <div className="flex items-center justify-between gap-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
           {/* Logo (With secret 3-tap trigger for admin login) */}
           <div 
             onClick={handleLogoClick}
-            className="flex items-center gap-3 cursor-pointer select-none group"
+            className="flex min-w-0 items-center gap-3 cursor-pointer select-none group"
             title="US&K Family Mart"
           >
             <div className="relative group-hover:scale-105 transition-transform shrink-0">
@@ -126,13 +126,13 @@ export const Header: React.FC<HeaderProps> = ({
                   <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-600 via-amber-700 to-stone-900 font-serif font-black">
                     US&K
                   </span>
-                  <span className="text-stone-900 font-sans font-extrabold">Family Mart</span>
+                  <span className="hidden text-stone-900 font-sans font-extrabold sm:inline">Family Mart</span>
                 </h1>
-                <span className="px-1.5 py-0.5 rounded-sm bg-amber-100 text-amber-800 text-[10px] font-bold tracking-wider uppercase border border-amber-300/40">
+                <span className="hidden px-1.5 py-0.5 rounded-sm bg-amber-100 text-amber-800 text-[10px] font-bold tracking-wider uppercase border border-amber-300/40 sm:inline">
                   ДАЛАНЗАДГАД
                 </span>
               </div>
-              <p className="text-[11px] text-stone-500 font-medium">АНУ & БНСУ Баталгаат Бараа • 09:00 - 20:00</p>
+              <p className="hidden text-[11px] text-stone-500 font-medium sm:block">АНУ & БНСУ Баталгаат Бараа • 09:00 - 20:00</p>
             </div>
           </div>
 
@@ -159,7 +159,7 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
 
           {/* Action Buttons */}
-          <div className="flex items-center gap-2 sm:gap-3">
+          <div className="flex w-full items-center justify-between gap-2 sm:w-auto sm:justify-start sm:gap-3">
             {/* Loyalty tier badge */}
             <button
               id="header-loyalty-btn"
