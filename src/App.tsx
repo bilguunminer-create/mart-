@@ -1156,7 +1156,7 @@ export default function App() {
               <div>
                 <h4 className="font-extrabold text-stone-900 text-sm">Түргэн Шуурхай Хүргэлт</h4>
                 <p className="text-xs text-stone-500 mt-0.5 leading-relaxed">
-                  {formatMNT(STORE_CONFIG.free_delivery_threshold)}-өөс дээш үнэгүй. Өмнөговь болон УБ хотод 1-2 цагт.
+                  {formatMNT(checkoutSettings.freeDeliveryThreshold)}-өөс дээш үнэгүй. Өмнөговь болон УБ хотод 1-2 цагт.
                 </p>
               </div>
             </div>
