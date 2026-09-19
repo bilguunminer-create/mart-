@@ -709,9 +709,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             >
               <ShieldCheck className="w-4 h-4 text-emerald-400" />
               <span>Тохиргоо, төлбөр & хамгаалалт</span>
-              {adminPin === '1234' && (
-                <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" title="Анхдагч ПИН ашиглаж байна" />
-              )}
+
             </button>
           </div>
 
@@ -2017,21 +2015,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 <div className="p-3.5 bg-stone-50 rounded-xl border border-stone-200/80 space-y-1">
                   <span className="text-stone-500 text-[11px] font-medium">ПИН кодны статус</span>
                   <div className="font-bold text-xs">
-                    {adminPin === '1234' ? (
-                      <span className="text-amber-600 font-extrabold flex items-center gap-1">
-                        <AlertCircle className="w-3.5 h-3.5" />
-                        Анхдагч (1234)
-                      </span>
-                    ) : (
-                      <span className="text-emerald-700 font-extrabold flex items-center gap-1">
-                        <ShieldCheck className="w-3.5 h-3.5" />
-                        Өөрчилж хамгаалсан
-                      </span>
-                    )}
+                    <span className="text-emerald-700 font-extrabold flex items-center gap-1">
+                      <ShieldCheck className="w-3.5 h-3.5" />
+                      Төв санд хамгаалагдсан
+                    </span>
                   </div>
-                  <p className="text-[10px] text-stone-400">
-                    {adminPin === '1234' ? 'Шинэ кодоор солихыг зөвлөж байна' : 'Хамгаалалт өндөр түвшинд'}
-                  </p>
+                  <p className="text-[10px] text-stone-400">Шинэ browser болон админ апп дээр ижил код үйлчилнэ.</p>
                 </div>
               </div>
 
