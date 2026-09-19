@@ -21,6 +21,7 @@ interface HeaderProps {
   selectedDay: number;
   setSelectedDay: (day: number) => void;
   dailyDealTitle: string;
+  storePhone: string;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -39,7 +40,8 @@ export const Header: React.FC<HeaderProps> = ({
   activeLoyalty,
   selectedDay,
   setSelectedDay,
-  dailyDealTitle
+  dailyDealTitle,
+  storePhone
 }) => {
   const logoClickCountRef = useRef(0);
   const logoTimerRef = useRef<any>(null);
@@ -97,9 +99,9 @@ export const Header: React.FC<HeaderProps> = ({
               </span>
             </button>
             <span className="text-stone-500">|</span>
-            <a href={`tel:${STORE_CONFIG.phone}`} className="flex items-center gap-1 hover:text-white transition-colors">
+            <a href={`tel:${storePhone}`} className="flex items-center gap-1 hover:text-white transition-colors">
               <Phone className="w-3.5 h-3.5" />
-              <span>{STORE_CONFIG.phone}</span>
+              <span>{storePhone}</span>
             </a>
 
           </div>
