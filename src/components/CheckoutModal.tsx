@@ -314,7 +314,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
               </button>
             </div>
 
-            <form onSubmit={handleSubmitOrder} className="p-6 space-y-6 max-h-[80vh] overflow-y-auto">
+            <form onSubmit={handleSubmitOrder} className="p-4 sm:p-6 space-y-5 sm:space-y-6 max-h-[calc(100dvh-1.5rem)] overflow-y-auto">
               {errors.form && <p className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs font-bold text-rose-700">{errors.form}</p>}
               {/* Recipient Details */}
               <div className="space-y-3">
