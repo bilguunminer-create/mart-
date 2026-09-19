@@ -89,6 +89,7 @@ export async function updatePassword(token: string, password: string) {
 
 export async function saveStoreOrder(token: string, order: {
   customerName: string; phone: string; address: string; notes: string;
+  deliveryMode?: 'delivery' | 'vehicle';
   total: number; pointsToUse?: number; items: Array<{ id: string; quantity: number }>;
 }) {
   const payload = {
@@ -98,6 +99,7 @@ export async function saveStoreOrder(token: string, order: {
     phone: order.phone.replace(/\D/g, '').slice(-8),
     address: order.address,
     note: order.notes || '',
+    deliveryMode: order.deliveryMode || 'delivery',
     pointsToUse: Math.max(0, Math.floor(order.pointsToUse || 0)),
     items: order.items.map(item => ({ productId: item.id, quantity: item.quantity })),
   };
