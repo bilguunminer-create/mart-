@@ -43,7 +43,7 @@ import { GoogleFormsModal } from './components/GoogleFormsModal';
 import { StoreHeroBanner } from './components/StoreHeroBanner';
 import { BeeEmblemLogo } from './components/BeeEmblemLogo';
 import { InventoryCameraModal } from './components/InventoryCameraModal';
-import { getStoreCustomerProfiles, getStoreOrders, getStoreSettings, saveStoreOrder, saveStoreProducts, saveStoreSettings, hasStoreAdminAccess, refreshSession, reportStoreOrderPayment, updateStoreOrderStatus, verifyAdminPin, changeAdminPin } from './services/supabaseAuth';
+import { getStoreCustomerProfiles, getStoreOrders, getStoreSettings, saveStoreOrder, saveStoreProducts, saveStoreSettings, hasStoreAdminAccess, refreshSession, reportStoreOrderPayment, updateStoreOrderStatus, confirmStoreOrderPayment, verifyAdminPin, changeAdminPin } from './services/supabaseAuth';
 
 export default function App() {
   // The installed PWA and native Capacitor shells open only the secured admin flow.
@@ -1427,6 +1427,14 @@ export default function App() {
           onDeleteProduct={handleDeleteProduct}
           onToggleStock={handleToggleStock}
           onUpdateOrderStatus={handleUpdateOrderStatus}
+          onConfirmPayment={async (orderId) => {
+            if (!currentUser?.accessToken) throw new Error('Админ и-мэйлээр нэвтэрнэ үү.');
+            await confirmStoreOrderPayment(currentUser.accessToken, orderId);
+            setOrders((previous) => previous.map((order) => order.orderId === orderId
+              ? { ...order, paymentStatus: 'Төлбөр баталгаажсан' }
+              : order));
+            showToast('Төлбөр баталгаажлаа. Захиалгын баримт хэвлэх эрх нээгдлээ.');
+          }}
           onResetProducts={handleResetProducts}
           onClose={() => setIsAdminOpen(false)}
           onLogout={handleAdminLogout}
