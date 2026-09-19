@@ -78,6 +78,8 @@ export interface OrderDetails {
   district: string;
   notes: string;
   paymentMethod: 'qpay' | 'bank' | 'cod';
+  paymentStatus?: string;
+  paymentReportedAt?: string;
   items: CartItem[];
   subtotal: number;
   dailyDiscount: number;
