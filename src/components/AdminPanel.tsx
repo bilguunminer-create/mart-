@@ -1225,6 +1225,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                         <p className="text-sm font-black text-rose-600">
                           Нийт: {formatMNT(order.total)}
                         </p>
+                        {order.paymentStatus === 'Төлбөр шалгуулж байна' && (
+                          <span className="inline-flex rounded-full bg-amber-100 px-2 py-1 text-[10px] font-black text-amber-900">
+                            ТӨЛБӨР ШАЛГАХ
+                          </span>
+                        )}
                       </div>
                     </div>
 
