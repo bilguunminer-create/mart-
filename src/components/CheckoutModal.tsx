@@ -12,7 +12,8 @@ interface CheckoutModalProps {
   currentUser?: UserProfile | null;
   dailyDiscountTotal: number;
   paymentSettings: { deliveryFee: number; bankName: string; accountNumber: string; iban: string; accountHolder: string };
-  onOrderSuccess: (order: OrderDetails) => Promise<void> | void;
+  onReportPayment?: (orderId: string) => Promise<void>;
+  onOrderSuccess: (order: OrderDetails) => Promise<OrderDetails | void> | OrderDetails | void;
 }
 
 export const CheckoutModal: React.FC<CheckoutModalProps> = ({
@@ -23,6 +24,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   currentUser,
   dailyDiscountTotal,
   paymentSettings,
+  onReportPayment,
   onOrderSuccess
 }) => {
   const [customerName, setCustomerName] = useState('');
@@ -38,6 +40,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [walletPoints, setWalletPoints] = useState(0);
   const [usePoints, setUsePoints] = useState(false);
+  const [isReportingPayment, setIsReportingPayment] = useState(false);
+  const [paymentReported, setPaymentReported] = useState(false);
 
   // Sync with currentUser when opened
   useEffect(() => {
@@ -54,6 +58,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     if (!isOpen) return;
     setCompletedOrder(null);
     setUsePoints(false);
+    setPaymentReported(false);
     if (!currentUser?.accessToken) {
       setWalletPoints(0);
       return;
@@ -168,8 +173,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     };
 
     try {
-      await onOrderSuccess(newOrder);
-      setCompletedOrder(newOrder);
+      const saved = await onOrderSuccess(newOrder);
+      setCompletedOrder(saved || newOrder);
     } catch (error: any) {
       setErrors({ form: error?.message || 'Захиалгыг төв санд хадгалах боломжгүй байна.' });
     }
@@ -254,6 +259,25 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 Таны <strong className="font-mono text-stone-900">{completedOrder.phone}</strong> {completedOrder.email ? `болон ${completedOrder.email} хаягт` : 'дугаарт'} энэхүү <strong className="text-stone-900">{formatMNT(completedOrder.total)}</strong>-ийн худалдан авалт амжилттай бүртгэгдэж, нийт хуримтлагдсан дүн <strong className="text-emerald-700">{formatMNT(accountSpent + completedOrder.total)}</strong> болж ахилаа.
               </p>
             </div>
+
+            {completedOrder.paymentMethod === 'bank' && onReportPayment && (
+              <button
+                type="button"
+                disabled={isReportingPayment || paymentReported}
+                onClick={async () => {
+                  setIsReportingPayment(true);
+                  try {
+                    await onReportPayment(completedOrder.orderId);
+                    setPaymentReported(true);
+                  } finally {
+                    setIsReportingPayment(false);
+                  }
+                }}
+                className="w-full rounded-xl bg-emerald-600 px-4 py-3 text-xs font-black text-white shadow-sm disabled:cursor-not-allowed disabled:bg-emerald-300"
+              >
+                {paymentReported ? 'Төлбөрийн мэдэгдэл админд очлоо' : isReportingPayment ? 'Илгээж байна…' : 'Төлбөр төлснөө админд мэдэгдэх'}
+              </button>
+            )}
 
             {/* Actions */}
             <div className="flex gap-3">
