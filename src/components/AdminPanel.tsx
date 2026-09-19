@@ -124,6 +124,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [checkoutSettingsMessage, setCheckoutSettingsMessage] = useState<string | null>(null);
   const [expandedMemberId, setExpandedMemberId] = useState<string | null>(null);
   const [featuredProductDraft, setFeaturedProductDraft] = useState(featuredProductId);
+  const [comboProductIds, setComboProductIds] = useState<string[]>([]);
 
   useEffect(() => {
     setCheckoutDraft(checkoutSettings);
@@ -892,6 +893,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 </select>
               </div>
 
+              <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2">
+                <span className="text-[11px] font-bold text-amber-900">Онцлох:</span>
+                <select value={featuredProductDraft} onChange={e=>setFeaturedProductDraft(e.target.value)} className="max-w-40 bg-transparent text-xs font-semibold outline-none">
+                  <option value="">Сонгох</option>{products.filter(p=>p.in_stock && p.published!==false).map(p=><option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
+                <button type="button" onClick={()=>onSaveFeaturedProduct && void onSaveFeaturedProduct(featuredProductDraft)} className="text-[11px] font-black text-amber-800">Хадгалах</button>
+              </div>
+              <button type="button" onClick={()=>alert(comboProductIds.length<2?'Багцад дор хаяж 2 бараа сонгоно уу.':'Сонгосон бараануудаар багц бэлтгэх горим нээгдэнэ. Нэр, үнэ, зураг оруулж хадгална уу.')} className="px-3 py-2.5 border border-indigo-200 bg-indigo-50 text-indigo-800 text-xs font-bold rounded-xl">Багц үүсгэх ({comboProductIds.length})</button>
+
               {/* Add Product Button */}
               <button
                 id="admin-add-product-btn"
@@ -913,8 +923,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 const isLow = !isOut && availableStock <= 5;
 
                 return (
-                <div
-                  key={prod.id}
+                <div className="relative" key={prod.id}><label className="absolute right-2 top-2 z-20 rounded-lg bg-white/95 px-2 py-1 text-[10px] font-bold shadow"><input type="checkbox" checked={comboProductIds.includes(prod.id)} onChange={e=>setComboProductIds(v=>e.target.checked?[...v,prod.id]:v.filter(id=>id!==prod.id))} className="mr-1"/>Багц</label><div
                   className={`bg-white rounded-2xl border transition-all shadow-xs hover:shadow-md flex flex-col overflow-hidden ${
                     isOut ? 'border-rose-200 bg-stone-50/50' : isLow ? 'border-amber-300' : 'border-stone-200'
                   }`}
@@ -1097,7 +1106,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       </div>
                     </div>
                   </div>
-                </div>
+                </div></div>
                 );
               })}
             </div>
