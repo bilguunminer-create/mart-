@@ -47,8 +47,14 @@ import { getStoreCustomerProfiles, getStoreOrders, getStoreSettings, saveStoreOr
 
 export default function App() {
   // The installed PWA and native Capacitor shells open only the secured admin flow.
+  const appMode = typeof window !== 'undefined'
+    ? new URLSearchParams(window.location.search).get('admin')
+    : null;
+  // /?admin=inventory is the separate warehouse application entry point.
+  const isInventoryApp = appMode === 'inventory';
   const isAdminApp = typeof window !== 'undefined' && (
-    new URLSearchParams(window.location.search).get('admin') === '1'
+    appMode === '1'
+    || isInventoryApp
     || window.location.protocol === 'capacitor:'
     || (window.location.hostname === 'localhost' && !window.location.port)
   );
@@ -293,7 +299,7 @@ export default function App() {
   // Browser back closes the current site panel first, instead of leaving the store.
   useEffect(() => {
     const overlayOpen = isCartOpen || isCheckoutOpen || isLoyaltyOpen || isProfileOpen
-      || isFormsOpen || Boolean(detailProduct) || isAdminOpen || isAdminLoginOpen || isDirectFormOpen;
+      || isFormsOpen || Boolean(detailProduct) || isAdminOpen || isAdminLoginOpen || isDirectFormOpen || isInventoryOpen;
     const closeOverlay = () => {
       setIsCartOpen(false);
       setIsCheckoutOpen(false);
@@ -304,6 +310,7 @@ export default function App() {
       setIsAdminOpen(false);
       setIsAdminLoginOpen(false);
       setIsDirectFormOpen(false);
+      setIsInventoryOpen(false);
       overlayHistoryRef.current = false;
     };
     const onPopState = () => {
@@ -315,7 +322,7 @@ export default function App() {
     }
     window.addEventListener('popstate', onPopState);
     return () => window.removeEventListener('popstate', onPopState);
-  }, [isCartOpen, isCheckoutOpen, isLoyaltyOpen, isProfileOpen, isFormsOpen, detailProduct, isAdminOpen, isAdminLoginOpen, isDirectFormOpen]);
+  }, [isCartOpen, isCheckoutOpen, isLoyaltyOpen, isProfileOpen, isFormsOpen, detailProduct, isAdminOpen, isAdminLoginOpen, isDirectFormOpen, isInventoryOpen]);
 
   // Supabase recovery links contain a short-lived session in the URL hash.
   // Open the password form immediately so the member can finish the reset.
@@ -421,6 +428,14 @@ export default function App() {
     if (!isAdminApp) return;
     void handleOpenAdmin();
   }, [isAdminApp, currentUser?.accessToken, isAdminAuthenticated]);
+
+  // The separate warehouse app never lands in the public admin dashboard.
+  // After central admin authentication it opens the camera inventory workflow directly.
+  useEffect(() => {
+    if (!isInventoryApp || !isAdminAuthenticated || !currentUser?.accessToken) return;
+    setIsAdminOpen(false);
+    setIsInventoryOpen(true);
+  }, [isInventoryApp, isAdminAuthenticated, currentUser?.accessToken]);
 
   const handleSaveProduct = (product: Product) => {
     setProducts((prev) => {
