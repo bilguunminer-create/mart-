@@ -59,8 +59,8 @@ export default function App() {
 
   // The public catalog is loaded from Supabase. PRODUCTS is only the first render fallback.
   const [products, setProducts] = useState<Product[]>(PRODUCTS);
-  const [checkoutSettings, setCheckoutSettings] = useState<{ deliveryFee: number; bankName: string; accountNumber: string; iban: string; accountHolder: string; storePhone: string }>({
-    deliveryFee: 3000, bankName: '', accountNumber: '', iban: '', accountHolder: '', storePhone: STORE_CONFIG.phone,
+  const [checkoutSettings, setCheckoutSettings] = useState<{ deliveryFee: number; freeDeliveryThreshold: number; bankName: string; accountNumber: string; iban: string; accountHolder: string; storePhone: string }>({
+    deliveryFee: 3000, freeDeliveryThreshold: STORE_CONFIG.free_delivery_threshold, bankName: '', accountNumber: '', iban: '', accountHolder: '', storePhone: STORE_CONFIG.phone,
   });
   useEffect(() => {
     getStoreSettings().then((settings) => {
@@ -74,6 +74,7 @@ export default function App() {
       const bank = settings.data.bank_accounts as Record<string, unknown> | undefined;
       setCheckoutSettings({
         deliveryFee: Number(settings.data.delivery_fee ?? 3000),
+        freeDeliveryThreshold: Number(settings.data.free_delivery_threshold ?? STORE_CONFIG.free_delivery_threshold),
         bankName: String(bank?.bankName ?? ''),
         accountNumber: String(bank?.accountNumber ?? ''),
         iban: String(bank?.iban ?? ''),
@@ -1377,6 +1378,7 @@ export default function App() {
             if (!currentUser?.accessToken) throw new Error('Админ и-мэйлээр нэвтэрнэ үү.');
             const data = await saveStoreSettings(currentUser.accessToken, {
               delivery_fee: settings.deliveryFee,
+              free_delivery_threshold: settings.freeDeliveryThreshold,
               bank_accounts: {
                 bankName: settings.bankName,
                 accountNumber: settings.accountNumber,
@@ -1387,6 +1389,7 @@ export default function App() {
             });
             setCheckoutSettings({
               deliveryFee: Number(data.delivery_fee ?? settings.deliveryFee),
+              freeDeliveryThreshold: Number(data.free_delivery_threshold ?? settings.freeDeliveryThreshold),
               bankName: settings.bankName,
               accountNumber: settings.accountNumber,
               iban: settings.iban,
