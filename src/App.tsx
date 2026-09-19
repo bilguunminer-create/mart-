@@ -493,16 +493,6 @@ export default function App() {
     showToast('Каталог анхдагч 24 бараагаар сэргээгдлээ');
   };
 
-  const handleChangePin = (newPin: string) => {
-    setAdminPin(newPin);
-    try {
-      localStorage.setItem('usk_admin_pin', newPin);
-    } catch {
-      // ignore
-    }
-    showToast('ПИН код шинэчлэгдлээ');
-  };
-
   const handleAdminLogout = () => {
     setIsAdminAuthenticated(false);
     setIsAdminOpen(false);
