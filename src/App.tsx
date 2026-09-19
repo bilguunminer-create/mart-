@@ -45,8 +45,12 @@ import { BeeEmblemLogo } from './components/BeeEmblemLogo';
 import { getStoreCustomerProfiles, getStoreOrders, getStoreSettings, saveStoreOrder, saveStoreProducts, saveStoreSettings, hasStoreAdminAccess, refreshSession, updateStoreOrderStatus } from './services/supabaseAuth';
 
 export default function App() {
-  // The installed admin PWA starts with ?admin=1 and exposes only the secured admin flow.
-  const isAdminApp = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('admin') === '1';
+  // The installed PWA and native Capacitor shells open only the secured admin flow.
+  const isAdminApp = typeof window !== 'undefined' && (
+    new URLSearchParams(window.location.search).get('admin') === '1'
+    || window.location.protocol === 'capacitor:'
+    || (window.location.hostname === 'localhost' && !window.location.port)
+  );
 
   // Today's day of week (0 = Sunday, 1 = Monday, ...)
   const [selectedDay, setSelectedDay] = useState<number>(() => {
