@@ -4,8 +4,8 @@
 
 ## Хийх дараалал
 
-1. Supabase дээр **usk-warehouse** нэртэй ШИНЭ project үүсгэнэ.
-2. SQL Editor дээр `supabase/schema.sql`-ийн бүх кодыг ажиллуулна.
+1. Free төлөвлөгөөн дээр одоогийн `usk-mart` Supabase project ашиглана. `warehouse_*` хүснэгт, RLS дүрэм нь дэлгүүрийн бусад мэдээллээс тусгаарлагдсан. Тусдаа paid project нээсэн үед л шинэ project ашиглана.
+2. `warehouse_*` schema одоогийн төв санд суусан. Шинэ Supabase project ашиглавал SQL Editor дээр `supabase/schema.sql`-ийн бүх кодыг ажиллуулна.
 3. Агуулахын ажилтан Auth → Users хэсгээр бүртгүүлсний дараа тухайн `user_id`-г `warehouse_staff` хүснэгтэд manager/staff эрхээр нэмнэ.
 4. Vercel → Add New → Project → энэ GitHub repository-г сонгоно.
 5. **Root Directory**: `warehouse-app`.
