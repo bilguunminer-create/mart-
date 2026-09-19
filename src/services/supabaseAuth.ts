@@ -101,10 +101,18 @@ export async function saveStoreOrder(token: string, order: {
     pointsToUse: Math.max(0, Math.floor(order.pointsToUse || 0)),
     items: order.items.map(item => ({ productId: item.id, quantity: item.quantity })),
   };
-  return request('/rest/v1/rpc/store_checkout_with_points', {
-    method: 'POST',
-    body: JSON.stringify({ payload, save_order: true }),
-  }, token);
+  try {
+    return await request('/rest/v1/rpc/store_checkout_with_points', {
+      method: 'POST',
+      body: JSON.stringify({ payload, save_order: true }),
+    }, token);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : '';
+    if (message.includes('OUT_OF_STOCK')) {
+      throw new Error('Сонгосон барааны үлдэгдэл өөрчлөгдсөн байна. Сагсаа шинэчлээд тухайн барааны тоог багасган дахин захиална уу.');
+    }
+    throw error;
+  }
 }
 
 
