@@ -164,6 +164,13 @@ export async function reportStoreOrderPayment(token: string, orderId: string) {
   }, token);
 }
 
+export async function confirmStoreOrderPayment(token: string, orderId: string) {
+  await request('/rest/v1/rpc/confirm_store_order_payment', {
+    method: 'POST',
+    body: JSON.stringify({ order_id: orderId }),
+  }, token);
+}
+
 export async function updateStoreOrderStatus(token: string, orderId: string, status: string) {
   await request('/rest/v1/rpc/store_order_status', {
     method: 'POST',
