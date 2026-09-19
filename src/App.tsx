@@ -52,8 +52,8 @@ export default function App() {
 
   // The public catalog is loaded from Supabase. PRODUCTS is only the first render fallback.
   const [products, setProducts] = useState<Product[]>(PRODUCTS);
-  const [checkoutSettings, setCheckoutSettings] = useState<{ deliveryFee: number; bankName: string; accountNumber: string; iban: string; accountHolder: string }>({
-    deliveryFee: 3000, bankName: '', accountNumber: '', iban: '', accountHolder: '',
+  const [checkoutSettings, setCheckoutSettings] = useState<{ deliveryFee: number; bankName: string; accountNumber: string; iban: string; accountHolder: string; storePhone: string }>({
+    deliveryFee: 3000, bankName: '', accountNumber: '', iban: '', accountHolder: '', storePhone: STORE_CONFIG.phone,
   });
   useEffect(() => {
     getStoreSettings().then((settings) => {
@@ -71,6 +71,7 @@ export default function App() {
         accountNumber: String(bank?.accountNumber ?? ''),
         iban: String(bank?.iban ?? ''),
         accountHolder: String(bank?.accountHolder ?? ''),
+        storePhone: String(settings.data.store_phone ?? checkoutSettings.storePhone),
       });
     }).catch(() => { /* The built-in catalog remains visible if the network is unavailable. */ });
   }, []);
@@ -732,6 +733,7 @@ export default function App() {
         selectedDay={selectedDay}
         setSelectedDay={setSelectedDay}
         dailyDealTitle={currentDeal.title}
+        storePhone={checkoutSettings.storePhone}
       />
 
       {/* Main Content Area */}
@@ -743,6 +745,7 @@ export default function App() {
             if (el) el.scrollIntoView({ behavior: 'smooth' });
           }}
           products={products}
+          storePhone={checkoutSettings.storePhone}
         />
 
         {/* Daily Deal Hero Banner */}
@@ -1075,7 +1078,7 @@ export default function App() {
               <div>
                 <h4 className="font-extrabold text-stone-900 text-sm">Хэрэглэгчийн Тусламж</h4>
                 <p className="text-xs text-stone-500 mt-0.5 leading-relaxed">
-                  Өдөр бүр 09:00 - 22:00 цагийн хооронд лавлах утас: <strong>{STORE_CONFIG.phone}</strong>
+                  Өдөр бүр 09:00 - 22:00 цагийн хооронд лавлах утас: <strong>{checkoutSettings.storePhone}</strong>
                 </p>
               </div>
             </div>
@@ -1132,8 +1135,8 @@ export default function App() {
               <span>•</span>
               <span className="text-stone-400">{STORE_CONFIG.location}</span>
               <span>•</span>
-              <a href={`tel:${STORE_CONFIG.phone}`} className="text-amber-400 font-bold hover:underline">
-                Утас: {STORE_CONFIG.phone}
+              <a href={`tel:${checkoutSettings.storePhone}`} className="text-amber-400 font-bold hover:underline">
+                Утас: {checkoutSettings.storePhone}
               </a>
               {isAdminAuthenticated && (
                 <>
@@ -1325,6 +1328,7 @@ export default function App() {
                 iban: settings.iban,
                 accountHolder: settings.accountHolder,
               },
+              store_phone: settings.storePhone,
             });
             setCheckoutSettings({
               deliveryFee: Number(data.delivery_fee ?? settings.deliveryFee),
@@ -1332,6 +1336,7 @@ export default function App() {
               accountNumber: settings.accountNumber,
               iban: settings.iban,
               accountHolder: settings.accountHolder,
+              storePhone: settings.storePhone,
             });
           }}
         />
