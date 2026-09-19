@@ -67,7 +67,7 @@ interface AdminPanelProps {
   onChangePin: (currentPin: string, newPin: string) => Promise<void>;
   onOpenForms?: () => void;
   onQuickUpdateStock?: (productId: string, amount: number, isAbsolute?: boolean) => void;
-  checkoutSettings?: { deliveryFee: number; bankName: string; accountNumber: string; iban: string; accountHolder: string; storePhone: string };
+  checkoutSettings?: { deliveryFee: number; freeDeliveryThreshold: number; bankName: string; accountNumber: string; iban: string; accountHolder: string; storePhone: string };
   onSaveCheckoutSettings?: (settings: { deliveryFee: number; bankName: string; accountNumber: string; iban: string; accountHolder: string; storePhone: string }) => Promise<void> | void;
 }
 
@@ -106,7 +106,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   onChangePin,
   onOpenForms,
   onQuickUpdateStock,
-  checkoutSettings = { deliveryFee: 3000, bankName: '', accountNumber: '', iban: '', accountHolder: '', storePhone: '' },
+  checkoutSettings = { deliveryFee: 3000, freeDeliveryThreshold: 100000, bankName: '', accountNumber: '', iban: '', accountHolder: '', storePhone: '' },
   onSaveCheckoutSettings
 }) => {
   const [activeTab, setActiveTab] = useState<'products' | 'orders' | 'loyalty' | 'stats' | 'settings'>('products');
@@ -120,7 +120,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
   useEffect(() => {
     setCheckoutDraft(checkoutSettings);
-  }, [checkoutSettings.deliveryFee, checkoutSettings.bankName, checkoutSettings.accountNumber, checkoutSettings.iban, checkoutSettings.accountHolder]);
+  }, [checkoutSettings.deliveryFee, checkoutSettings.freeDeliveryThreshold, checkoutSettings.bankName, checkoutSettings.accountNumber, checkoutSettings.iban, checkoutSettings.accountHolder]);
 
   const openLoyaltyMembers = () => {
     setActiveTab('loyalty');
@@ -1943,6 +1943,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   <input type="number" min="0" value={checkoutDraft.deliveryFee}
                     onChange={(e) => setCheckoutDraft((value) => ({ ...value, deliveryFee: Math.max(0, Number(e.target.value) || 0) }))}
                     className="mt-1.5 w-full px-3 py-2 border border-stone-300 rounded-xl bg-stone-50" />
+                </label>
+                <label className="text-xs font-bold text-stone-700">Үнэгүй хүргэлтийн босго (₮)
+                  <input type="number" min="0" step="1000" value={checkoutDraft.freeDeliveryThreshold}
+                    onChange={(e) => setCheckoutDraft((value) => ({ ...value, freeDeliveryThreshold: Math.max(0, Number(e.target.value) || 0) }))}
+                    className="mt-1.5 w-full px-3 py-2 border border-stone-300 rounded-xl bg-stone-50" />
+                  <span className="mt-1 block text-[10px] font-normal text-stone-500">Энэ дүн болон түүнээс дээш захиалгад хүргэлт үнэгүй.</span>
                 </label>
                 <label className="text-xs font-bold text-stone-700">Дэлгүүрийн холбоо барих утас
                   <input type="tel" value={checkoutDraft.storePhone} onChange={(e) => setCheckoutDraft((value) => ({ ...value, storePhone: e.target.value }))}
