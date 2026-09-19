@@ -205,3 +205,18 @@ export async function saveStoreProducts(token: string, products: Array<Record<st
     body: JSON.stringify({ data: nextData, version: settings.version + 1, updated_at: new Date().toISOString() }),
   }, token);
 }
+
+
+export async function verifyAdminPin(token: string, pin: string) {
+  return request<boolean>('/rest/v1/rpc/verify_admin_pin', {
+    method: 'POST',
+    body: JSON.stringify({ pin }),
+  }, token);
+}
+
+export async function changeAdminPin(token: string, currentPin: string, newPin: string) {
+  await request('/rest/v1/rpc/change_admin_pin', {
+    method: 'POST',
+    body: JSON.stringify({ current_pin: currentPin, new_pin: newPin }),
+  }, token);
+}
