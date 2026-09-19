@@ -66,12 +66,15 @@ export default function App() {
 
   // The public catalog is loaded from Supabase. PRODUCTS is only the first render fallback.
   const [products, setProducts] = useState<Product[]>(PRODUCTS);
+  const [comboPacks, setComboPacks] = useState<ComboPack[]>(COMBOS);
   const [featuredProductId, setFeaturedProductId] = useState('');
   const [checkoutSettings, setCheckoutSettings] = useState<{ deliveryFee: number; freeDeliveryThreshold: number; bankName: string; accountNumber: string; iban: string; accountHolder: string; storePhone: string; storeEmail: string; facebookUrl: string; storeAddress: string; unpaidCancellationMinutes: number }>({
     deliveryFee: 3000, freeDeliveryThreshold: STORE_CONFIG.free_delivery_threshold, bankName: '', accountNumber: '', iban: '', accountHolder: '', storePhone: STORE_CONFIG.phone, storeEmail: '', facebookUrl: '', storeAddress: STORE_CONFIG.location, unpaidCancellationMinutes: 60,
   });
   useEffect(() => {
     getStoreSettings().then((settings) => {
+      const savedCombos = settings.data.combo_packs;
+      if (Array.isArray(savedCombos)) setComboPacks(savedCombos as ComboPack[]);
       const remoteProducts = settings.data.products;
       if (!Array.isArray(remoteProducts)) return;
       setProducts(remoteProducts.map((product: any) => ({
@@ -880,6 +883,8 @@ export default function App() {
         {/* Curated Combos Section */}
         {featuredProductId && products.find(p=>p.id===featuredProductId) && <button type="button" onClick={()=>setDetailProduct(products.find(p=>p.id===featuredProductId)!)} className="mb-6 flex w-full items-center gap-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-left"><img src={products.find(p=>p.id===featuredProductId)!.image} className="h-16 w-16 rounded-xl object-cover" /><div><p className="text-xs font-bold text-amber-700">ӨНӨӨДРИЙН ОНЦЛОХ БАРАА</p><p className="font-black text-stone-900">{products.find(p=>p.id===featuredProductId)!.name}</p><p className="font-bold text-rose-600">{formatMNT(products.find(p=>p.id===featuredProductId)!.price)}</p></div></button>}
         <CombosSection
+          combos={comboPacks}
+          products={products}
           onAddComboToCart={handleAddComboToCart}
           onOpenProductDetail={(productId) => {
             const found = products.find((p) => p.id === productId);
