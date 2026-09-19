@@ -66,6 +66,7 @@ export default function App() {
 
   // The public catalog is loaded from Supabase. PRODUCTS is only the first render fallback.
   const [products, setProducts] = useState<Product[]>(PRODUCTS);
+  const [featuredProductId, setFeaturedProductId] = useState('');
   const [checkoutSettings, setCheckoutSettings] = useState<{ deliveryFee: number; freeDeliveryThreshold: number; bankName: string; accountNumber: string; iban: string; accountHolder: string; storePhone: string; storeEmail: string; facebookUrl: string; storeAddress: string; unpaidCancellationMinutes: number }>({
     deliveryFee: 3000, freeDeliveryThreshold: STORE_CONFIG.free_delivery_threshold, bankName: '', accountNumber: '', iban: '', accountHolder: '', storePhone: STORE_CONFIG.phone, storeEmail: '', facebookUrl: '', storeAddress: STORE_CONFIG.location, unpaidCancellationMinutes: 60,
   });
@@ -78,6 +79,7 @@ export default function App() {
         stock_quantity: Number(product.stock ?? 0),
         in_stock: Boolean(product.in_stock) && Number(product.stock ?? 0) > 0,
       })) as Product[]);
+      setFeaturedProductId(String(settings.data.featured_product_id ?? ''));
       const bank = settings.data.bank_accounts as Record<string, unknown> | undefined;
       setCheckoutSettings({
         deliveryFee: Number(settings.data.delivery_fee ?? 3000),
@@ -876,7 +878,7 @@ export default function App() {
         />
 
         {/* Curated Combos Section */}
-        <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm font-bold text-amber-950">Өнөөдрийн онцлох бараа болон багцуудыг админ төв сангаас сонгон шинэчилдэг.</div>
+        {featuredProductId && products.find(p=>p.id===featuredProductId) && <button type="button" onClick={()=>setDetailProduct(products.find(p=>p.id===featuredProductId)!)} className="mb-6 flex w-full items-center gap-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-left"><img src={products.find(p=>p.id===featuredProductId)!.image} className="h-16 w-16 rounded-xl object-cover" /><div><p className="text-xs font-bold text-amber-700">ӨНӨӨДРИЙН ОНЦЛОХ БАРАА</p><p className="font-black text-stone-900">{products.find(p=>p.id===featuredProductId)!.name}</p><p className="font-bold text-rose-600">{formatMNT(products.find(p=>p.id===featuredProductId)!.price)}</p></div></button>}
         <CombosSection
           onAddComboToCart={handleAddComboToCart}
           onOpenProductDetail={(productId) => {
@@ -1448,6 +1450,8 @@ export default function App() {
           onChangePin={handleChangePin}
           onOpenForms={() => setIsFormsOpen(true)}
           onQuickUpdateStock={handleQuickUpdateStock}
+          featuredProductId={featuredProductId}
+          onSaveFeaturedProduct={async (productId) => { if (!currentUser?.accessToken) throw new Error('Админ и-мэйлээр нэвтэрнэ үү.'); await saveStoreSettings(currentUser.accessToken, { featured_product_id: productId }); setFeaturedProductId(productId); showToast('Өнөөдрийн онцлох бараа төв санд хадгалагдлаа.'); }}
           checkoutSettings={checkoutSettings}
           onSaveCheckoutSettings={async (settings) => {
             if (!currentUser?.accessToken) throw new Error('Админ и-мэйлээр нэвтэрнэ үү.');
