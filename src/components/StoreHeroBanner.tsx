@@ -5,9 +5,10 @@ import { DEFAULT_STORE_BANNER } from '../data/brandAssets';
 
 interface StoreHeroBannerProps {
   onExploreClick?: () => void;
+  storePhone?: string;
 }
 
-export const StoreHeroBanner: React.FC<StoreHeroBannerProps> = ({ onExploreClick }) => {
+export const StoreHeroBanner: React.FC<StoreHeroBannerProps> = ({ onExploreClick, storePhone = '7700-1122' }) => {
   const [customBanner, setCustomBanner] = useState<string | null>(() => {
     try {
       return localStorage.getItem('usk_custom_banner') || DEFAULT_STORE_BANNER;
@@ -61,11 +62,11 @@ export const StoreHeroBanner: React.FC<StoreHeroBannerProps> = ({ onExploreClick
             <span className="text-stone-300">|</span>
 
             <a 
-              href="tel:7700-1122" 
+              href={"tel:" + storePhone.replace(/\D/g, '')} 
               className="flex items-center gap-1.5 text-stone-900 hover:text-rose-600 transition-colors font-bold"
             >
               <Phone className="w-3.5 h-3.5 text-rose-600" />
-              <span>Утас: 7700-1122</span>
+              <span>Утас: {storePhone}</span>
             </a>
 
             {onExploreClick && (
@@ -191,11 +192,11 @@ export const StoreHeroBanner: React.FC<StoreHeroBannerProps> = ({ onExploreClick
           <span className="text-stone-300">|</span>
 
           <a 
-            href="tel:7700-1122" 
+            href={"tel:" + storePhone.replace(/\D/g, '')} 
             className="flex items-center gap-1.5 text-stone-900 hover:text-rose-600 transition-colors font-bold"
           >
             <Phone className="w-3.5 h-3.5 text-rose-600" />
-            <span>Утас: 7700-1122</span>
+            <span>Утас: {storePhone}</span>
           </a>
         </div>
       </div>
