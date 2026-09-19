@@ -1230,6 +1230,7 @@ export default function App() {
         orders={orders}
         currentUser={currentUser}
         dailyDiscountTotal={dailyDiscountTotal}
+        paymentSettings={checkoutSettings}
         onOrderSuccess={async (order) => {
           if (!currentUser?.accessToken) {
             throw new Error('Захиалгаа хадгалахын тулд эхлээд бүртгэлдээ нэвтэрнэ үү.');
