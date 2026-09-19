@@ -133,12 +133,12 @@ export type StoreOrderRecord = {
   id: string; customer_id: string; customer_name: string; phone: string; address: string;
   note: string; items: Array<{ productId: string; title: string; quantity: number; price: number }>;
   subtotal: number; daily_discount: number; vip_discount: number; delivery_fee: number;
-  total: number; created_at: string; status: string;
+  total: number; created_at: string; status: string; payment_status?: string; payment_reported_at?: string | null;
 };
 
 export async function getStoreOrders(token: string) {
   return request<StoreOrderRecord[]>(
-    '/rest/v1/store_orders?select=id,customer_id,customer_name,phone,address,note,items,subtotal,daily_discount,vip_discount,delivery_fee,total,created_at,status&order=created_at.desc',
+    '/rest/v1/store_orders?select=id,customer_id,customer_name,phone,address,note,items,subtotal,daily_discount,vip_discount,delivery_fee,total,created_at,status,payment_status,payment_reported_at&order=created_at.desc',
     { method: 'GET' },
     token,
   );
@@ -155,6 +155,13 @@ export async function getStoreCustomerProfiles(token: string) {
 export async function hasStoreAdminAccess(token: string) {
   const rows = await request<Array<{ email: string }>>('/rest/v1/allowed_accounts?select=email', { method: 'GET' }, token);
   return rows.length > 0;
+}
+
+export async function reportStoreOrderPayment(token: string, orderId: string) {
+  return request('/rest/v1/rpc/report_store_order_payment', {
+    method: 'POST',
+    body: JSON.stringify({ order_id: orderId }),
+  }, token);
 }
 
 export async function updateStoreOrderStatus(token: string, orderId: string, status: string) {
