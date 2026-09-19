@@ -4,15 +4,13 @@ import { X, Lock, KeyRound, AlertCircle, ArrowRight, ShieldAlert, Eye, EyeOff, S
 interface AdminLoginModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onLoginSuccess: () => void;
-  currentPin: string;
+  onLogin: (pin: string) => Promise<void>;
 }
 
 export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
   isOpen,
   onClose,
-  onLoginSuccess,
-  currentPin
+  onLogin
 }) => {
   const [pin, setPin] = useState('');
   const [showPin, setShowPin] = useState(false);
@@ -62,50 +60,32 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
     if (lockoutRemaining > 0) {
       setError(`Систем хамгаалалтаар түр түгжигдсэн байна. ${lockoutRemaining} секундийн дараа дахин оролдоно уу.`);
       return;
     }
-
-    // Strict validation against current active PIN
-    if (pin.trim() === currentPin) {
+    try {
+      await onLogin(pin);
       setError(null);
       setPin('');
       setFailedAttempts(0);
-      try {
-        sessionStorage.removeItem('usk_admin_fail_count');
-        sessionStorage.removeItem('usk_admin_lock_until');
-        // Record last successful login timestamp
-        sessionStorage.setItem('usk_admin_last_login', new Date().toLocaleString('mn-MN'));
-      } catch {
-        // ignore
-      }
-      onLoginSuccess();
-    } else {
+      sessionStorage.removeItem('usk_admin_fail_count');
+      sessionStorage.removeItem('usk_admin_lock_until');
+      sessionStorage.setItem('usk_admin_last_login', new Date().toLocaleString('mn-MN'));
+    } catch (reason) {
       const nextFail = failedAttempts + 1;
       setFailedAttempts(nextFail);
-      try {
-        sessionStorage.setItem('usk_admin_fail_count', nextFail.toString());
-      } catch {
-        // ignore
-      }
-
+      sessionStorage.setItem('usk_admin_fail_count', nextFail.toString());
       if (nextFail >= MAX_ATTEMPTS) {
         const lockSeconds = 60;
-        const lockUntil = Date.now() + lockSeconds * 1000;
-        try {
-          sessionStorage.setItem('usk_admin_lock_until', lockUntil.toString());
-        } catch {
-          // ignore
-        }
+        sessionStorage.setItem('usk_admin_lock_until', String(Date.now() + lockSeconds * 1000));
         setLockoutRemaining(lockSeconds);
-        setError(`Аюулгүй байдлын үүднээс систем 60 секунд түр түгжигдлээ. Түр хүлээгээд дахин оролдоно уу.`);
+        setError('Аюулгүй байдлын үүднээс систем 60 секунд түр түгжигдлээ. Түр хүлээгээд дахин оролдоно уу.');
       } else {
-        const remaining = MAX_ATTEMPTS - nextFail;
-        setError(`Админ ПИН код буруу байна! Танд ${remaining} оролдлого үлдлээ.`);
+        const detail = reason instanceof Error ? reason.message : 'Админ ПИН код буруу байна.';
+        setError(`${detail} Танд ${MAX_ATTEMPTS - nextFail} оролдлого үлдлээ.`);
       }
       setPin('');
     }
@@ -169,9 +149,7 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
                 <KeyRound className="w-3.5 h-3.5 text-stone-400" />
                 <span>Админ ПИН код</span>
               </span>
-              <span className="text-[10px] text-stone-400 font-normal">
-                {currentPin === '1234' ? '(Анхдагч: 1234)' : '(Нууцлагдсан)'}
-              </span>
+              <span className="text-[10px] text-stone-400 font-normal">(Төв санд хадгалагдана)</span>
             </label>
             <div className="relative">
               <input
