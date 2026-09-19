@@ -541,30 +541,29 @@ export default function App() {
   const handleAddToCart = (product: Product, quantity = 1) => {
     const pricing = getProductPricing(product);
     const available = Math.max(0, Number(product.stock_quantity ?? (product.in_stock ? 1 : 0)));
+    const alreadyInCart = cart.find((item) => item.id === product.id)?.quantity ?? 0;
     if (!product.in_stock || available < 1) {
       showToast(`"${product.name}" одоогоор дууссан байна.`);
       return;
     }
+    if (alreadyInCart + quantity > available) {
+      showToast(`"${product.name}"-ын үлдэгдэл ${available} ш байна. Нэг барааны тоо үлдэгдлээс их байж болохгүй.`);
+      return;
+    }
 
-    let added = false;
     setCart((prevCart) => {
-      const existingIndex = prevCart.findIndex((i) => i.id === product.id);
-      const currentQuantity = existingIndex > -1 ? prevCart[existingIndex].quantity : 0;
-      if (currentQuantity + quantity > available) {
-        return prevCart;
-      }
-      added = true;
+      const existingIndex = prevCart.findIndex((item) => item.id === product.id);
       if (existingIndex > -1) {
         const next = [...prevCart];
         next[existingIndex] = {
           ...next[existingIndex],
-          quantity: currentQuantity + quantity,
+          quantity: next[existingIndex].quantity + quantity,
           price: pricing.price,
           originalPrice: pricing.originalPrice
         };
         return next;
       }
-      const newItem: CartItem = {
+      return [...prevCart, {
         type: 'product',
         id: product.id,
         name: product.name,
@@ -576,13 +575,9 @@ export default function App() {
         appliedDiscountPct: pricing.discountPercent,
         origin: product.origin,
         flag: product.flag
-      };
-      return [...prevCart, newItem];
+      }];
     });
-
-    showToast(added
-      ? `"${product.name}" сагсанд нэмэгдлээ!`
-      : `"${product.name}"-ын үлдэгдэл ${available} ш байна. Нэг барааны тоо үлдэгдлээс их байж болохгүй.`);
+    showToast(`"${product.name}" сагсанд нэмэгдлээ!`);
   };
 
   // Add Combo to Cart
