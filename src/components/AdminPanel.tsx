@@ -68,8 +68,8 @@ interface AdminPanelProps {
   onChangePin: (newPin: string) => void;
   onOpenForms?: () => void;
   onQuickUpdateStock?: (productId: string, amount: number, isAbsolute?: boolean) => void;
-  checkoutSettings?: { deliveryFee: number; bankName: string; accountNumber: string; iban: string; accountHolder: string };
-  onSaveCheckoutSettings?: (settings: { deliveryFee: number; bankName: string; accountNumber: string; iban: string; accountHolder: string }) => Promise<void> | void;
+  checkoutSettings?: { deliveryFee: number; bankName: string; accountNumber: string; iban: string; accountHolder: string; storePhone: string };
+  onSaveCheckoutSettings?: (settings: { deliveryFee: number; bankName: string; accountNumber: string; iban: string; accountHolder: string; storePhone: string }) => Promise<void> | void;
 }
 
 export interface LoyaltyMember {
@@ -108,7 +108,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   onChangePin,
   onOpenForms,
   onQuickUpdateStock,
-  checkoutSettings = { deliveryFee: 3000, bankName: '', accountNumber: '', iban: '', accountHolder: '' },
+  checkoutSettings = { deliveryFee: 3000, bankName: '', accountNumber: '', iban: '', accountHolder: '', storePhone: '' },
   onSaveCheckoutSettings
 }) => {
   const [activeTab, setActiveTab] = useState<'products' | 'orders' | 'loyalty' | 'stats' | 'settings'>('products');
@@ -1946,6 +1946,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   <input type="number" min="0" value={checkoutDraft.deliveryFee}
                     onChange={(e) => setCheckoutDraft((value) => ({ ...value, deliveryFee: Math.max(0, Number(e.target.value) || 0) }))}
                     className="mt-1.5 w-full px-3 py-2 border border-stone-300 rounded-xl bg-stone-50" />
+                </label>
+                <label className="text-xs font-bold text-stone-700">Дэлгүүрийн холбоо барих утас
+                  <input type="tel" value={checkoutDraft.storePhone} onChange={(e) => setCheckoutDraft((value) => ({ ...value, storePhone: e.target.value }))}
+                    placeholder="Жишээ: 7700-1122" className="mt-1.5 w-full px-3 py-2 border border-stone-300 rounded-xl bg-stone-50" />
                 </label>
                 <label className="text-xs font-bold text-stone-700">Банкны нэр
                   <input value={checkoutDraft.bankName} onChange={(e) => setCheckoutDraft((value) => ({ ...value, bankName: e.target.value }))}
