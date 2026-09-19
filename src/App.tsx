@@ -42,7 +42,7 @@ import { UserProfileModal } from './components/UserProfileModal';
 import { GoogleFormsModal } from './components/GoogleFormsModal';
 import { StoreHeroBanner } from './components/StoreHeroBanner';
 import { BeeEmblemLogo } from './components/BeeEmblemLogo';
-import { getStoreCustomerProfiles, getStoreOrders, getStoreSettings, saveStoreOrder, saveStoreProducts, saveStoreSettings, hasStoreAdminAccess, refreshSession, updateStoreOrderStatus } from './services/supabaseAuth';
+import { getStoreCustomerProfiles, getStoreOrders, getStoreSettings, saveStoreOrder, saveStoreProducts, saveStoreSettings, hasStoreAdminAccess, refreshSession, reportStoreOrderPayment, updateStoreOrderStatus } from './services/supabaseAuth';
 
 export default function App() {
   // The installed PWA and native Capacitor shells open only the secured admin flow.
@@ -174,7 +174,9 @@ export default function App() {
           address: order.address,
           district: 'Өмнөговь, Даланзадгад',
           notes: order.note || '',
-          paymentMethod: 'cod',
+          paymentMethod: 'bank',
+          paymentStatus: order.payment_status,
+          paymentReportedAt: order.payment_reported_at || undefined,
           items: (order.items || []).map((item) => ({
             type: 'product',
             id: item.productId,
@@ -1231,11 +1233,19 @@ export default function App() {
         currentUser={currentUser}
         dailyDiscountTotal={dailyDiscountTotal}
         paymentSettings={checkoutSettings}
+        onReportPayment={async (orderId) => {
+          if (!currentUser?.accessToken) throw new Error('Бүртгэлдээ нэвтэрнэ үү.');
+          await reportStoreOrderPayment(currentUser.accessToken, orderId);
+          setOrders((prev) => prev.map((item) => item.orderId === orderId
+            ? { ...item, paymentStatus: 'Төлбөр шалгуулж байна', paymentReportedAt: new Date().toISOString() }
+            : item));
+          showToast('Төлбөрийн мэдэгдэл админд илгээгдлээ.');
+        }}
         onOrderSuccess={async (order) => {
           if (!currentUser?.accessToken) {
             throw new Error('Захиалгаа хадгалахын тулд эхлээд бүртгэлдээ нэвтэрнэ үү.');
           }
-          await saveStoreOrder(currentUser.accessToken, {
+          const savedOrder = await saveStoreOrder(currentUser.accessToken, {
             customerName: order.customerName,
             phone: order.phone,
             address: order.address,
@@ -1247,7 +1257,9 @@ export default function App() {
           });
           const newOrder: OrderDetails = {
             ...order,
-            status: 'new'
+            orderId: String((savedOrder as { id?: string }).id || order.orderId),
+            status: 'new',
+            paymentStatus: String((savedOrder as { payment_status?: string }).payment_status || 'Төлөөгүй')
           };
           const orderPhoneClean = order.phone?.replace(/\D/g, '').slice(-8) || '';
           const currentPhoneClean = currentUser?.phone?.replace(/\D/g, '').slice(-8) || '';
@@ -1294,7 +1306,8 @@ export default function App() {
 
           setOrders((prev) => [newOrder, ...prev]);
           setCart([]);
-          showToast(`Захиалга #${order.orderId} амжилттай бүртгэгдлээ! Таны бүртгэл дээр түүх хадгалагдлаа.${promotionMsg}`);
+          showToast(`Захиалга #${newOrder.orderId} амжилттай бүртгэгдлээ! Таны бүртгэл дээр түүх хадгалагдлаа.${promotionMsg}`);
+          return newOrder;
         }}
       />
 
