@@ -448,7 +448,6 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                       {usePoints ? `Энэ захиалгад ${formatMNT(pointsDiscount)} бонус оноо ашиглана.` : 'Бонус оноо таны дансанд бүрэн хадгалагдана.'}
                     </p>
                   </div>
-                </div>
 
                 <div>
                   <label className="block text-xs font-semibold text-stone-700 mb-1">
