@@ -42,7 +42,7 @@ import { UserProfileModal } from './components/UserProfileModal';
 import { GoogleFormsModal } from './components/GoogleFormsModal';
 import { StoreHeroBanner } from './components/StoreHeroBanner';
 import { BeeEmblemLogo } from './components/BeeEmblemLogo';
-import { getStoreCustomerProfiles, getStoreOrders, getStoreSettings, saveStoreOrder, saveStoreProducts, saveStoreSettings, hasStoreAdminAccess, refreshSession, reportStoreOrderPayment, updateStoreOrderStatus } from './services/supabaseAuth';
+import { getStoreCustomerProfiles, getStoreOrders, getStoreSettings, saveStoreOrder, saveStoreProducts, saveStoreSettings, hasStoreAdminAccess, refreshSession, reportStoreOrderPayment, updateStoreOrderStatus, verifyAdminPin, changeAdminPin } from './services/supabaseAuth';
 
 export default function App() {
   // The installed PWA and native Capacitor shells open only the secured admin flow.
@@ -96,13 +96,6 @@ export default function App() {
       return sessionStorage.getItem('usk_admin_auth') === 'true';
     } catch {
       return false;
-    }
-  });
-  const [adminPin, setAdminPin] = useState<string>(() => {
-    try {
-      return localStorage.getItem('usk_admin_pin') || '1234';
-    } catch {
-      return '1234';
     }
   });
   const [directEditProduct, setDirectEditProduct] = useState<Product | null>(null);
@@ -396,12 +389,12 @@ export default function App() {
     else setIsAdminLoginOpen(true);
   };
 
-  const handleAdminLoginSuccess = async () => {
+  const handleAdminLogin = async (pin: string) => {
     if (!currentUser?.accessToken || !await hasStoreAdminAccess(currentUser.accessToken)) {
-      setIsAdminLoginOpen(false);
-      setIsProfileOpen(true);
-      showToast('Админ и-мэйлээр дахин нэвтэрч байж төв сангийн гишүүдийг харна.');
-      return;
+      throw new Error('Админ и-мэйлээр дахин нэвтэрч байж төв сангийн гишүүдийг харна.');
+    }
+    if (!await verifyAdminPin(currentUser.accessToken, pin.trim())) {
+      throw new Error('Админ ПИН код буруу байна.');
     }
     setIsAdminAuthenticated(true);
     try {
@@ -412,6 +405,12 @@ export default function App() {
     setIsAdminLoginOpen(false);
     setIsAdminOpen(true);
     showToast('Админ системд амжилттай нэвтэрлээ!');
+  };
+
+  const handleChangePin = async (currentPin: string, newPin: string) => {
+    if (!currentUser?.accessToken) throw new Error('Админ и-мэйлээр дахин нэвтэрнэ үү.');
+    await changeAdminPin(currentUser.accessToken, currentPin.trim(), newPin.trim());
+    showToast('Админ ПИН код төв санд шинэчлэгдлээ. Шинэ browser болон апп дээр шууд үйлчилнэ.');
   };
 
   // The dedicated installed admin app opens the secured management screen directly.
@@ -1380,7 +1379,6 @@ export default function App() {
           onResetProducts={handleResetProducts}
           onClose={() => setIsAdminOpen(false)}
           onLogout={handleAdminLogout}
-          adminPin={adminPin}
           onChangePin={handleChangePin}
           onOpenForms={() => setIsFormsOpen(true)}
           onQuickUpdateStock={handleQuickUpdateStock}
@@ -1440,8 +1438,7 @@ export default function App() {
       <AdminLoginModal
         isOpen={isAdminLoginOpen}
         onClose={() => setIsAdminLoginOpen(false)}
-        onLoginSuccess={handleAdminLoginSuccess}
-        currentPin={adminPin}
+        onLogin={handleAdminLogin}
       />
 
       {/* Direct Product Form Modal (for quick edit from catalog cards) */}
