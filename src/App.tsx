@@ -1239,6 +1239,7 @@ export default function App() {
             phone: order.phone,
             address: order.address,
             notes: order.notes,
+            deliveryMode: order.district === 'Өмнөговь, Даланзадгад' ? 'delivery' : 'vehicle',
             total: order.total,
             pointsToUse: order.pointsDiscount || 0,
             items: order.items.map((item) => ({ id: item.id, quantity: item.quantity })),
