@@ -2073,7 +2073,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   </label>
                   <input
                     type="password"
-                    placeholder="Одоо ашиглаж буй ПИН (Анхдагч: 1234)"
+                    placeholder="Одоо ашиглаж буй төв ПИН код"
                     value={currentPinInput}
                     onChange={(e) => setCurrentPinInput(e.target.value)}
                     className="w-full px-3.5 py-2 text-xs border border-stone-300 rounded-xl focus:outline-none focus:border-rose-500 font-mono tracking-widest bg-stone-50"
