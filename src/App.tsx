@@ -540,37 +540,49 @@ export default function App() {
   // Add Product to Cart
   const handleAddToCart = (product: Product, quantity = 1) => {
     const pricing = getProductPricing(product);
-    
+    const available = Math.max(0, Number(product.stock_quantity ?? (product.in_stock ? 1 : 0)));
+    if (!product.in_stock || available < 1) {
+      showToast(`"${product.name}" одоогоор дууссан байна.`);
+      return;
+    }
+
+    let added = false;
     setCart((prevCart) => {
       const existingIndex = prevCart.findIndex((i) => i.id === product.id);
+      const currentQuantity = existingIndex > -1 ? prevCart[existingIndex].quantity : 0;
+      if (currentQuantity + quantity > available) {
+        return prevCart;
+      }
+      added = true;
       if (existingIndex > -1) {
         const next = [...prevCart];
         next[existingIndex] = {
           ...next[existingIndex],
-          quantity: next[existingIndex].quantity + quantity,
+          quantity: currentQuantity + quantity,
           price: pricing.price,
           originalPrice: pricing.originalPrice
         };
         return next;
-      } else {
-        const newItem: CartItem = {
-          type: 'product',
-          id: product.id,
-          name: product.name,
-          price: pricing.price,
-          originalPrice: pricing.originalPrice,
-          image: product.image,
-          weight: product.weight,
-          quantity,
-          appliedDiscountPct: pricing.discountPercent,
-          origin: product.origin,
-          flag: product.flag
-        };
-        return [...prevCart, newItem];
       }
+      const newItem: CartItem = {
+        type: 'product',
+        id: product.id,
+        name: product.name,
+        price: pricing.price,
+        originalPrice: pricing.originalPrice,
+        image: product.image,
+        weight: product.weight,
+        quantity,
+        appliedDiscountPct: pricing.discountPercent,
+        origin: product.origin,
+        flag: product.flag
+      };
+      return [...prevCart, newItem];
     });
 
-    showToast(`"${product.name}" сагсанд нэмэгдлээ!`);
+    showToast(added
+      ? `"${product.name}" сагсанд нэмэгдлээ!`
+      : `"${product.name}"-ын үлдэгдэл ${available} ш байна. Нэг барааны тоо үлдэгдлээс их байж болохгүй.`);
   };
 
   // Add Combo to Cart
@@ -612,11 +624,15 @@ export default function App() {
   const handleUpdateQuantity = (id: string, quantity: number) => {
     if (quantity <= 0) {
       handleRemoveItem(id);
-    } else {
-      setCart((prev) =>
-        prev.map((item) => (item.id === id ? { ...item, quantity } : item))
-      );
+      return;
     }
+    const product = products.find((item) => item.id === id);
+    const available = product ? Math.max(0, Number(product.stock_quantity ?? (product.in_stock ? 1 : 0))) : quantity;
+    if (product && quantity > available) {
+      showToast(`"${product.name}"-ын үлдэгдэл ${available} ш байна.`);
+      return;
+    }
+    setCart((prev) => prev.map((item) => (item.id === id ? { ...item, quantity } : item)));
   };
 
   const handleRemoveItem = (id: string) => {
