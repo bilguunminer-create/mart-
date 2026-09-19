@@ -1,0 +1,99 @@
+import React, { useEffect, useRef, useState } from 'react';
+import { X, Camera, Barcode, PackagePlus, MinusCircle, History, CheckCircle2, RefreshCw } from 'lucide-react';
+import { deductInventoryByBarcode, getInventoryMovements, registerInventoryProduct, uploadProductImage, InventoryMovement } from '../services/supabaseAuth';
+
+type Props = { isOpen: boolean; onClose: () => void; accessToken: string; onChanged: () => void };
+type Tab = 'register' | 'deduct' | 'history';
+const blank = { name:'', stock:'', origin:'АНУ', category:'other', category_name:'Бусад', price:'', weight:'', badge:'', day_deal:'-1', description:'', barcode:'' };
+
+export const InventoryCameraModal: React.FC<Props> = ({ isOpen, onClose, accessToken, onChanged }) => {
+  const [tab,setTab]=useState<Tab>('register');
+  const [form,setForm]=useState(blank);
+  const [image,setImage]=useState<File|null>(null);
+  const [preview,setPreview]=useState('');
+  const [imageOk,setImageOk]=useState(false);
+  const [scan,setScan]=useState('');
+  const [deductQty,setDeductQty]=useState('1');
+  const [note,setNote]=useState('');
+  const [message,setMessage]=useState('');
+  const [busy,setBusy]=useState(false);
+  const [history,setHistory]=useState<InventoryMovement[]>([]);
+  const videoRef=useRef<HTMLVideoElement|null>(null);
+  const streamRef=useRef<MediaStream|null>(null);
+  const timerRef=useRef<number|undefined>();
+
+  const stopCamera=()=>{ if(timerRef.current) window.clearInterval(timerRef.current); streamRef.current?.getTracks().forEach(t=>t.stop()); streamRef.current=null; };
+  useEffect(()=>()=>stopCamera(),[]);
+  useEffect(()=>{ if(tab==='history'&&isOpen) void loadHistory(); },[tab,isOpen]);
+
+  const setField=(key:string,value:string)=>setForm(current=>({...current,[key]:value}));
+  const loadHistory=async()=>{ try { setHistory(await getInventoryMovements(accessToken)); } catch { setMessage('Хөдөлгөөний түүх татагдсангүй.'); } };
+
+  const chooseImage=async(file?:File)=>{
+    if(!file) return;
+    setImageOk(false); setImage(file); setPreview(URL.createObjectURL(file));
+    const img=new Image(); img.onload=()=>{ const ok=img.naturalWidth>=900&&img.naturalHeight>=900&&file.size>=40*1024&&file.size<=5*1024*1024; setImageOk(ok); setMessage(ok?'Зургийн хэмжээ шаардлага хангалаа. Одоо barcode / QR код уншуулна уу.':'Зураг бүдэг эсвэл хэт жижиг байж болзошгүй. 900×900-аас дээш, тод зураг дахин авна уу.'); }; img.src=URL.createObjectURL(file);
+  };
+
+  const startScanner=async(target:'register'|'deduct')=>{
+    try {
+      stopCamera();
+      const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}},audio:false});
+      streamRef.current=stream;
+      if(videoRef.current){ videoRef.current.srcObject=stream; await videoRef.current.play(); }
+      const Detector=(window as any).BarcodeDetector;
+      if(!Detector){ setMessage('Энэ төхөөрөмж barcode автоматаар уншихыг дэмжихгүй байна. Кодоо гараар оруулна уу.'); return; }
+      const detector=new Detector({formats:['ean_13','ean_8','upc_a','upc_e','code_128','code_39','qr_code']});
+      timerRef.current=window.setInterval(async()=>{ try { if(!videoRef.current) return; const found=await detector.detect(videoRef.current); const value=found?.[0]?.rawValue; if(value){ if(target==='register') setField('barcode',value); else setScan(value); setMessage('Код амжилттай уншигдлаа: '+value); stopCamera(); } } catch {} },500);
+    } catch { setMessage('Камер нээх зөвшөөрөл өгнө үү.'); }
+  };
+
+  const register=async()=>{
+    if(!image||!imageOk){ setMessage('Шаардлага хангасан барааны зураг авна уу.'); return; }
+    if(!form.barcode||!form.name||!form.stock||!form.price){ setMessage('Зураг, barcode, нэр, тоо, үнийг заавал бөглөнө.'); return; }
+    setBusy(true); setMessage('');
+    try {
+      const imageUrl=await uploadProductImage(accessToken,image);
+      await registerInventoryProduct(accessToken,{...form,id:crypto.randomUUID(),stock:Number(form.stock),price:Number(form.price),day_deal:Number(form.day_deal),image:imageUrl,country:form.origin,flag:form.origin==='БНСУ'?'🇰🇷':'🇺🇸',rating:5,published:false,note:'Камерын апп-аар шинээр бүртгэв'});
+      setMessage('Бараа амжилттай бүртгэгдлээ. Админ удирдлагаас шалгаж нийтлээрэй.'); setForm(blank); setImage(null); setPreview(''); setImageOk(false); onChanged();
+    } catch(e){ setMessage(e instanceof Error?e.message:'Бүртгэх боломжгүй байна.'); } finally { setBusy(false); }
+  };
+
+  const deduct=async()=>{
+    if(!scan||Number(deductQty)<1){ setMessage('Barcode болон хасах тоог оруулна уу.'); return; }
+    setBusy(true); setMessage('');
+    try { const result=await deductInventoryByBarcode(accessToken,scan,Number(deductQty),note); setMessage(`${String(result.name)}: ${String(result.stock_before)}ш → ${String(result.stock_after)}ш. Хасалт серверт хадгалагдлаа.`); setScan(''); setDeductQty('1'); setNote(''); onChanged(); }
+    catch(e){ const raw=e instanceof Error?e.message:''; setMessage(raw.includes('OUT_OF_STOCK')?'Үлдэгдэл хүрэлцэхгүй байна. Хасалт хийгдсэнгүй.':raw.includes('BARCODE_NOT_FOUND')?'Энэ barcode/QR кодтой бараа олдсонгүй.':raw||'Хасалт хийх боломжгүй байна.'); }
+    finally { setBusy(false); }
+  };
+
+  if(!isOpen) return null;
+  return <div className="fixed inset-0 z-[70] overflow-y-auto bg-stone-950/75 p-3 sm:p-6">
+    <div className="mx-auto min-h-full w-full max-w-2xl rounded-3xl bg-white shadow-2xl">
+      <header className="sticky top-0 z-10 flex items-center justify-between rounded-t-3xl bg-stone-950 p-4 text-white">
+        <div><h2 className="font-black">Агуулах · Камер ба Barcode</h2><p className="text-xs text-stone-300">Бараа бүртгэл, борлуулалтын хасалт, хөдөлгөөний түүх</p></div>
+        <button onClick={()=>{stopCamera();onClose();}} className="rounded-xl p-2 hover:bg-white/10"><X /></button>
+      </header>
+      <div className="flex border-b border-stone-200">
+        {[['register','Бараа бүртгэх',PackagePlus],['deduct','Борлуулалт хасах',MinusCircle],['history','Түүх',History]].map(([id,label,Icon])=><button key={String(id)} onClick={()=>{stopCamera();setTab(id as Tab);}} className={`flex-1 p-3 text-xs font-bold ${tab===id?'border-b-2 border-rose-600 text-rose-700':'text-stone-500'}`}><Icon className="mr-1 inline h-4 w-4"/>{String(label)}</button>)}
+      </div>
+      <main className="space-y-4 p-4 sm:p-6">
+        {message&&<div className="rounded-xl bg-amber-50 p-3 text-sm text-amber-900">{message}</div>}
+        {(tab==='register'||tab==='deduct')&&<><video ref={videoRef} playsInline muted className={streamRef.current?'block w-full rounded-2xl bg-black':'hidden'} /></>}
+        {tab==='register'&&<div className="space-y-4">
+          <section className="rounded-2xl border p-4"><h3 className="font-black">1. Барааны зураг</h3>{preview&&<img src={preview} className="mt-3 h-48 w-full rounded-xl object-cover" />}
+          <label className="mt-3 flex cursor-pointer items-center justify-center gap-2 rounded-xl bg-stone-900 p-3 text-sm font-bold text-white"><Camera className="h-4 w-4"/> Зураг авах / оруулах<input type="file" accept="image/jpeg,image/png,image/webp" capture="environment" className="hidden" onChange={e=>void chooseImage(e.target.files?.[0])}/></label>
+          {image&&<p className={`mt-2 text-xs font-bold ${imageOk?'text-emerald-700':'text-rose-700'}`}>{imageOk?'✓ Зураг шаардлага хангалаа':'! Зургийг дахин авах шаардлагатай'}</p>}</section>
+          <section className="rounded-2xl border p-4"><h3 className="font-black">2. QR / Barcode</h3><div className="mt-3 flex gap-2"><input value={form.barcode} onChange={e=>setField('barcode',e.target.value)} placeholder="Barcode эсвэл QR код" className="min-w-0 flex-1 rounded-xl border p-3"/><button onClick={()=>void startScanner('register')} className="rounded-xl bg-amber-400 px-3 font-bold"><Barcode/></button></div></section>
+          <section className="rounded-2xl border p-4"><h3 className="font-black">3. Барааны мэдээлэл</h3><div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {[['name','Барааны нэр'],['stock','Тоо ширхэг'],['price','Зарах үнэ (₮)'],['weight','Жин / савалгаа'],['origin','Гарал үүсэл'],['category_name','Ангилал'],['badge','Онцлох тэмдэглэгээ']].map(([key,label])=><label key={key} className="text-xs font-bold">{label}<input value={(form as any)[key]} type={key==='stock'||key==='price'?'number':'text'} onChange={e=>setField(key,e.target.value)} className="mt-1 w-full rounded-xl border p-3 font-normal"/></label>)}
+            <label className="text-xs font-bold">Өдрийн хямдрал<select value={form.day_deal} onChange={e=>setField('day_deal',e.target.value)} className="mt-1 w-full rounded-xl border p-3 font-normal"><option value="-1">Хямдралгүй</option><option value="0">Ням</option><option value="1">Даваа</option><option value="2">Мягмар</option><option value="3">Лхагва</option><option value="4">Пүрэв</option><option value="5">Баасан</option><option value="6">Бямба</option></select></label>
+          </div><label className="mt-3 block text-xs font-bold">Тайлбар<textarea value={form.description} onChange={e=>setField('description',e.target.value)} className="mt-1 w-full rounded-xl border p-3 font-normal"/></label></section>
+          <button disabled={busy} onClick={()=>void register()} className="w-full rounded-xl bg-rose-600 p-3 font-black text-white disabled:bg-stone-300">{busy?'Хадгалж байна...':'Админд шалгуулахаар бүртгэх'}</button>
+        </div>}
+        {tab==='deduct'&&<div className="space-y-4"><section className="rounded-2xl border p-4"><h3 className="font-black">Barcode / QR уншуулаад зарлага хасах</h3><div className="mt-3 flex gap-2"><input value={scan} onChange={e=>setScan(e.target.value)} placeholder="Код уншуулна уу" className="min-w-0 flex-1 rounded-xl border p-3"/><button onClick={()=>void startScanner('deduct')} className="rounded-xl bg-amber-400 px-3 font-bold"><Barcode/></button></div><label className="mt-3 block text-xs font-bold">Хасах тоо<input type="number" min="1" value={deductQty} onChange={e=>setDeductQty(e.target.value)} className="mt-1 w-full rounded-xl border p-3"/></label><label className="mt-3 block text-xs font-bold">Тайлбар<textarea value={note} onChange={e=>setNote(e.target.value)} className="mt-1 w-full rounded-xl border p-3"/></label><button disabled={busy} onClick={()=>void deduct()} className="mt-4 w-full rounded-xl bg-rose-600 p-3 font-black text-white disabled:bg-stone-300">{busy?'Шалгаж байна...':'Үлдэгдлээс хасах'}</button><p className="mt-2 text-xs text-stone-500">Сервер үлдэгдлийг дахин шалгана. Үлдэгдэл хүрэхгүй бол хасалт хийгдэхгүй.</p></section></div>}
+        {tab==='history'&&<div><button onClick={()=>void loadHistory()} className="mb-3 flex items-center gap-1 text-sm font-bold"><RefreshCw className="h-4 w-4"/> Шинэчлэх</button><div className="space-y-2">{history.map(m=><article key={m.id} className="rounded-xl border p-3 text-sm"><div className="flex justify-between gap-2"><b>{m.product_name}</b><span className={m.quantity<0?'text-rose-600':'text-emerald-700'}>{m.quantity>0?'+':''}{m.quantity}ш</span></div><p className="text-xs text-stone-500">{m.stock_before}ш → {m.stock_after}ш · {new Date(m.created_at).toLocaleString('mn-MN')}</p>{m.note&&<p className="mt-1 text-xs">{m.note}</p>}</article>)}{!history.length&&<p className="rounded-xl bg-stone-50 p-4 text-sm text-stone-500">Хөдөлгөөний түүх одоогоор байхгүй.</p>}</div></div>}
+      </main>
+    </div>
+  </div>;
+};
