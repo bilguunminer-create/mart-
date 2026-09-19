@@ -64,8 +64,7 @@ interface AdminPanelProps {
   onResetProducts: () => void;
   onClose: () => void;
   onLogout?: () => void;
-  adminPin: string;
-  onChangePin: (newPin: string) => void;
+  onChangePin: (currentPin: string, newPin: string) => Promise<void>;
   onOpenForms?: () => void;
   onQuickUpdateStock?: (productId: string, amount: number, isAbsolute?: boolean) => void;
   checkoutSettings?: { deliveryFee: number; bankName: string; accountNumber: string; iban: string; accountHolder: string; storePhone: string };
@@ -104,7 +103,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   onResetProducts,
   onClose,
   onLogout,
-  adminPin,
   onChangePin,
   onOpenForms,
   onQuickUpdateStock,
@@ -521,32 +519,28 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   };
 
   // Secure 3-step PIN change
-  const handleSavePin = (e: React.FormEvent) => {
+  const handleSavePin = async (e: React.FormEvent) => {
     e.preventDefault();
     setPinChangeError(null);
     setPinChangeMsg(null);
-
-    if (currentPinInput.trim() !== adminPin) {
-      setPinChangeError('Одоогийн хуучин ПИН код буруу байна!');
+    if (!/^\d{4,12}$/.test(newPinInput.trim())) {
+      setPinChangeError('Шинэ ПИН код 4–12 оронтой тоо байх ёстой!');
       return;
     }
-
-    if (newPinInput.trim().length < 4) {
-      setPinChangeError('Шинэ ПИН код хамгийн багадаа 4 оронтой байх ёстой!');
-      return;
-    }
-
     if (newPinInput.trim() !== confirmPinInput.trim()) {
       setPinChangeError('Шинэ ПИН код болон давтан оруулсан код хоорондоо тохирохгүй байна!');
       return;
     }
-
-    onChangePin(newPinInput.trim());
-    setPinChangeMsg('Админ ПИН код амжилттай шинэчлэгдлээ! Систем шинэ кодоор хамгаалагдлаа.');
-    setCurrentPinInput('');
-    setNewPinInput('');
-    setConfirmPinInput('');
-    setTimeout(() => setPinChangeMsg(null), 4000);
+    try {
+      await onChangePin(currentPinInput.trim(), newPinInput.trim());
+      setPinChangeMsg('ПИН код төв санд амжилттай шинэчлэгдлээ. Бүх browser болон админ апп дээр шинэ код үйлчилнэ.');
+      setCurrentPinInput('');
+      setNewPinInput('');
+      setConfirmPinInput('');
+      setTimeout(() => setPinChangeMsg(null), 4000);
+    } catch (reason) {
+      setPinChangeError(reason instanceof Error ? reason.message : 'ПИН код шинэчлэх боломжгүй байна.');
+    }
   };
 
   const getStatusBadge = (status?: string) => {
