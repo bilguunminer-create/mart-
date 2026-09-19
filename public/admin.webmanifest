@@ -1,0 +1,20 @@
+{
+  "id": "/?admin=1",
+  "name": "US&K Family Mart — Админ удирдлага",
+  "short_name": "US&K Админ",
+  "description": "US&K Family Mart бараа, захиалга, гишүүн болон хүргэлтийн удирдлага.",
+  "lang": "mn",
+  "start_url": "/?admin=1",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f7f5f2",
+  "theme_color": "#1c1917",
+  "icons": [
+    {
+      "src": "/admin-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
