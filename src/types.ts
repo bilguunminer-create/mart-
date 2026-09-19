@@ -16,6 +16,8 @@ export interface Product {
   stock_quantity?: number;
   rating: number;
   day_deal: number;
+  published?: boolean;
+  featured?: boolean;
 }
 
 export interface DailyDeal {
@@ -105,4 +107,5 @@ export interface UserProfile {
   createdAt: string;
   isVerified: boolean;
   privacyMasking: boolean;
+  avatarUrl?: string;
 }
