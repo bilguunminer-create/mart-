@@ -66,8 +66,8 @@ export default function App() {
 
   // The public catalog is loaded from Supabase. PRODUCTS is only the first render fallback.
   const [products, setProducts] = useState<Product[]>(PRODUCTS);
-  const [checkoutSettings, setCheckoutSettings] = useState<{ deliveryFee: number; freeDeliveryThreshold: number; bankName: string; accountNumber: string; iban: string; accountHolder: string; storePhone: string }>({
-    deliveryFee: 3000, freeDeliveryThreshold: STORE_CONFIG.free_delivery_threshold, bankName: '', accountNumber: '', iban: '', accountHolder: '', storePhone: STORE_CONFIG.phone,
+  const [checkoutSettings, setCheckoutSettings] = useState<{ deliveryFee: number; freeDeliveryThreshold: number; bankName: string; accountNumber: string; iban: string; accountHolder: string; storePhone: string; storeEmail: string; facebookUrl: string; storeAddress: string; unpaidCancellationMinutes: number }>({
+    deliveryFee: 3000, freeDeliveryThreshold: STORE_CONFIG.free_delivery_threshold, bankName: '', accountNumber: '', iban: '', accountHolder: '', storePhone: STORE_CONFIG.phone, storeEmail: '', facebookUrl: '', storeAddress: STORE_CONFIG.location, unpaidCancellationMinutes: 60,
   });
   useEffect(() => {
     getStoreSettings().then((settings) => {
@@ -87,6 +87,10 @@ export default function App() {
         iban: String(bank?.iban ?? ''),
         accountHolder: String(bank?.accountHolder ?? ''),
         storePhone: String(settings.data.store_phone ?? checkoutSettings.storePhone),
+        storeEmail: String(settings.data.store_email ?? ''),
+        facebookUrl: String(settings.data.facebook_url ?? ''),
+        storeAddress: String(settings.data.store_address ?? STORE_CONFIG.location),
+        unpaidCancellationMinutes: Number(settings.data.unpaid_cancellation_minutes ?? 60),
       });
     }).catch(() => { /* The built-in catalog remains visible if the network is unavailable. */ });
   }, []);
@@ -723,6 +727,8 @@ export default function App() {
   // Filtered Products
   const filteredProducts = useMemo(() => {
     return products.filter((product) => {
+      // Draft and sold-out products are only visible to the administrator.
+      if (product.published === false || product.in_stock === false || Number(product.stock_quantity ?? 0) <= 0) return false;
       // Search filter
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase().trim();
@@ -866,10 +872,11 @@ export default function App() {
             }
             setShowDealsOnly(true);
           }}
-          products={products}
+          products={products.filter(product => product.published !== false && product.in_stock && Number(product.stock_quantity ?? 0) > 0)}
         />
 
         {/* Curated Combos Section */}
+        <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm font-bold text-amber-950">Өнөөдрийн онцлох бараа болон багцуудыг админ төв сангаас сонгон шинэчилдэг.</div>
         <CombosSection
           onAddComboToCart={handleAddComboToCart}
           onOpenProductDetail={(productId) => {
@@ -1206,7 +1213,7 @@ export default function App() {
                 </div>
               </div>
               <p className="text-stone-400 text-xs max-w-md">
-                АНУ болон БНСУ-ын дээд зэрэглэлийн чанартай хүнс, рамен, хүүхдийн живх, өргөн хэрэглээ, амин дэмийг шуурхай хүргэх цахим дэлгүүр.
+                АНУ болон БНСУ-ын дээд зэрэглэлийн чанартай хүнс, рамен, хүүхдийн живх, өргөн хэрэглээ, амин дэмийг шуурхай хүргэх цахим дэлгүүр.<br/>📍 {checkoutSettings.storeAddress}<br/>{checkoutSettings.storeEmail && <>✉️ {checkoutSettings.storeEmail}<br/></>}{checkoutSettings.facebookUrl && <>Facebook: {checkoutSettings.facebookUrl}</>}
               </p>
             </div>
 
