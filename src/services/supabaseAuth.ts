@@ -220,3 +220,39 @@ export async function changeAdminPin(token: string, currentPin: string, newPin: 
     body: JSON.stringify({ current_pin: currentPin, new_pin: newPin }),
   }, token);
 }
+
+
+export type InventoryMovement = {
+  id: string; product_id: string; product_name: string; barcode_value?: string | null;
+  movement_type: 'entry' | 'sale' | 'adjustment' | 'return'; quantity: number;
+  stock_before: number; stock_after: number; note: string; created_at: string;
+};
+
+export async function uploadProductImage(token: string, file: File) {
+  if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) throw new Error('Зөвхөн JPG, PNG эсвэл WEBP зураг оруулна.');
+  if (file.size > 5 * 1024 * 1024) throw new Error('Зургийн хэмжээ 5MB-аас бага байх ёстой.');
+  const path = `${crypto.randomUUID()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, '-')}`;
+  const response = await fetch(`${SUPABASE_URL}/storage/v1/object/product-images/${path}`, {
+    method: 'POST',
+    headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${token}`, 'Content-Type': file.type, 'x-upsert': 'false' },
+    body: file,
+  });
+  if (!response.ok) throw new Error('Барааны зургийг серверт хадгалах боломжгүй байна.');
+  return `${SUPABASE_URL}/storage/v1/object/public/product-images/${path}`;
+}
+
+export async function registerInventoryProduct(token: string, payload: Record<string, unknown>) {
+  return request<Record<string, unknown>>('/rest/v1/rpc/admin_register_catalog_product', {
+    method: 'POST', body: JSON.stringify({ payload }),
+  }, token);
+}
+
+export async function deductInventoryByBarcode(token: string, barcode: string, quantity: number, note = '') {
+  return request<Record<string, unknown>>('/rest/v1/rpc/admin_inventory_deduct', {
+    method: 'POST', body: JSON.stringify({ scan_code: barcode, deduction_quantity: quantity, movement_note: note }),
+  }, token);
+}
+
+export async function getInventoryMovements(token: string) {
+  return request<InventoryMovement[]>('/rest/v1/inventory_movements?select=*&order=created_at.desc&limit=50', { method: 'GET' }, token);
+}
