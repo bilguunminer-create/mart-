@@ -654,6 +654,45 @@ export default function App() {
     setCart((prev) => prev.filter((item) => item.id !== id));
   };
 
+  // Before opening checkout, reload the central catalog. This prevents a customer
+  // from proceeding with a quantity that another order has already consumed.
+  const handleProceedToCheckout = async () => {
+    try {
+      const settings = await getStoreSettings();
+      const remoteProducts = Array.isArray(settings.data.products) ? settings.data.products as Array<Record<string, unknown>> : [];
+      const remoteCombos = Array.isArray(settings.data.combos) ? settings.data.combos as Array<Record<string, unknown>> : [];
+      const latest = [...remoteProducts, ...remoteCombos];
+      const shortages = cart.map((item) => {
+        const product = latest.find((entry) => String(entry.id) === item.id);
+        if (!product) return { item, available: 0 };
+        const available = Boolean(product.in_stock) && Boolean(product.published ?? true)
+          ? Math.max(0, Number(product.stock ?? 0))
+          : 0;
+        return { item, available };
+      }).filter(({ item, available }) => item.quantity > available);
+
+      if (shortages.length > 0) {
+        setCart((previous) => previous.flatMap((item) => {
+          const mismatch = shortages.find(({ item: affected }) => affected.id === item.id);
+          return mismatch ? (mismatch.available > 0 ? [{ ...item, quantity: mismatch.available, stock_quantity: mismatch.available }] : []) : [item];
+        }));
+        const names = shortages.slice(0, 2).map(({ item, available }) => `${item.name} (${available}ш)`).join(', ');
+        showToast(`Үлдэгдэл шинэчлэгдсэн тул сагсыг заслаа: ${names}. Тоогоо шалгаад дахин үргэлжлүүлнэ үү.`);
+        return;
+      }
+
+      setProducts(remoteProducts.map((product: any) => ({
+        ...product,
+        stock_quantity: Number(product.stock ?? 0),
+        in_stock: Boolean(product.in_stock) && Number(product.stock ?? 0) > 0,
+      })) as Product[]);
+    } catch {
+      // Checkout is still protected by the central transaction if the catalog cannot be refreshed.
+    }
+    setIsCartOpen(false);
+    setIsCheckoutOpen(true);
+  };
+
   const handleClearCart = () => {
     setCart([]);
   };
@@ -1235,10 +1274,7 @@ export default function App() {
         onUpdateQuantity={handleUpdateQuantity}
         onRemoveItem={handleRemoveItem}
         onClearCart={handleClearCart}
-        onProceedToCheckout={() => {
-          setIsCartOpen(false);
-          setIsCheckoutOpen(true);
-        }}
+        onProceedToCheckout={handleProceedToCheckout}
         activeLoyalty={activeLoyalty}
         dailyDiscountTotal={dailyDiscountTotal}
       />
