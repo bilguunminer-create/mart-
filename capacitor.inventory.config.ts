@@ -6,6 +6,11 @@ const config: CapacitorConfig = {
   appId: 'mn.uskmart.inventory',
   appName: 'US&K Агуулах',
   webDir: 'dist',
+  // A distinct folder name so this native project never collides with a future
+  // android/ folder generated from the main capacitor.config.ts (com.uskfamilymart.admin).
+  android: {
+    path: 'android-inventory',
+  },
   server: {
     url: 'https://www.uskmart.com/?admin=inventory',
     cleartext: false,
