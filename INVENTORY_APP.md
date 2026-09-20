@@ -12,17 +12,39 @@
 
 ## Play Store APK бэлтгэх
 
-Энэ репог тусдаа `usk-inventory-app` хавтас руу хуулна. Дараа нь `capacitor.inventory.config.ts`-ийг `capacitor.config.ts` нэрээр ашиглаад:
+`capacitor.inventory.config.ts` нь `android.path: 'android-inventory'` гэж тохируулсан
+тул үндсэн `capacitor.config.ts`-той зөрчилдөхгүйгээр адилхан репод ажиллуулж болно.
+Зөвхөн `npx cap add`/`sync`/`open` ажиллуулах мөчид л `capacitor.inventory.config.ts`-ийн
+агуулгыг түр зуур `capacitor.config.ts`-руу хуулна (дараа нь буцааж сэргээнэ):
 
 ```powershell
 npm install
 npm run build
+Copy-Item capacitor.config.ts capacitor.config.main.ts.bak
+Copy-Item capacitor.inventory.config.ts capacitor.config.ts -Force
 npx cap add android
 npx cap sync android
 npx cap open android
+Copy-Item capacitor.config.main.ts.bak capacitor.config.ts -Force
+Remove-Item capacitor.config.main.ts.bak
 ```
 
 Android Studio-д **Build → Generate Signed Bundle / APK** сонгоно. App id нь `mn.uskmart.inventory` учраас дэлгүүрийн үндсэн апптай зэрэг суух тусдаа package болно.
+
+`android-inventory/` нь `.gitignore`-д орсон тул git рүү commit хийгдэхгүй — дахин хэрэгтэй
+болгонд дээрх командаар шинээр үүсгэнэ.
+
+**JDK хувилбар чухал**: Capacitor 7-ийн Android модулиуд Java 21 source/target
+шаарддаг тул `assembleDebug`/`Build`-ийг **яг JDK 21**-ээр ажиллуулах ёстой (JDK 17
+дутуу, JDK 24/25 бол одоогийн Gradle wrapper-т хэт шинэ — алийг нь ч ашиглавал алдаа
+өгнө). Android Studio дотроос build хийвэл **Settings → Build Tools → Gradle → Gradle
+JDK**-г 21 болгож сонгоно. Терминалаас `gradlew` шууд ажиллуулах бол:
+
+```powershell
+$env:JAVA_HOME = "C:\Program Files\Eclipse Adoptium\jdk-21.0.12.101-hotspot"
+$env:ANDROID_HOME = "$env:LOCALAPPDATA\Android\Sdk"
+.\gradlew.bat assembleDebug
+```
 
 Камер ашиглахын тулд Android-ийн `AndroidManifest.xml` дээр дараах permission байгаа эсэхийг шалгана:
 
