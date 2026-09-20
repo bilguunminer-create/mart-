@@ -1036,7 +1036,7 @@ export default function App() {
         {/* Official Store Banner: US&K Family Mart Даланзадгад хот */}
         <StoreHeroBanner
           onExploreClick={() => {
-            const el = document.getElementById('products-grid-section');
+            const el = document.getElementById('catalog-section');
             if (el) el.scrollIntoView({ behavior: 'smooth' });
           }}
           products={products}
