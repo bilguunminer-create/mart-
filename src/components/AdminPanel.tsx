@@ -38,19 +38,21 @@ import {
   Boxes,
   Minus,
   AlertTriangle,
-  Upload
+  Upload,
+  MessageSquareText
 } from 'lucide-react';
 import { processImageFile } from '../utils/imageUtils';
-import { Product, OrderDetails, LoyaltyTier } from '../types';
-import { 
-  CATEGORIES, 
-  LOYALTY_TIERS, 
-  formatMNT, 
-  getStoredLoyaltyTiers, 
+import { Product, OrderDetails, LoyaltyTier, ComboPack, ProductReview } from '../types';
+import {
+  CATEGORIES,
+  LOYALTY_TIERS,
+  formatMNT,
+  getStoredLoyaltyTiers,
   getStoredCashbackPct,
   calculateLoyaltyTierBySpent
 } from '../data/storeData';
 import { ProductFormModal } from './ProductFormModal';
+import { ComboFormModal } from './ComboFormModal';
 import { LoyaltyRulesModal } from './LoyaltyRulesModal';
 
 interface AdminPanelProps {
@@ -69,8 +71,14 @@ interface AdminPanelProps {
   onOpenForms?: () => void;
   onQuickUpdateStock?: (productId: string, amount: number, isAbsolute?: boolean) => void;
   featuredProductId?: string;
-  onSaveCombo?: (combo: import('../types').ComboPack) => Promise<void> | void;
+  combos?: ComboPack[];
+  onSaveCombo?: (combo: ComboPack) => Promise<void> | void;
+  onDeleteCombo?: (comboId: string) => Promise<void> | void;
   onSaveFeaturedProduct?: (productId: string) => Promise<void> | void;
+  reviews?: ProductReview[];
+  onRefreshReviews?: () => void;
+  onModerateReview?: (reviewId: string, approve: boolean) => Promise<void> | void;
+  onDeleteReview?: (reviewId: string) => Promise<void> | void;
   checkoutSettings?: { deliveryFee: number; freeDeliveryThreshold: number; bankName: string; accountNumber: string; iban: string; accountHolder: string; storePhone: string; storeEmail: string; facebookUrl: string; storeAddress: string; unpaidCancellationMinutes: number };
   onSaveCheckoutSettings?: (settings: { deliveryFee: number; freeDeliveryThreshold: number; bankName: string; accountNumber: string; iban: string; accountHolder: string; storePhone: string; storeEmail: string; facebookUrl: string; storeAddress: string; unpaidCancellationMinutes: number }) => Promise<void> | void;
 }
@@ -113,11 +121,17 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   onQuickUpdateStock,
   featuredProductId = '',
   onSaveFeaturedProduct,
+  combos = [],
   onSaveCombo,
+  onDeleteCombo,
+  reviews = [],
+  onRefreshReviews,
+  onModerateReview,
+  onDeleteReview,
   checkoutSettings = { deliveryFee: 3000, freeDeliveryThreshold: 100000, bankName: '', accountNumber: '', iban: '', accountHolder: '', storePhone: '', storeEmail: '', facebookUrl: '', storeAddress: '', unpaidCancellationMinutes: 60 },
   onSaveCheckoutSettings
 }) => {
-  const [activeTab, setActiveTab] = useState<'products' | 'orders' | 'loyalty' | 'stats' | 'settings'>('products');
+  const [activeTab, setActiveTab] = useState<'products' | 'orders' | 'loyalty' | 'stats' | 'settings' | 'reviews'>('products');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedOrigin, setSelectedOrigin] = useState<'ALL' | 'KR' | 'US'>('ALL');
@@ -127,6 +141,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [expandedMemberId, setExpandedMemberId] = useState<string | null>(null);
   const [featuredProductDraft, setFeaturedProductDraft] = useState(featuredProductId);
   const [comboProductIds, setComboProductIds] = useState<string[]>([]);
+  const [editingCombo, setEditingCombo] = useState<ComboPack | null>(null);
+  const [isComboFormOpen, setIsComboFormOpen] = useState(false);
 
   useEffect(() => {
     setCheckoutDraft(checkoutSettings);
@@ -138,28 +154,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     setCheckoutDraft(checkoutSettings);
   }, [checkoutSettings.deliveryFee, checkoutSettings.freeDeliveryThreshold, checkoutSettings.bankName, checkoutSettings.accountNumber, checkoutSettings.iban, checkoutSettings.accountHolder, checkoutSettings.storePhone, checkoutSettings.storeEmail, checkoutSettings.facebookUrl, checkoutSettings.storeAddress, checkoutSettings.unpaidCancellationMinutes]);
 
-  const createComboProduct = () => {
-    const selected = products.filter(product => comboProductIds.includes(product.id));
-    if (selected.length < 2) { alert('Багцад дор хаяж 2 бараа сонгоно уу.'); return; }
-    const name = window.prompt('Багцын нэр:', selected.map(p => p.name).join(' + '));
-    if (!name?.trim()) return;
-    const total = selected.reduce((sum, product) => sum + product.price, 0);
-    const priceText = window.prompt('Багцын зарах үнэ (₮):', String(total));
-    const price = Number(priceText);
-    if (!Number.isFinite(price) || price <= 0) { alert('Үнэ зөв оруулна уу.'); return; }
-    const image = window.prompt('Багцын зургийн холбоос (хоосон бол эхний барааны зураг):', selected[0].image) || selected[0].image;
-    const description = window.prompt('Багцын тайлбар:', selected.map(p => p.name).join(' + ')) || selected.map(p => p.name).join(' + ');
-    const stock = Math.min(...selected.map(p => Number(p.stock_quantity ?? 0)));
-    const combo = {
-      id: 'COMBO-' + crypto.randomUUID().slice(0, 8).toUpperCase(),
-      name: name.trim(), category: 'combo', category_name: 'Багц бүтээгдэхүүн', origin: 'KR',
-      country: 'Багц', flag: '🎁', price: Math.round(price), weight: `${selected.length} бараа`,
-      badge: 'Багц', badge_color: 'bg-indigo-600', image, description,
-      in_stock: stock > 0, stock_quantity: stock, rating: 5, day_deal: -1, published: false,
-    };
-    if (onSaveCombo) { void onSaveCombo({ id: combo.id, name: combo.name, badge: combo.badge, price: combo.price, orig_price: total, image: combo.image, description: combo.description, items: selected.map(p => p.id) }); } else { onSaveProduct(combo); }
-    setComboProductIds([]);
-    alert('Багц үүслээ. Админ нийтэлсний дараа хэрэглэгчдэд харагдана.');
+  const openNewComboForm = () => {
+    setEditingCombo(null);
+    setIsComboFormOpen(true);
+  };
+
+  const openEditComboForm = (combo: ComboPack) => {
+    setEditingCombo(combo);
+    setIsComboFormOpen(true);
   };
 
   const openLoyaltyMembers = () => {
@@ -539,6 +541,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   // Overall order stats
   const totalOrders = orders.length;
   const newOrdersCount = orders.filter(o => !o.status || o.status === 'new').length;
+  const pendingReviewsCount = reviews.filter(r => r.status === 'pending').length;
   const totalRevenue = orders
     .filter(o => o.status !== 'cancelled')
     .reduce((sum, o) => sum + o.total, 0);
@@ -739,6 +742,24 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             </button>
 
             <button
+              id="admin-tab-reviews"
+              onClick={() => { setActiveTab('reviews'); onRefreshReviews?.(); }}
+              className={`py-3 px-4 text-xs font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+                activeTab === 'reviews'
+                  ? 'border-indigo-500 text-indigo-400'
+                  : 'border-transparent text-stone-400 hover:text-stone-200'
+              }`}
+            >
+              <MessageSquareText className="w-4 h-4 text-indigo-400" />
+              <span>Сэтгэгдэл</span>
+              {pendingReviewsCount > 0 && (
+                <span className="px-1.5 py-0.2 rounded-full bg-indigo-600 text-[10px] text-white font-bold animate-pulse">
+                  {pendingReviewsCount} шинэ
+                </span>
+              )}
+            </button>
+
+            <button
               id="admin-tab-settings"
               onClick={() => setActiveTab('settings')}
               className={`py-3 px-4 text-xs font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
@@ -926,7 +947,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 </select>
                 <button type="button" onClick={()=>onSaveFeaturedProduct && void onSaveFeaturedProduct(featuredProductDraft)} className="text-[11px] font-black text-amber-800">Хадгалах</button>
               </div>
-              <button type="button" onClick={createComboProduct} className="px-3 py-2.5 border border-indigo-200 bg-indigo-50 text-indigo-800 text-xs font-bold rounded-xl">Багц үүсгэх ({comboProductIds.length})</button>
+              <button type="button" onClick={openNewComboForm} className="px-3 py-2.5 border border-indigo-200 bg-indigo-50 text-indigo-800 text-xs font-bold rounded-xl">
+                Шинэ багц үүсгэх{comboProductIds.length > 0 ? ` (${comboProductIds.length} сонгосон)` : ''}
+              </button>
 
               {/* Add Product Button */}
               <button
@@ -971,6 +994,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       {prod.badge && (
                         <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold text-white shadow-xs ${prod.badge_color || 'bg-rose-500'}`}>
                           {prod.badge}
+                        </span>
+                      )}
+                      {prod.published === false && (
+                        <span className="px-2 py-0.5 rounded-md text-[10px] font-black text-white shadow-xs bg-indigo-600">
+                          Ноорог · Нийтлэгдээгүй
                         </span>
                       )}
                     </div>
@@ -1144,6 +1172,56 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 <p className="text-xs text-stone-400 mt-1">Шүүлтүүрээ өөрчлөх эсвэл шинээр бараа нэмнэ үү.</p>
               </div>
             )}
+
+            {/* Combo Packs Management */}
+            <section className="mt-6 rounded-2xl border border-indigo-200 bg-white p-4 sm:p-5 space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <h3 className="font-black text-stone-900 text-sm flex items-center gap-2">
+                    <Layers className="w-4 h-4 text-indigo-600" />
+                    <span>Бэлэн Комбо Багцууд ({combos.length})</span>
+                  </h3>
+                  <p className="text-xs text-stone-500 mt-0.5">Хэрэглэгчийн дэлгүүрт "Бэлэн Комбо Багцууд" хэсэгт харагдах багцуудыг энд удирдана.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={openNewComboForm}
+                  className="px-3.5 py-2 bg-indigo-700 hover:bg-indigo-800 text-white text-xs font-bold rounded-xl cursor-pointer flex items-center gap-1.5 shrink-0"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Шинэ багц</span>
+                </button>
+              </div>
+
+              {combos.length === 0 ? (
+                <p className="text-xs text-stone-400 text-center py-6">Одоогоор багц бүртгэгдээгүй байна.</p>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {combos.map((combo) => (
+                    <div key={combo.id} className="flex items-center gap-3 p-3 rounded-xl border border-stone-200 hover:border-indigo-300 hover:shadow-xs transition-all">
+                      <img src={combo.image} alt={combo.name} className="w-14 h-14 rounded-lg object-cover border border-stone-200 shrink-0" />
+                      <div className="min-w-0 flex-1">
+                        <p className="font-bold text-stone-900 text-xs truncate">{combo.name}</p>
+                        <p className="text-[11px] text-stone-500">
+                          {formatMNT(combo.price)} · {combo.items.length} бараа ·{' '}
+                          <span className={combo.published !== false ? 'text-emerald-700 font-semibold' : 'text-amber-700 font-semibold'}>
+                            {combo.published !== false ? 'Нийтэлсэн' : 'Ноорог'}
+                          </span>
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => openEditComboForm(combo)}
+                        className="p-1.5 text-stone-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors cursor-pointer shrink-0"
+                        title="Багц засах"
+                      >
+                        <Edit3 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
           </div>
         )}
 
@@ -1847,6 +1925,99 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           </div>
         )}
 
+        {/* ================= REVIEWS MODERATION TAB ================= */}
+        {activeTab === 'reviews' && (
+          <div className="space-y-4">
+            <div className="bg-white p-4 rounded-2xl border border-stone-200 shadow-xs flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h3 className="font-black text-stone-900 text-sm flex items-center gap-2">
+                  <MessageSquareText className="w-4 h-4 text-indigo-600" />
+                  <span>Хэрэглэгчийн сэтгэгдэл шалгах</span>
+                </h3>
+                <p className="text-xs text-stone-500 mt-0.5">Зөвшөөрсний дараа л сэтгэгдэл барааны хуудас болон нүүр хуудасны урсгалд харагдана.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => onRefreshReviews?.()}
+                className="px-3 py-2 bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-bold rounded-xl cursor-pointer"
+              >
+                Шинэчлэх
+              </button>
+            </div>
+
+            {reviews.length === 0 ? (
+              <div className="text-center py-12 bg-white rounded-2xl border border-stone-200">
+                <MessageSquareText className="w-12 h-12 text-stone-300 mx-auto mb-2" />
+                <p className="font-bold text-stone-700 text-sm">Одоогоор сэтгэгдэл алга</p>
+                <p className="text-xs text-stone-400 mt-1">Хэрэглэгч барааны хуудаснаас сэтгэгдэл бичихэд энд харагдана.</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {reviews.map((review) => {
+                  const product = products.find(p => p.id === review.product_id);
+                  return (
+                    <div key={review.id} className="bg-white rounded-2xl border border-stone-200 shadow-xs p-4 space-y-2.5">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="flex items-center gap-2.5">
+                          {product?.image && <img src={product.image} alt={product.name} className="w-10 h-10 rounded-lg object-cover border border-stone-200" />}
+                          <div>
+                            <p className="font-bold text-stone-900 text-xs">{product?.name || review.product_id}</p>
+                            <p className="text-[11px] text-stone-500">{review.customer_name} · {new Date(review.created_at).toLocaleDateString('mn-MN')}</p>
+                          </div>
+                        </div>
+                        <span className={`px-2.5 py-1 rounded-full text-[10px] font-black ${
+                          review.status === 'approved' ? 'bg-emerald-100 text-emerald-800'
+                            : review.status === 'rejected' ? 'bg-rose-100 text-rose-800'
+                              : 'bg-amber-100 text-amber-800 animate-pulse'
+                        }`}>
+                          {review.status === 'approved' ? 'Зөвшөөрсөн' : review.status === 'rejected' ? 'Татгалзсан' : 'Шинэ · Хүлээгдэж буй'}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-0.5">
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <Star key={star} className={`w-3.5 h-3.5 ${star <= review.rating ? 'fill-amber-400 text-amber-400' : 'text-stone-200'}`} />
+                        ))}
+                      </div>
+
+                      <p className="text-xs text-stone-700 bg-stone-50 rounded-xl p-2.5 border border-stone-100">{review.comment}</p>
+
+                      <div className="flex items-center gap-2 pt-1">
+                        {review.status !== 'approved' && (
+                          <button
+                            type="button"
+                            onClick={() => { void onModerateReview?.(review.id, true); }}
+                            className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold rounded-lg cursor-pointer"
+                          >
+                            Зөвшөөрөх
+                          </button>
+                        )}
+                        {review.status !== 'rejected' && (
+                          <button
+                            type="button"
+                            onClick={() => { void onModerateReview?.(review.id, false); }}
+                            className="px-3 py-1.5 bg-stone-100 hover:bg-stone-200 text-stone-700 text-[11px] font-bold rounded-lg cursor-pointer"
+                          >
+                            Татгалзах
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => { if (window.confirm('Энэ сэтгэгдлийг бүрмөсөн устгах уу?')) void onDeleteReview?.(review.id); }}
+                          className="px-3 py-1.5 text-rose-600 hover:bg-rose-50 text-[11px] font-bold rounded-lg cursor-pointer flex items-center gap-1"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                          <span>Устгах</span>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* ================= SETTINGS & SECURITY TAB ================= */}
         {activeTab === 'settings' && (
           <div className="max-w-3xl space-y-6">
@@ -2457,6 +2628,17 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         onClose={() => setIsFormOpen(false)}
         productToEdit={editingProduct}
         onSave={onSaveProduct}
+      />
+
+      {/* Combo Pack Form Modal (Add / Edit / Delete) */}
+      <ComboFormModal
+        isOpen={isComboFormOpen}
+        onClose={() => { setIsComboFormOpen(false); setEditingCombo(null); setComboProductIds([]); }}
+        comboToEdit={editingCombo}
+        products={products}
+        preselectedProductIds={comboProductIds}
+        onSave={async (combo) => { if (onSaveCombo) { await onSaveCombo(combo); } setComboProductIds([]); }}
+        onDelete={onDeleteCombo ? async (comboId) => { await onDeleteCombo(comboId); setComboProductIds([]); } : undefined}
       />
 
       {/* Delete Confirmation Modal */}

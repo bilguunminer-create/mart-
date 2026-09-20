@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { X, User, Mail, MapPin, Phone, LogOut, KeyRound, ChevronDown, ReceiptText, XCircle } from 'lucide-react';
+import { X, User, Mail, MapPin, Phone, LogOut, KeyRound, ChevronDown, ReceiptText, XCircle, Camera } from 'lucide-react';
 import { UserProfile, OrderDetails, LoyaltyTier } from '../types';
 import { formatMNT } from '../data/storeData';
-import { AuthSession, signIn, requestSignupOtp, verifySignupOtp, sendPasswordReset, updatePassword, getProfile, saveProfile, getStoreOrders, getLoyaltyWallet, cancelMyStoreOrder, expireMyUnpaidOrders } from '../services/supabaseAuth';
+import { AuthSession, signIn, requestSignupOtp, verifySignupOtp, sendPasswordReset, updatePassword, getProfile, saveProfile, getStoreOrders, getLoyaltyWallet, cancelMyStoreOrder, expireMyUnpaidOrders, uploadProfileImage, saveProfileAvatar } from '../services/supabaseAuth';
 
 interface Props {
   isOpen: boolean; onClose: () => void; user: UserProfile | null;
@@ -30,6 +30,24 @@ export const UserProfileModal: React.FC<Props> = ({ isOpen, onClose, user, onSav
   const [walletPoints, setWalletPoints] = useState(0);
   const [lifetimePoints, setLifetimePoints] = useState(0);
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
+  const [avatarBusy, setAvatarBusy] = useState(false);
+
+  async function handleAvatarChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file || !user?.accessToken) return;
+    setAvatarBusy(true); setMessage('');
+    try {
+      const url = await uploadProfileImage(user.accessToken, file);
+      await saveProfileAvatar(user.accessToken, url);
+      onSaveUser({ ...user, avatarUrl: url });
+      setMessage('Профайлын зураг шинэчлэгдлээ.');
+    } catch (error: any) {
+      setMessage(error?.message || 'Профайлын зургийг хадгалах боломжгүй байна.');
+    } finally {
+      setAvatarBusy(false);
+    }
+  }
 
   useEffect(() => {
     if (!user) return;
@@ -135,6 +153,7 @@ export const UserProfileModal: React.FC<Props> = ({ isOpen, onClose, user, onSav
       id: session.user.id, supabaseUserId: session.user.id, accessToken: session.access_token, refreshToken: session.refresh_token,
       name: existing?.name || fallback.name || email.split('@')[0], email: email.trim().toLowerCase(),
       phone: existing?.phone || fallback.phone, address: existing?.address || fallback.address,
+      avatarUrl: existing?.avatar_url,
       district: 'Өмнөговь, Даланзадгад', createdAt: new Date().toLocaleDateString('mn-MN'),
       isVerified: true, privacyMasking: true, loginMethod: 'email' as const,
     } satisfies UserProfile;
@@ -232,7 +251,7 @@ export const UserProfileModal: React.FC<Props> = ({ isOpen, onClose, user, onSav
       {(mode === 'login' || mode === 'reset' || (mode === 'signup' && signupStep === 'password')) && <><label className="block text-sm font-bold">{mode==='signup'?'Шинэ нууц үг':'Нууц үг'}<input type="password" value={password} onChange={e=>setPassword(e.target.value)} minLength={8} required className="mt-1 w-full rounded-xl border p-3"/></label>{(mode === 'reset' || (mode === 'signup' && signupStep === 'password')) && <label className="block text-sm font-bold">Нууц үг давтах<input type="password" value={passwordConfirm} onChange={e=>setPasswordConfirm(e.target.value)} minLength={8} required className="mt-1 w-full rounded-xl border p-3"/></label>}</>}
       <button disabled={busy} className="w-full rounded-xl bg-stone-900 p-3 font-bold text-white">{busy?'Түр хүлээнэ үү…':mode==='login'?'Нэвтрэх':mode==='recover'?'Сэргээх холбоос илгээх':mode==='reset'?'Шинэ нууц үг хадгалах':signupStep==='details'?'Баталгаажуулах код илгээх':signupStep==='otp'?'Код баталгаажуулах':'Бүртгэл үүсгэж нэвтрэх'}</button>
       {mode !== 'reset' && <div className="flex justify-between text-xs font-bold text-amber-800"><button type="button" onClick={()=>switchMode('login')}>Нэвтрэх</button><button type="button" onClick={()=>switchMode('signup')}>Шинэ бүртгэл</button><button type="button" onClick={()=>switchMode('recover')}>Нууц үгээ мартсан</button></div>}
-    </form> : <><section className="mb-5 overflow-hidden rounded-3xl bg-gradient-to-br from-stone-950 to-stone-800 p-5 text-white shadow-lg"><div className="mb-4 flex items-center gap-3"><div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-400 text-lg font-black text-stone-950">{user.name.slice(0, 1).toUpperCase()}</div><div><p className="font-black">{user.name}</p><p className="text-xs text-stone-300">{user.email}</p></div></div><div className="rounded-2xl bg-white/10 p-3"><p className="font-black text-amber-300">{activeLoyalty ? activeLoyalty.badge+' '+activeLoyalty.name : 'Энгийн гишүүн'}</p><p className="mt-1 text-sm text-stone-200">Хүргэгдсэн захиалга: <b>{ownOrders.filter(o => o.status === 'delivered').length}</b></p><div className="mt-3 grid grid-cols-2 gap-2"><div className="rounded-xl bg-emerald-400/15 p-2"><p className="text-[10px] text-emerald-200">Боломжит урамшуулал</p><p className="font-black text-emerald-300">{formatMNT(walletPoints)}</p></div><div className="rounded-xl bg-amber-400/15 p-2"><p className="text-[10px] text-amber-100">Нийт цуглуулсан</p><p className="font-black text-amber-300">{formatMNT(lifetimePoints)}</p></div></div><p className="mt-2 text-[11px] text-stone-300">Боломжит оноогоо дараагийн захиалгад сонгож ашиглаж болно.</p></div></section>
+    </form> : <><section className="mb-5 overflow-hidden rounded-3xl bg-gradient-to-br from-stone-950 to-stone-800 p-5 text-white shadow-lg"><div className="mb-4 flex items-center gap-3"><div className="relative shrink-0">{user.avatarUrl ? <img src={user.avatarUrl} alt={user.name} className="h-12 w-12 rounded-2xl object-cover" /> : <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-400 text-lg font-black text-stone-950">{user.name.slice(0, 1).toUpperCase()}</div>}<label className={`absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-white text-stone-900 ring-2 ring-stone-900 ${avatarBusy ? 'opacity-50' : 'cursor-pointer'}`} title="Профайл зураг солих"><Camera className="h-3 w-3" /><input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" disabled={avatarBusy} onChange={handleAvatarChange} /></label></div><div><p className="font-black">{user.name}</p><p className="text-xs text-stone-300">{user.email}</p></div></div><div className="rounded-2xl bg-white/10 p-3"><p className="font-black text-amber-300">{activeLoyalty ? activeLoyalty.badge+' '+activeLoyalty.name : 'Энгийн гишүүн'}</p><p className="mt-1 text-sm text-stone-200">Хүргэгдсэн захиалга: <b>{ownOrders.filter(o => o.status === 'delivered').length}</b></p><div className="mt-3 grid grid-cols-2 gap-2"><div className="rounded-xl bg-emerald-400/15 p-2"><p className="text-[10px] text-emerald-200">Боломжит урамшуулал</p><p className="font-black text-emerald-300">{formatMNT(walletPoints)}</p></div><div className="rounded-xl bg-amber-400/15 p-2"><p className="text-[10px] text-amber-100">Нийт цуглуулсан</p><p className="font-black text-amber-300">{formatMNT(lifetimePoints)}</p></div></div><p className="mt-2 text-[11px] text-stone-300">Боломжит оноогоо дараагийн захиалгад сонгож ашиглаж болно.</p></div></section>
       <form onSubmit={updateProfile} className="space-y-4"><p className="text-sm text-stone-600"><Mail className="mr-1 inline h-4 w-4"/>{user.email}</p><label className="block text-sm font-bold">Нэр<input value={name} onChange={e=>setName(e.target.value)} required className="mt-1 w-full rounded-xl border p-3"/></label><label className="block text-sm font-bold">Утас<input value={phone} onChange={e=>setPhone(e.target.value)} className="mt-1 w-full rounded-xl border p-3"/></label><label className="block text-sm font-bold">Хаяг<input value={address} onChange={e=>setAddress(e.target.value)} className="mt-1 w-full rounded-xl border p-3"/></label><button disabled={busy} className="w-full rounded-xl bg-stone-900 p-3 font-bold text-white">Мэдээлэл хадгалах</button></form>
       <section className="mt-5 border-t border-stone-100 pt-5"><div className="mb-3 flex items-center justify-between"><h3 className="font-black text-stone-900">Миний захиалгууд</h3><span className="rounded-full bg-stone-100 px-2 py-1 text-[10px] font-bold text-stone-600">{ownOrders.length} захиалга</span></div>{ownOrders.length ? <div className="space-y-2">{ownOrders.map((order) => {
   const expanded=expandedOrderId===order.orderId; const paid=order.paymentStatus==='Төлбөр баталгаажсан';

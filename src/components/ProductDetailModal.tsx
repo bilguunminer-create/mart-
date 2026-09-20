@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
-import { X, Star, ShoppingBag, Plus, Minus, Truck, ShieldCheck, Check } from 'lucide-react';
-import { Product } from '../types';
+import React, { useState, useEffect } from 'react';
+import { X, Star, ShoppingBag, Plus, Minus, Truck, ShieldCheck, Check, MessageSquare, Clock } from 'lucide-react';
+import { Product, UserProfile, ProductReview } from '../types';
 import { formatMNT, DAILY_DEALS } from '../data/storeData';
+import { getProductReviews, getMyProductReview, submitProductReview } from '../services/supabaseAuth';
 
 interface ProductDetailModalProps {
   product: Product | null;
@@ -9,6 +10,8 @@ interface ProductDetailModalProps {
   selectedDay: number;
   onAddToCart: (product: Product, quantity: number) => void;
   freeDeliveryThreshold: number;
+  currentUser?: UserProfile | null;
+  onRequireLogin?: () => void;
 }
 
 export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
@@ -16,12 +19,60 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   onClose,
   selectedDay,
   onAddToCart,
-  freeDeliveryThreshold
+  freeDeliveryThreshold,
+  currentUser,
+  onRequireLogin
 }) => {
   const [quantity, setQuantity] = useState(1);
   const [addedAnimation, setAddedAnimation] = useState(false);
 
+  // Reviews & ratings
+  const [reviews, setReviews] = useState<ProductReview[]>([]);
+  const [myReview, setMyReview] = useState<ProductReview | null>(null);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewComment, setReviewComment] = useState('');
+  const [reviewBusy, setReviewBusy] = useState(false);
+  const [reviewMessage, setReviewMessage] = useState('');
+
+  useEffect(() => {
+    if (!product) return;
+    let active = true;
+    setReviewsLoading(true);
+    setReviewMessage('');
+    const loadReviews = getProductReviews(product.id)
+      .then((rows) => { if (active) setReviews(rows); })
+      .catch(() => { if (active) setReviews([]); });
+    const loadMine = currentUser?.accessToken
+      ? getMyProductReview(currentUser.accessToken, product.id)
+          .then((row) => { if (active) { setMyReview(row); if (row) { setReviewRating(row.rating); setReviewComment(row.comment); } } })
+          .catch(() => { if (active) setMyReview(null); })
+      : Promise.resolve();
+    Promise.all([loadReviews, loadMine]).finally(() => { if (active) setReviewsLoading(false); });
+    return () => { active = false; };
+  }, [product?.id, currentUser?.accessToken]);
+
+  const handleSubmitReview = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!product) return;
+    if (!currentUser?.accessToken) { onRequireLogin?.(); return; }
+    if (!reviewComment.trim()) { setReviewMessage('Сэтгэгдэлээ бичнэ үү.'); return; }
+    setReviewBusy(true);
+    setReviewMessage('');
+    try {
+      const saved = await submitProductReview(currentUser.accessToken, product.id, reviewRating, reviewComment.trim());
+      setMyReview(saved);
+      setReviewMessage('Баярлалаа! Таны сэтгэгдэл админ зөвшөөрсний дараа бусад хэрэглэгчдэд харагдана.');
+    } catch (error: any) {
+      setReviewMessage(error?.message || 'Сэтгэгдэл илгээхэд алдаа гарлаа.');
+    } finally {
+      setReviewBusy(false);
+    }
+  };
+
   if (!product) return null;
+
+  const averageRating = reviews.length > 0 ? reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length : product.rating;
 
   const currentDeal = DAILY_DEALS[selectedDay.toString()];
   const isDealActive = product.day_deal !== -1 && (
@@ -216,6 +267,89 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 </button>
               )}
             </div>
+          </div>
+        </div>
+
+        {/* Reviews & Ratings */}
+        <div className="border-t border-stone-200 bg-stone-50/60 p-6 space-y-4">
+          <div className="flex items-center justify-between">
+            <h4 className="font-black text-stone-900 text-sm flex items-center gap-2">
+              <MessageSquare className="w-4 h-4 text-rose-600" />
+              <span>Хэрэглэгчийн сэтгэгдэл</span>
+            </h4>
+            <div className="flex items-center gap-1 text-xs">
+              <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+              <span className="font-black text-stone-900">{averageRating.toFixed(1)}</span>
+              <span className="text-stone-500">({reviews.length} сэтгэгдэл)</span>
+            </div>
+          </div>
+
+          {currentUser?.accessToken ? (
+            myReview && myReview.status !== 'rejected' ? (
+              <div className={`rounded-xl border p-3 text-xs ${myReview.status === 'approved' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>
+                <p className="font-bold flex items-center gap-1.5">
+                  {myReview.status === 'approved' ? <Check className="w-3.5 h-3.5" /> : <Clock className="w-3.5 h-3.5" />}
+                  <span>{myReview.status === 'approved' ? 'Таны сэтгэгдэл нийтлэгдсэн байна' : 'Таны сэтгэгдэл админы шалгалтад орсон байна'}</span>
+                </p>
+                <p className="mt-1 text-stone-600">"{myReview.comment}"</p>
+              </div>
+            ) : (
+              <form onSubmit={handleSubmitReview} className="space-y-2 rounded-xl border border-stone-200 bg-white p-3">
+                <div className="flex items-center gap-1">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <button key={star} type="button" onClick={() => setReviewRating(star)} className="cursor-pointer">
+                      <Star className={`w-5 h-5 ${star <= reviewRating ? 'fill-amber-400 text-amber-400' : 'text-stone-300'}`} />
+                    </button>
+                  ))}
+                </div>
+                <textarea
+                  rows={2}
+                  maxLength={1000}
+                  placeholder="Энэ бараатай холбоотой сэтгэгдэлээ бичнэ үү..."
+                  value={reviewComment}
+                  onChange={(e) => setReviewComment(e.target.value)}
+                  className="w-full px-3 py-2 text-xs border border-stone-300 rounded-xl focus:outline-none focus:border-rose-500"
+                />
+                {reviewMessage && <p className="text-[11px] text-rose-600 font-medium">{reviewMessage}</p>}
+                <button
+                  type="submit"
+                  disabled={reviewBusy}
+                  className="px-4 py-2 bg-stone-900 hover:bg-stone-800 text-white text-xs font-bold rounded-xl cursor-pointer disabled:opacity-60"
+                >
+                  {reviewBusy ? 'Илгээж байна…' : 'Сэтгэгдэл илгээх'}
+                </button>
+              </form>
+            )
+          ) : (
+            <button
+              type="button"
+              onClick={() => onRequireLogin?.()}
+              className="w-full rounded-xl border border-dashed border-stone-300 py-2.5 text-xs font-bold text-stone-600 hover:border-rose-300 hover:text-rose-600 cursor-pointer"
+            >
+              Сэтгэгдэл бичихийн тулд бүртгэлдээ нэвтэрнэ үү
+            </button>
+          )}
+
+          <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+            {reviewsLoading ? (
+              <p className="text-xs text-stone-400 text-center py-3">Сэтгэгдэл ачаалж байна...</p>
+            ) : reviews.length === 0 ? (
+              <p className="text-xs text-stone-400 text-center py-3">Одоогоор сэтгэгдэл алга. Эхний сэтгэгдлийг та үлдээгээрэй!</p>
+            ) : (
+              reviews.map((review) => (
+                <div key={review.id} className="rounded-xl border border-stone-200 bg-white p-3 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-stone-900">{review.customer_name}</span>
+                    <div className="flex items-center gap-0.5">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <Star key={star} className={`w-3 h-3 ${star <= review.rating ? 'fill-amber-400 text-amber-400' : 'text-stone-200'}`} />
+                      ))}
+                    </div>
+                  </div>
+                  <p className="mt-1 text-stone-600 leading-relaxed">{review.comment}</p>
+                </div>
+              ))
+            )}
           </div>
         </div>
       </div>

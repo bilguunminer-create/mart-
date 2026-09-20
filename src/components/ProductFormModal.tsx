@@ -30,6 +30,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   const [stockQuantity, setStockQuantity] = useState<number>(18);
   const [dayDeal, setDayDeal] = useState<number>(1);
   const [rating, setRating] = useState<number>(4.8);
+  const [published, setPublished] = useState(false);
 
   const [useUrlMode, setUseUrlMode] = useState(false);
   const [imageUrlInput, setImageUrlInput] = useState('');
@@ -63,6 +64,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       setDayDeal(initialDayDeal);
       setRating(productToEdit.rating || 4.8);
       setUseUrlMode(!productToEdit.image.startsWith('data:'));
+      setPublished(productToEdit.published !== false);
     } else {
       // Defaults for new product
       setName('');
@@ -80,6 +82,8 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       setDayDeal(-1); // Default to no day deal (none)
       setRating(4.9);
       setUseUrlMode(false);
+      // New products stay hidden from customers until the admin explicitly publishes them.
+      setPublished(false);
     }
     setImageError(null);
     setFormError(null);
@@ -172,7 +176,8 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       in_stock: finalInStock,
       stock_quantity: finalStock,
       rating: Math.min(5, Math.max(1, Number(rating) || 4.8)),
-      day_deal: cleanDayDeal
+      day_deal: cleanDayDeal,
+      published
     };
 
     onSave(savedProduct);
@@ -601,6 +606,25 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                 <div className="w-11 h-6 bg-stone-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-stone-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
               </label>
             </div>
+          </div>
+
+          {/* Published toggle */}
+          <div className="flex items-center justify-between p-3.5 bg-stone-50 rounded-2xl border border-stone-200">
+            <div>
+              <span className="text-xs font-bold text-stone-800 block">Хэрэглэгчдэд нийтлэх</span>
+              <span className="text-[11px] text-stone-500">
+                Унтраавал энэ бараа зөвхөн админд харагдах ноорог хэвээр үлдэнэ
+              </span>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={published}
+                onChange={(e) => setPublished(e.target.checked)}
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-stone-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-stone-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
+            </label>
           </div>
 
           {/* Action buttons */}

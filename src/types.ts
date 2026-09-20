@@ -53,6 +53,8 @@ export interface ComboPack {
   image: string;
   description: string;
   items: string[];
+  /** Draft combos (published === false) stay hidden from customers until an admin publishes them. */
+  published?: boolean;
 }
 
 export interface CartItem {
@@ -108,4 +110,16 @@ export interface UserProfile {
   isVerified: boolean;
   privacyMasking: boolean;
   avatarUrl?: string;
+}
+
+export interface ProductReview {
+  id: string;
+  product_id: string;
+  customer_id: string;
+  customer_name: string;
+  rating: number;
+  comment: string;
+  status: 'pending' | 'approved' | 'rejected';
+  created_at: string;
+  reviewed_at?: string | null;
 }

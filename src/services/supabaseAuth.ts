@@ -67,8 +67,8 @@ export async function sendPasswordReset(email: string) {
 }
 
 export async function getProfile(token: string, userId: string) {
-  const rows = await request<Array<{ name: string; phone: string; address: string }>>(
-    `/rest/v1/customer_profiles?user_id=eq.${encodeURIComponent(userId)}&select=name,phone,address`,
+  const rows = await request<Array<{ name: string; phone: string; address: string; avatar_url?: string }>>(
+    `/rest/v1/customer_profiles?user_id=eq.${encodeURIComponent(userId)}&select=name,phone,address,avatar_url`,
     { method: 'GET' },
     token,
   );
@@ -295,5 +295,54 @@ export async function uploadProfileImage(token: string, file: File) {
 export async function saveProfileAvatar(token: string, avatarUrl: string) {
   await request('/rest/v1/customer_profiles?user_id=eq.' + encodeURIComponent(JSON.parse(atob(token.split('.')[1])).sub), {
     method: 'PATCH', body: JSON.stringify({ avatar_url: avatarUrl }),
+  }, token);
+}
+
+
+export type ProductReview = {
+  id: string; product_id: string; customer_id: string; customer_name: string;
+  rating: number; comment: string; status: 'pending' | 'approved' | 'rejected';
+  created_at: string; reviewed_at?: string | null;
+};
+
+/** Approved reviews for one product, or the site-wide feed when productId is omitted. Works for anonymous visitors. */
+export async function getProductReviews(productId?: string, limit = 50) {
+  return request<ProductReview[]>('/rest/v1/rpc/read_product_reviews', {
+    method: 'POST',
+    body: JSON.stringify({ p_product_id: productId ?? null, p_limit: limit }),
+  });
+}
+
+export async function getMyProductReview(token: string, productId: string) {
+  const rows = await request<ProductReview[] | ProductReview | null>('/rest/v1/rpc/read_my_product_review', {
+    method: 'POST',
+    body: JSON.stringify({ p_product_id: productId }),
+  }, token);
+  if (Array.isArray(rows)) return rows[0] || null;
+  return rows || null;
+}
+
+export async function submitProductReview(token: string, productId: string, rating: number, comment: string) {
+  return request<ProductReview>('/rest/v1/rpc/submit_product_review', {
+    method: 'POST',
+    body: JSON.stringify({ p_product_id: productId, p_rating: rating, p_comment: comment }),
+  }, token);
+}
+
+export async function getAllReviewsForAdmin(token: string) {
+  return request<ProductReview[]>('/rest/v1/rpc/read_all_reviews_admin', { method: 'POST', body: '{}' }, token);
+}
+
+export async function moderateProductReview(token: string, reviewId: string, approve: boolean) {
+  await request('/rest/v1/rpc/moderate_product_review', {
+    method: 'POST',
+    body: JSON.stringify({ p_review_id: reviewId, p_approve: approve }),
+  }, token);
+}
+
+export async function deleteProductReview(token: string, reviewId: string) {
+  await request('/rest/v1/rpc/delete_product_review', {
+    method: 'POST',
+    body: JSON.stringify({ p_review_id: reviewId }),
   }, token);
 }
