@@ -1,7 +1,7 @@
 import React from 'react';
 import { X, Plus, Minus, Trash2, Truck, ShoppingBag, ArrowRight, ShieldCheck, Tag } from 'lucide-react';
 import { CartItem, LoyaltyTier } from '../types';
-import { STORE_CONFIG, formatMNT } from '../data/storeData';
+import { formatMNT } from '../data/storeData';
 
 interface CartDrawerProps {
   isOpen: boolean;
@@ -13,6 +13,8 @@ interface CartDrawerProps {
   onProceedToCheckout: () => void;
   activeLoyalty: LoyaltyTier | null;
   dailyDiscountTotal: number;
+  freeDeliveryThreshold: number;
+  deliveryFee: number;
 }
 
 export const CartDrawer: React.FC<CartDrawerProps> = ({
@@ -24,7 +26,9 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
   onClearCart,
   onProceedToCheckout,
   activeLoyalty,
-  dailyDiscountTotal
+  dailyDiscountTotal,
+  freeDeliveryThreshold,
+  deliveryFee: deliveryFeeSetting
 }) => {
   if (!isOpen) return null;
 
@@ -36,12 +40,12 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
   const loyaltyDiscountAmount = Math.round((itemsPriceAfterDailyDeal * loyaltyDiscountPct) / 100);
 
   const isGoldVIP = activeLoyalty?.id === 'gold';
-  const qualifiesForFreeDelivery = itemsPriceAfterDailyDeal >= STORE_CONFIG.free_delivery_threshold || isGoldVIP;
-  const deliveryFee = qualifiesForFreeDelivery || items.length === 0 ? 0 : STORE_CONFIG.delivery_fee;
+  const qualifiesForFreeDelivery = itemsPriceAfterDailyDeal >= freeDeliveryThreshold || isGoldVIP;
+  const deliveryFee = qualifiesForFreeDelivery || items.length === 0 ? 0 : deliveryFeeSetting;
 
   const total = Math.max(0, itemsPriceAfterDailyDeal - loyaltyDiscountAmount + deliveryFee);
-  const progressToFreeDelivery = Math.min(100, Math.round((itemsPriceAfterDailyDeal / STORE_CONFIG.free_delivery_threshold) * 100));
-  const remainingForFree = Math.max(0, STORE_CONFIG.free_delivery_threshold - itemsPriceAfterDailyDeal);
+  const progressToFreeDelivery = Math.min(100, Math.round((itemsPriceAfterDailyDeal / freeDeliveryThreshold) * 100));
+  const remainingForFree = Math.max(0, freeDeliveryThreshold - itemsPriceAfterDailyDeal);
 
   return (
     <div className="fixed inset-0 z-50 overflow-hidden">
@@ -230,7 +234,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                     </span>
                   ) : (
                     <span className="font-semibold text-stone-900">
-                      {formatMNT(STORE_CONFIG.delivery_fee)}
+                      {formatMNT(deliveryFeeSetting)}
                     </span>
                   )}
                 </div>

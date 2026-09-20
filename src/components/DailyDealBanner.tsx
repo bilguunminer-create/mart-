@@ -7,12 +7,14 @@ interface DailyDealBannerProps {
   selectedDay: number;
   onFilterDealCategory: (category: string) => void;
   products: Product[];
+  freeDeliveryThreshold: number;
 }
 
 export const DailyDealBanner: React.FC<DailyDealBannerProps> = ({
   selectedDay,
   onFilterDealCategory,
-  products
+  products,
+  freeDeliveryThreshold
 }) => {
   const deal = DAILY_DEALS[selectedDay.toString()] || DAILY_DEALS["1"];
   const [showDetails, setShowDetails] = useState(false);
@@ -50,7 +52,7 @@ export const DailyDealBanner: React.FC<DailyDealBannerProps> = ({
               Хямдрал сагсанд шууд бодогдоно
             </span>
             <span className="text-stone-600">•</span>
-            <span>100,000 ₮-өөс дээш үнэгүй хүргэлттэй</span>
+            <span>{formatMNT(freeDeliveryThreshold)}-өөс дээш үнэгүй хүргэлттэй</span>
           </div>
         </div>
 

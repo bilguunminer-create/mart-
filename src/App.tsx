@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { 
   Sparkles, 
   Truck, 
@@ -13,7 +13,8 @@ import {
   HelpCircle,
   MapPin,
   HeartHandshake,
-  LogOut
+  LogOut,
+  Star
 } from 'lucide-react';
 import { 
   PRODUCTS, 
@@ -27,7 +28,7 @@ import {
   getStoredCashbackPct,
   calculateLoyaltyTierBySpent
 } from './data/storeData';
-import { Product, CartItem, LoyaltyTier, ComboPack, OrderDetails, UserProfile } from './types';
+import { Product, CartItem, LoyaltyTier, ComboPack, OrderDetails, UserProfile, ProductReview } from './types';
 import { Header } from './components/Header';
 import { DailyDealBanner } from './components/DailyDealBanner';
 import { ProductCard } from './components/ProductCard';
@@ -44,7 +45,7 @@ import { GoogleFormsModal } from './components/GoogleFormsModal';
 import { StoreHeroBanner } from './components/StoreHeroBanner';
 import { BeeEmblemLogo } from './components/BeeEmblemLogo';
 import { InventoryCameraModal } from './components/InventoryCameraModal';
-import { getStoreCustomerProfiles, getStoreOrders, getStoreSettings, saveStoreOrder, saveStoreProducts, saveStoreSettings, hasStoreAdminAccess, refreshSession, reportStoreOrderPayment, updateStoreOrderStatus, confirmStoreOrderPayment, verifyAdminPin, changeAdminPin } from './services/supabaseAuth';
+import { getStoreCustomerProfiles, getStoreOrders, getStoreSettings, saveStoreOrder, saveStoreProducts, saveStoreSettings, hasStoreAdminAccess, refreshSession, reportStoreOrderPayment, updateStoreOrderStatus, confirmStoreOrderPayment, verifyAdminPin, changeAdminPin, expireUnpaidOrdersAsAdmin, getAllReviewsForAdmin, moderateProductReview, deleteProductReview, getProductReviews } from './services/supabaseAuth';
 
 export default function App() {
   // The installed PWA and native Capacitor shells open only the secured admin flow.
@@ -174,11 +175,26 @@ export default function App() {
   useEffect(() => {
     if (!currentUser?.accessToken) return;
     let active = true;
-    const loadCentralData = () => Promise.all([getStoreOrders(currentUser.accessToken), getStoreCustomerProfiles(currentUser.accessToken)])
-      .then(([remoteOrders, profiles]) => {
-        if (!active) return;
-        setMemberProfiles(profiles);
-        setOrders(remoteOrders.map((order) => ({
+    // Tracks order IDs seen on the previous poll so a genuinely new order can be announced to the admin.
+    let knownOrderIds: Set<string> | null = null;
+
+    const loadCentralData = async () => {
+      const token = currentUser.accessToken as string;
+      if (isAdminAuthenticated) {
+        // Best-effort periodic sweep: cancel orders nobody paid for within the configured window
+        // and release their reserved stock, even if that customer never reopens their profile.
+        try { await expireUnpaidOrdersAsAdmin(token); } catch { /* not fatal to the rest of the refresh */ }
+      }
+
+      const [ordersResult, profilesResult] = await Promise.allSettled([
+        getStoreOrders(token),
+        getStoreCustomerProfiles(token),
+      ]);
+      if (!active) return;
+      const failures: string[] = [];
+
+      if (ordersResult.status === 'fulfilled') {
+        const mapped = ordersResult.value.map((order) => ({
           orderId: order.id,
           customerId: order.customer_id,
           customerName: order.customer_name,
@@ -186,11 +202,11 @@ export default function App() {
           address: order.address,
           district: 'Өмнөговь, Даланзадгад',
           notes: order.note || '',
-          paymentMethod: 'bank',
+          paymentMethod: 'bank' as const,
           paymentStatus: order.payment_status,
           paymentReportedAt: order.payment_reported_at || undefined,
           items: (order.items || []).map((item) => ({
-            type: 'product',
+            type: 'product' as const,
             id: item.productId,
             name: item.title,
             price: item.price,
@@ -204,12 +220,60 @@ export default function App() {
           deliveryFee: order.delivery_fee,
           total: order.total,
           date: new Date(order.created_at).toLocaleString('mn-MN'),
-          status: order.status === 'Дууссан' ? 'delivered' : order.status === 'Цуцалсан' ? 'cancelled' : order.status === 'Хүргэлтэд' ? 'shipping' : order.status === 'Баталгаажсан' ? 'confirmed' : 'new',
-        })));
-      })
-      .catch(() => { if (active) setMemberProfiles([]); });
-    return () => { active = false; };
+          status: order.status === 'Дууссан' ? 'delivered' as const : order.status === 'Цуцалсан' ? 'cancelled' as const : order.status === 'Хүргэлтэд' ? 'shipping' as const : order.status === 'Баталгаажсан' ? 'confirmed' as const : 'new' as const,
+        }));
+
+        if (isAdminAuthenticated) {
+          const currentIds = new Set(mapped.map((o) => o.orderId));
+          if (knownOrderIds) {
+            const arrived = mapped.filter((o) => !knownOrderIds!.has(o.orderId));
+            if (arrived.length > 0) {
+              const names = arrived.slice(0, 3).map((o) => `#${o.orderId}`).join(', ');
+              showToast(`🔔 Шинэ захиалга ирлээ: ${names}${arrived.length > 3 ? ` (+${arrived.length - 3})` : ''}`);
+            }
+          }
+          knownOrderIds = currentIds;
+        }
+
+        setOrders(mapped);
+      } else {
+        console.error('[Admin] Захиалгын түүх татахад алдаа гарлаа:', ordersResult.reason);
+        failures.push('захиалгын түүх');
+      }
+
+      if (profilesResult.status === 'fulfilled') {
+        setMemberProfiles(profilesResult.value);
+      } else {
+        console.error('[Admin] Гишүүдийн мэдээлэл татахад алдаа гарлаа:', profilesResult.reason);
+        setMemberProfiles([]);
+        failures.push('хэрэглэгчийн мэдээлэл');
+      }
+
+      if (failures.length > 0) {
+        showToast(`Төв сангаас ${failures.join(', ')} татаж чадсангүй. Дахин нэвтэрч үзнэ үү.`);
+      }
+    };
+
+    void loadCentralData();
+    // Admins get a live-ish refresh so new orders and payment sweeps do not wait for a manual reload.
+    const timer = window.setInterval(() => { if (!document.hidden) void loadCentralData(); }, 20000);
+    return () => { active = false; window.clearInterval(timer); };
   }, [currentUser?.accessToken, isAdminAuthenticated]);
+
+  // Review moderation queue (admin-only).
+  const [adminReviews, setAdminReviews] = useState<ProductReview[]>([]);
+  const refreshAdminReviews = useCallback(async () => {
+    if (!currentUser?.accessToken) return;
+    try {
+      setAdminReviews(await getAllReviewsForAdmin(currentUser.accessToken));
+    } catch {
+      // The moderation tab simply stays empty; the admin can retry by reopening it.
+    }
+  }, [currentUser?.accessToken]);
+  useEffect(() => {
+    if (!isAdminAuthenticated) return;
+    void refreshAdminReviews();
+  }, [isAdminAuthenticated, refreshAdminReviews]);
 
   // Log out a customer after 30 minutes without activity.
   useEffect(() => {
@@ -347,6 +411,12 @@ export default function App() {
   // Toast message
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
+  // Site-wide approved testimonials for the footer ticker. Public, no login required.
+  const [testimonials, setTestimonials] = useState<ProductReview[]>([]);
+  useEffect(() => {
+    getProductReviews(undefined, 20).then(setTestimonials).catch(() => setTestimonials([]));
+  }, []);
+
   // Sync cart to localStorage
   useEffect(() => {
     try {
@@ -383,7 +453,7 @@ export default function App() {
       showToast('Каталогийн өөрчлөлтийг хадгалахын тулд админ и-мэйлээрээ нэвтэрнэ үү.');
       return;
     }
-    void saveStoreProducts(currentUser.accessToken, nextProducts)
+    void saveStoreProducts(currentUser.accessToken, nextProducts as unknown as Record<string, unknown>[])
       .catch(() => showToast('Supabase каталогийн өөрчлөлтийг хадгалах боломжгүй байна.'));
   };
 
@@ -687,10 +757,15 @@ export default function App() {
     try {
       const settings = await getStoreSettings();
       const remoteProducts = Array.isArray(settings.data.products) ? settings.data.products as Array<Record<string, unknown>> : [];
-      const remoteCombos = Array.isArray(settings.data.combos) ? settings.data.combos as Array<Record<string, unknown>> : [];
-      const latest = [...remoteProducts, ...remoteCombos];
+      const remoteCombos = Array.isArray(settings.data.combo_packs) ? settings.data.combo_packs as Array<Record<string, unknown>> : [];
       const shortages = cart.map((item) => {
-        const product = latest.find((entry) => String(entry.id) === item.id);
+        if (item.type === 'combo') {
+          // Combo packs are not stock-tracked: they stay available as long as they still exist and are published.
+          const combo = remoteCombos.find((entry) => String(entry.id) === item.id);
+          const available = combo && combo.published !== false ? item.quantity : 0;
+          return { item, available };
+        }
+        const product = remoteProducts.find((entry) => String(entry.id) === item.id);
         if (!product) return { item, available: 0 };
         const available = Boolean(product.in_stock) && Boolean(product.published ?? true)
           ? Math.max(0, Number(product.stock ?? 0))
@@ -853,6 +928,7 @@ export default function App() {
         setSelectedDay={setSelectedDay}
         dailyDealTitle={currentDeal.title}
         storePhone={checkoutSettings.storePhone}
+        freeDeliveryThreshold={checkoutSettings.freeDeliveryThreshold}
       />
 
       {/* Main Content Area */}
@@ -879,12 +955,13 @@ export default function App() {
             setShowDealsOnly(true);
           }}
           products={products.filter(product => product.published !== false && product.in_stock && Number(product.stock_quantity ?? 0) > 0)}
+          freeDeliveryThreshold={checkoutSettings.freeDeliveryThreshold}
         />
 
         {/* Curated Combos Section */}
         {featuredProductId && products.find(p=>p.id===featuredProductId) && <button type="button" onClick={()=>setDetailProduct(products.find(p=>p.id===featuredProductId)!)} className="mb-6 flex w-full items-center gap-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-left"><img src={products.find(p=>p.id===featuredProductId)!.image} className="h-16 w-16 rounded-xl object-cover" /><div><p className="text-xs font-bold text-amber-700">ӨНӨӨДРИЙН ОНЦЛОХ БАРАА</p><p className="font-black text-stone-900">{products.find(p=>p.id===featuredProductId)!.name}</p><p className="font-bold text-rose-600">{formatMNT(products.find(p=>p.id===featuredProductId)!.price)}</p></div></button>}
         <CombosSection
-          combos={comboPacks}
+          combos={comboPacks.filter((combo) => combo.published !== false)}
           products={products}
           onAddComboToCart={handleAddComboToCart}
           onOpenProductDetail={(productId) => {
@@ -1210,6 +1287,24 @@ export default function App() {
 
       {/* Footer */}
       <footer className="bg-stone-900 text-stone-400 text-xs py-10 mt-12 border-t border-stone-800">
+        {/* Approved customer testimonials, scrolling continuously */}
+        {testimonials.length > 0 && (
+          <div className="border-b border-stone-800 bg-stone-950/60 py-3 overflow-hidden mb-8">
+            <div className="flex w-max gap-8 usk-testimonial-track">
+              {[...testimonials, ...testimonials].map((review, idx) => (
+                <div key={`${review.id}-${idx}`} className="flex items-center gap-2 shrink-0 px-4 whitespace-nowrap">
+                  <div className="flex items-center gap-0.5">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <Star key={star} className={`w-3 h-3 ${star <= review.rating ? 'fill-amber-400 text-amber-400' : 'text-stone-700'}`} />
+                    ))}
+                  </div>
+                  <span className="font-bold text-white">{review.customer_name}:</span>
+                  <span className="text-stone-400 max-w-xs truncate">"{review.comment}"</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
         <div className="max-w-7xl mx-auto px-4 space-y-8">
           <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 pb-8 border-b border-stone-800">
             <div className="space-y-2">
@@ -1316,6 +1411,8 @@ export default function App() {
         onProceedToCheckout={handleProceedToCheckout}
         activeLoyalty={activeLoyalty}
         dailyDiscountTotal={dailyDiscountTotal}
+        freeDeliveryThreshold={checkoutSettings.freeDeliveryThreshold}
+        deliveryFee={checkoutSettings.deliveryFee}
       />
 
       <CheckoutModal
@@ -1431,6 +1528,8 @@ export default function App() {
           handleAddToCart(prod, qty);
         }}
         freeDeliveryThreshold={checkoutSettings.freeDeliveryThreshold}
+        currentUser={currentUser}
+        onRequireLogin={() => { setDetailProduct(null); setIsProfileOpen(true); showToast('Сэтгэгдэл бичихийн тулд эхлээд бүртгэлдээ нэвтэрнэ үү.'); }}
       />
 
       {/* Admin Panel Full Screen Dashboard */}
@@ -1446,10 +1545,21 @@ export default function App() {
           onConfirmPayment={async (orderId) => {
             if (!currentUser?.accessToken) throw new Error('Админ и-мэйлээр нэвтэрнэ үү.');
             await confirmStoreOrderPayment(currentUser.accessToken, orderId);
+            // Confirming payment must also move a still-"new" order forward to "confirmed" so
+            // the customer's order-status steps reflect it immediately, not just the payment badge.
+            const target = orders.find((order) => order.orderId === orderId);
+            const shouldAdvanceStatus = !target?.status || target.status === 'new';
+            if (shouldAdvanceStatus) {
+              try {
+                await updateStoreOrderStatus(currentUser.accessToken, orderId, 'Баталгаажсан');
+              } catch {
+                // The payment is already confirmed; a status-transition hiccup here must not block the UI update.
+              }
+            }
             setOrders((previous) => previous.map((order) => order.orderId === orderId
-              ? { ...order, paymentStatus: 'Төлбөр баталгаажсан' }
+              ? { ...order, paymentStatus: 'Төлбөр баталгаажсан', status: shouldAdvanceStatus ? 'confirmed' : order.status }
               : order));
-            showToast('Төлбөр баталгаажлаа. Захиалгын баримт хэвлэх эрх нээгдлээ.');
+            showToast('Төлбөр баталгаажлаа. Захиалгын төлөв "Баталгаажсан" болж, баримт хэвлэх эрх нээгдлээ.');
           }}
           onResetProducts={handleResetProducts}
           onClose={() => setIsAdminOpen(false)}
@@ -1458,7 +1568,40 @@ export default function App() {
           onOpenForms={() => setIsFormsOpen(true)}
           onQuickUpdateStock={handleQuickUpdateStock}
           featuredProductId={featuredProductId}
+          combos={comboPacks}
+          onSaveCombo={async (combo) => {
+            if (!currentUser?.accessToken) throw new Error('Админ и-мэйлээр нэвтэрнэ үү.');
+            const next = comboPacks.some((item) => item.id === combo.id)
+              ? comboPacks.map((item) => (item.id === combo.id ? combo : item))
+              : [...comboPacks, combo];
+            await saveStoreSettings(currentUser.accessToken, { combo_packs: next });
+            setComboPacks(next);
+            showToast(`"${combo.name}" багц төв санд хадгалагдлаа.`);
+          }}
+          onDeleteCombo={async (comboId) => {
+            if (!currentUser?.accessToken) throw new Error('Админ и-мэйлээр нэвтэрнэ үү.');
+            const next = comboPacks.filter((item) => item.id !== comboId);
+            await saveStoreSettings(currentUser.accessToken, { combo_packs: next });
+            setComboPacks(next);
+            showToast('Багц устгагдлаа.');
+          }}
           onSaveFeaturedProduct={async (productId) => { if (!currentUser?.accessToken) throw new Error('Админ и-мэйлээр нэвтэрнэ үү.'); await saveStoreSettings(currentUser.accessToken, { featured_product_id: productId }); setFeaturedProductId(productId); showToast('Өнөөдрийн онцлох бараа төв санд хадгалагдлаа.'); }}
+          reviews={adminReviews}
+          onRefreshReviews={refreshAdminReviews}
+          onModerateReview={async (reviewId, approve) => {
+            if (!currentUser?.accessToken) throw new Error('Админ и-мэйлээр нэвтэрнэ үү.');
+            await moderateProductReview(currentUser.accessToken, reviewId, approve);
+            setAdminReviews((previous) => previous.map((review) => review.id === reviewId
+              ? { ...review, status: approve ? 'approved' : 'rejected', reviewed_at: new Date().toISOString() }
+              : review));
+            showToast(approve ? 'Сэтгэгдэл зөвшөөрөгдлөө.' : 'Сэтгэгдэл татгалзагдлаа.');
+          }}
+          onDeleteReview={async (reviewId) => {
+            if (!currentUser?.accessToken) throw new Error('Админ и-мэйлээр нэвтэрнэ үү.');
+            await deleteProductReview(currentUser.accessToken, reviewId);
+            setAdminReviews((previous) => previous.filter((review) => review.id !== reviewId));
+            showToast('Сэтгэгдэл устгагдлаа.');
+          }}
           checkoutSettings={checkoutSettings}
           onSaveCheckoutSettings={async (settings) => {
             if (!currentUser?.accessToken) throw new Error('Админ и-мэйлээр нэвтэрнэ үү.');

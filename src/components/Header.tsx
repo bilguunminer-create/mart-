@@ -1,6 +1,6 @@
 import React, { useRef } from 'react';
 import { ShoppingBag, Search, Sparkles, Truck, Phone, Award, ShieldCheck, LogOut, User, MapPin } from 'lucide-react';
-import { STORE_CONFIG, formatMNT } from '../data/storeData';
+import { formatMNT } from '../data/storeData';
 import { LoyaltyTier, UserProfile } from '../types';
 import { BeeEmblemLogo } from './BeeEmblemLogo';
 
@@ -22,6 +22,7 @@ interface HeaderProps {
   setSelectedDay: (day: number) => void;
   dailyDealTitle: string;
   storePhone: string;
+  freeDeliveryThreshold: number;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -41,7 +42,8 @@ export const Header: React.FC<HeaderProps> = ({
   selectedDay,
   setSelectedDay,
   dailyDealTitle,
-  storePhone
+  storePhone,
+  freeDeliveryThreshold
 }) => {
   const logoClickCountRef = useRef(0);
   const logoTimerRef = useRef<any>(null);
@@ -77,7 +79,7 @@ export const Header: React.FC<HeaderProps> = ({
           <div className="flex items-center gap-4">
             <span className="flex items-center gap-1.5 text-amber-300 font-medium">
               <Truck className="w-3.5 h-3.5 text-amber-400" />
-              <span>{formatMNT(STORE_CONFIG.free_delivery_threshold)}-өөс дээш үнэгүй хүргэлттэй</span>
+              <span>{formatMNT(freeDeliveryThreshold)}-өөс дээш үнэгүй хүргэлттэй</span>
             </span>
             <span className="hidden md:inline-block text-stone-400">|</span>
             <span className="hidden md:inline-block text-stone-300">

@@ -3,6 +3,17 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 const globalOtpStore = (global as any).__otpStore || new Map<string, { code: string; expiresAt: number; name?: string }>();
 (global as any).__otpStore = globalOtpStore;
 
+// HMAC secret used to verify stateless OTP tokens. Must match the value used
+// in api/send-email-otp.ts, and must be set via the environment in production.
+function getOtpSecret(): string {
+  const secret = process.env.OTP_SECRET;
+  if (!secret) {
+    console.warn('[Email OTP] OTP_SECRET тохируулаагүй тул түр зуурын анхдагч түлхүүр ашиглаж байна. Production дээр OTP_SECRET-ийг заавал тохируулна уу.');
+    return 'usk-mart-static-otp-v1';
+  }
+  return secret;
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -43,7 +54,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       const crypto = await import('crypto');
-      const secret = 'usk-mart-static-otp-v1';
+      const secret = getOtpSecret();
       const expectedPayload = `${cleanEmail}:${cleanCode}:${expiresAt}`;
       const expectedSignature = crypto.createHmac('sha256', secret).update(expectedPayload).digest('hex');
 

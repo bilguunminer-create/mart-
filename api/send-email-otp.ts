@@ -5,6 +5,19 @@ import nodemailer from 'nodemailer';
 const globalOtpStore = (global as any).__otpStore || new Map<string, { code: string; expiresAt: number; name?: string }>();
 (global as any).__otpStore = globalOtpStore;
 
+// HMAC secret used to sign stateless OTP verification tokens. Must be set via
+// the environment in production — anyone who can read the source can forge
+// tokens if the fallback default is ever left in place on a live deployment.
+// Keep this identical to the value used in api/verify-email-otp.ts.
+function getOtpSecret(): string {
+  const secret = process.env.OTP_SECRET;
+  if (!secret) {
+    console.warn('[Email OTP] OTP_SECRET тохируулаагүй тул түр зуурын анхдагч түлхүүр ашиглаж байна. Production дээр OTP_SECRET-ийг заавал тохируулна уу.');
+    return 'usk-mart-static-otp-v1';
+  }
+  return secret;
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // CORS headers
   res.setHeader('Access-Control-Allow-Credentials', 'true');
@@ -95,7 +108,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // In serverless environments, each invocation can run in an isolated lambda instance.
     // We provide an HMAC signature / verification token so verification is 100% stateless and never lost.
     const crypto = await import('crypto');
-    const secret = 'usk-mart-static-otp-v1';
+    const secret = getOtpSecret();
     const payload = `${cleanEmail}:${code}:${expiresAt}`;
     const token = crypto.createHmac('sha256', secret).update(payload).digest('hex');
 

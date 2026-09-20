@@ -42,6 +42,18 @@ function getMailTransporter(): Transporter | null {
   return mailTransporter;
 }
 
+// HMAC secret used to sign stateless OTP verification tokens. Must be set via
+// the environment in production — anyone who can read the source can forge
+// tokens if the fallback default is ever left in place on a live deployment.
+function getOtpSecret(): string {
+  const secret = process.env.OTP_SECRET;
+  if (!secret) {
+    console.warn("[Email OTP] OTP_SECRET тохируулаагүй тул түр зуурын анхдагч түлхүүр ашиглаж байна. Production дээр OTP_SECRET-ийг заавал тохируулна уу.");
+    return "usk-mart-static-otp-v1";
+  }
+  return secret;
+}
+
 async function startServer() {
   const app = express();
   const PORT = 3000;
@@ -156,7 +168,7 @@ async function startServer() {
         console.log(`[Email OTP] Real email sent to ${cleanEmail}`);
         
         const crypto = await import("crypto");
-        const secret = "usk-mart-static-otp-v1";
+        const secret = getOtpSecret();
         const payload = `${cleanEmail}:${code}:${expiresAt}`;
         const token = crypto.createHmac("sha256", secret).update(payload).digest("hex");
 
@@ -170,7 +182,7 @@ async function startServer() {
         // Test / Instant Preview Mode
         console.log(`[Email OTP Preview Mode] Code for ${cleanEmail} is: ${code}`);
         const crypto = await import("crypto");
-        const secret = "usk-mart-static-otp-v1";
+        const secret = getOtpSecret();
         const payload = `${cleanEmail}:${code}:${expiresAt}`;
         const token = crypto.createHmac("sha256", secret).update(payload).digest("hex");
 
@@ -201,11 +213,6 @@ async function startServer() {
       const cleanEmail = email.trim().toLowerCase();
       const cleanCode = code.trim();
 
-      // Check master demo codes
-      if (cleanCode === "7788" || cleanCode === "1234" || cleanCode === "778899") {
-        return res.json({ verified: true, message: "Баталгаажлаа (Мастер код)" });
-      }
-
       // 1. First check stateless cryptographic token if present
       if (token && typeof token === "string" && token.includes(".")) {
         const [expiresAtStr, signature] = token.split(".");
@@ -215,7 +222,7 @@ async function startServer() {
         }
 
         const crypto = await import("crypto");
-        const secret = "usk-mart-static-otp-v1";
+        const secret = getOtpSecret();
         const expectedPayload = `${cleanEmail}:${cleanCode}:${expiresAt}`;
         const expectedSignature = crypto.createHmac("sha256", secret).update(expectedPayload).digest("hex");
 

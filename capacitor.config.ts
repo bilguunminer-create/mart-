@@ -4,7 +4,6 @@ const config: CapacitorConfig = {
   appId: 'com.uskfamilymart.admin',
   appName: 'US&K Admin',
   webDir: 'dist',
-  bundledWebRuntime: false,
   server: {
     androidScheme: 'https',
   },
