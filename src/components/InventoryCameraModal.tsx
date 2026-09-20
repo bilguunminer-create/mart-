@@ -1,5 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { X, Camera, Barcode, PackagePlus, MinusCircle, History, CheckCircle2, RefreshCw } from 'lucide-react';
+import { BrowserMultiFormatReader } from '@zxing/browser';
+import type { IScannerControls } from '@zxing/browser';
 import { deductInventoryByBarcode, getInventoryMovements, registerInventoryProduct, uploadProductImage, InventoryMovement } from '../services/supabaseAuth';
 
 type Props = { isOpen: boolean; onClose: () => void; accessToken: string; onChanged: () => void };
@@ -22,8 +24,15 @@ export const InventoryCameraModal: React.FC<Props> = ({ isOpen, onClose, accessT
   const videoRef=useRef<HTMLVideoElement|null>(null);
   const streamRef=useRef<MediaStream|null>(null);
   const timerRef=useRef<number|undefined>();
+  const zxingControlsRef=useRef<IScannerControls|null>(null);
 
-  const stopCamera=()=>{ if(timerRef.current) window.clearInterval(timerRef.current); streamRef.current?.getTracks().forEach(t=>t.stop()); streamRef.current=null; };
+  const stopCamera=()=>{
+    if(timerRef.current) window.clearInterval(timerRef.current);
+    zxingControlsRef.current?.stop();
+    zxingControlsRef.current=null;
+    streamRef.current?.getTracks().forEach(t=>t.stop());
+    streamRef.current=null;
+  };
   useEffect(()=>()=>stopCamera(),[]);
   useEffect(()=>{ if(tab==='history'&&isOpen) void loadHistory(); },[tab,isOpen]);
 
@@ -48,10 +57,26 @@ export const InventoryCameraModal: React.FC<Props> = ({ isOpen, onClose, accessT
       const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}},audio:false});
       streamRef.current=stream;
       if(videoRef.current){ videoRef.current.srcObject=stream; await videoRef.current.play(); }
+
+      const handleDetected=(value:string)=>{
+        if(target==='register'){ setField('barcode',value); window.setTimeout(()=>setStep(3),600); } else setScan(value);
+        setMessage('Код амжилттай уншигдлаа: '+value);
+        stopCamera();
+      };
+
+      // The native BarcodeDetector API is fast when available, but many WebViews
+      // (including the installed Android app's) do not implement it at all, even on
+      // devices where Chrome itself supports it. ZXing decodes from raw video frames
+      // in pure JS, so it works everywhere the camera itself works.
       const Detector=(window as any).BarcodeDetector;
-      if(!Detector){ setMessage('Энэ төхөөрөмж barcode автоматаар уншихыг дэмжихгүй байна. Кодоо гараар оруулна уу.'); return; }
-      const detector=new Detector({formats:['ean_13','ean_8','upc_a','upc_e','code_128','code_39','qr_code']});
-      timerRef.current=window.setInterval(async()=>{ try { if(!videoRef.current) return; const found=await detector.detect(videoRef.current); const value=found?.[0]?.rawValue; if(value){ if(target==='register'){ setField('barcode',value); window.setTimeout(()=>setStep(3),600); } else setScan(value); setMessage('Код амжилттай уншигдлаа: '+value); stopCamera(); } } catch {} },500);
+      if(Detector){
+        const detector=new Detector({formats:['ean_13','ean_8','upc_a','upc_e','code_128','code_39','qr_code']});
+        timerRef.current=window.setInterval(async()=>{ try { if(!videoRef.current) return; const found=await detector.detect(videoRef.current); const value=found?.[0]?.rawValue; if(value) handleDetected(value); } catch {} },500);
+        return;
+      }
+
+      const reader=new BrowserMultiFormatReader();
+      zxingControlsRef.current=await reader.decodeFromStream(stream, videoRef.current ?? undefined, (result)=>{ if(result) handleDetected(result.getText()); });
     } catch { setMessage('Камер нээх зөвшөөрөл өгнө үү.'); }
   };
 
@@ -63,7 +88,12 @@ export const InventoryCameraModal: React.FC<Props> = ({ isOpen, onClose, accessT
       const imageUrl=await uploadProductImage(accessToken,image);
       await registerInventoryProduct(accessToken,{...form,id:crypto.randomUUID(),stock:Number(form.stock),price:Number(form.price),day_deal:Number(form.day_deal),image:imageUrl,country:form.origin,flag:form.origin==='БНСУ'?'🇰🇷':'🇺🇸',rating:5,published:false,note:'Камерын апп-аар шинээр бүртгэв'});
       setMessage('Бараа амжилттай бүртгэгдлээ. Админ удирдлагаас шалгаж нийтлээрэй.'); setForm(blank); setImage(null); setPreview(''); setImageOk(false); setStep(1); onChanged();
-    } catch(e){ setMessage(e instanceof Error?e.message:'Бүртгэх боломжгүй байна.'); } finally { setBusy(false); }
+    } catch(e){
+      const raw=e instanceof Error?e.message:'';
+      setMessage(/duplicate|already|exists|unique/i.test(raw)
+        ? 'Энэ barcode код өмнө нь өөр бараанд бүртгэгдсэн байна. Кодоо шалгаад дахин оролдоно уу.'
+        : raw||'Бүртгэх боломжгүй байна.');
+    } finally { setBusy(false); }
   };
 
   const deduct=async()=>{

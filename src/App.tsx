@@ -46,7 +46,11 @@ import { UserProfileModal } from './components/UserProfileModal';
 import { GoogleFormsModal } from './components/GoogleFormsModal';
 import { StoreHeroBanner } from './components/StoreHeroBanner';
 import { BeeEmblemLogo } from './components/BeeEmblemLogo';
-import { InventoryCameraModal } from './components/InventoryCameraModal';
+// Lazy-loaded: pulls in the barcode-scanning library, which only the warehouse
+// app ever needs -- regular storefront visitors should never pay for that weight.
+const InventoryCameraModal = React.lazy(() =>
+  import('./components/InventoryCameraModal').then((m) => ({ default: m.InventoryCameraModal }))
+);
 import { getStoreCustomerProfiles, getStoreOrders, getStoreSettings, saveStoreOrder, saveStoreProducts, saveStoreSettings, hasStoreAdminAccess, refreshSession, reportStoreOrderPayment, updateStoreOrderStatus, confirmStoreOrderPayment, verifyAdminPin, changeAdminPin, expireUnpaidOrdersAsAdmin, getAllReviewsForAdmin, moderateProductReview, deleteProductReview, getProductReviews } from './services/supabaseAuth';
 import { initAdminPushNotifications } from './services/pushNotifications';
 
@@ -926,15 +930,17 @@ export default function App() {
           </button>
         )}
         {currentUser?.accessToken && (
-          <InventoryCameraModal
-            isOpen={isInventoryOpen}
-            onClose={() => setIsInventoryOpen(false)}
-            accessToken={currentUser.accessToken}
-            onChanged={() => {
-              setIsInventoryOpen(false);
-              window.location.reload();
-            }}
-          />
+          <React.Suspense fallback={null}>
+            <InventoryCameraModal
+              isOpen={isInventoryOpen}
+              onClose={() => setIsInventoryOpen(false)}
+              accessToken={currentUser.accessToken}
+              onChanged={() => {
+                setIsInventoryOpen(false);
+                window.location.reload();
+              }}
+            />
+          </React.Suspense>
         )}
         {toastMessage && (
           <div className="fixed bottom-6 right-6 z-50 bg-stone-900/95 backdrop-blur-md text-white px-4 py-3 rounded-2xl shadow-2xl border border-stone-700 flex items-center gap-2.5 text-xs font-semibold">
@@ -1803,15 +1809,17 @@ export default function App() {
       )}
 
       {isInventoryOpen && currentUser?.accessToken && (
-        <InventoryCameraModal
-          isOpen={isInventoryOpen}
-          onClose={() => setIsInventoryOpen(false)}
-          accessToken={currentUser.accessToken}
-          onChanged={() => {
-            setIsInventoryOpen(false);
-            window.location.reload();
-          }}
-        />
+        <React.Suspense fallback={null}>
+          <InventoryCameraModal
+            isOpen={isInventoryOpen}
+            onClose={() => setIsInventoryOpen(false)}
+            accessToken={currentUser.accessToken}
+            onChanged={() => {
+              setIsInventoryOpen(false);
+              window.location.reload();
+            }}
+          />
+        </React.Suspense>
       )}
 
       {/* User Profile & Security Modal */}
