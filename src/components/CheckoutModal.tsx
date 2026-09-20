@@ -3,6 +3,7 @@ import { X, CheckCircle2, QrCode, CreditCard, Banknote, Truck, ShieldCheck, Copy
 import { CartItem, LoyaltyTier, OrderDetails, UserProfile } from '../types';
 import { STORE_CONFIG, LOYALTY_TIERS, formatMNT, getStoredLoyaltyTiers, calculateLoyaltyTierBySpent } from '../data/storeData';
 import { getLoyaltyWallet } from '../services/supabaseAuth';
+import { printOrderReceipt } from '../utils/printReceipt';
 
 interface CheckoutModalProps {
   isOpen: boolean;
@@ -44,16 +45,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const [paymentReported, setPaymentReported] = useState(false);
 
   const printReceipt = () => {
-    if (!completedOrder || completedOrder.paymentStatus !== 'Төлбөр баталгаажсан') return;
-    const rows = completedOrder.items.map((item) =>
-      '<tr><td>' + item.name.replace(/</g, '&lt;') + ' × ' + item.quantity + '</td><td style="text-align:right">' + formatMNT(item.price * item.quantity) + '</td></tr>'
-    ).join('');
-    const receipt = window.open('', '_blank', 'width=420,height=720');
-    if (!receipt) return;
-    receipt.document.write('<!doctype html><html><head><title>Захиалгын баримт</title><style>body{font-family:Arial,sans-serif;color:#18181b;padding:24px;max-width:360px;margin:auto}h1{font-size:20px;margin:0 0 4px}p{font-size:12px;margin:6px 0}table{width:100%;border-collapse:collapse;margin:16px 0;font-size:12px}td{padding:7px 0;border-bottom:1px solid #ddd}.total{font-size:18px;font-weight:800;text-align:right;margin-top:12px}.ok{color:#047857;font-weight:700}@media print{body{padding:0}}</style></head><body><h1>US&K Family Mart</h1><p>Захиалгын баримт · #' + completedOrder.orderId + '</p><p>Огноо: ' + completedOrder.date + '</p><p>Харилцагч: ' + completedOrder.customerName + ' · ' + completedOrder.phone + '</p><p class="ok">Төлбөр баталгаажсан</p><table>' + rows + '</table><p>Хүргэлт: ' + (completedOrder.deliveryFee === 0 ? 'ҮНЭГҮЙ' : formatMNT(completedOrder.deliveryFee)) + '</p><p class="total">Нийт: ' + formatMNT(completedOrder.total) + '</p><p>Баярлалаа.</p></body></html>');
-    receipt.document.close();
-    receipt.focus();
-    receipt.print();
+    if (!completedOrder) return;
+    printOrderReceipt(completedOrder);
   };
 
   // Sync with currentUser when opened
@@ -569,6 +562,9 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                             </div>
                           )}
                         </div>
+                        <p className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-[11px] font-bold text-amber-900">
+                          ⚠️ Мөнгө шилжүүлэхээсээ өмнө ДАНС ЭЗЭМШИГЧИЙН НЭРийг дээрх мэдээлэлтэй адил эсэхийг сайтар шалгана уу. Буруу данс руу шилжүүлсэн мөнгийг буцаан авах боломжгүй.
+                        </p>
                         <p className="text-[11px] text-stone-500">
                           Гүйлгээний утга дээр өөрийн утасны дугаарыг бичнэ үү. Төлбөр орсныг админ баталгаажуулсны дараа захиалга үргэлжилнэ.
                         </p>
