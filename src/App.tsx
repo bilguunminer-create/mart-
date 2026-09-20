@@ -14,7 +14,8 @@ import {
   MapPin,
   HeartHandshake,
   LogOut,
-  Star
+  Star,
+  Mail
 } from 'lucide-react';
 import { 
   PRODUCTS, 
@@ -70,8 +71,8 @@ export default function App() {
   const [products, setProducts] = useState<Product[]>(PRODUCTS);
   const [comboPacks, setComboPacks] = useState<ComboPack[]>(COMBOS);
   const [featuredProductId, setFeaturedProductId] = useState('');
-  const [checkoutSettings, setCheckoutSettings] = useState<{ deliveryFee: number; freeDeliveryThreshold: number; bankName: string; accountNumber: string; iban: string; accountHolder: string; storePhone: string; storeEmail: string; facebookUrl: string; storeAddress: string; unpaidCancellationMinutes: number }>({
-    deliveryFee: 3000, freeDeliveryThreshold: STORE_CONFIG.free_delivery_threshold, bankName: '', accountNumber: '', iban: '', accountHolder: '', storePhone: STORE_CONFIG.phone, storeEmail: '', facebookUrl: '', storeAddress: STORE_CONFIG.location, unpaidCancellationMinutes: 60,
+  const [checkoutSettings, setCheckoutSettings] = useState<{ deliveryFee: number; freeDeliveryThreshold: number; bankName: string; accountNumber: string; iban: string; accountHolder: string; storePhone: string; storeEmail: string; facebookUrl: string; messengerUrl: string; googleMapsUrl: string; storeAddress: string; unpaidCancellationMinutes: number }>({
+    deliveryFee: 3000, freeDeliveryThreshold: STORE_CONFIG.free_delivery_threshold, bankName: '', accountNumber: '', iban: '', accountHolder: '', storePhone: STORE_CONFIG.phone, storeEmail: '', facebookUrl: '', messengerUrl: '', googleMapsUrl: '', storeAddress: STORE_CONFIG.location, unpaidCancellationMinutes: 60,
   });
   useEffect(() => {
     getStoreSettings().then((settings) => {
@@ -96,6 +97,8 @@ export default function App() {
         storePhone: String(settings.data.store_phone ?? checkoutSettings.storePhone),
         storeEmail: String(settings.data.store_email ?? ''),
         facebookUrl: String(settings.data.facebook_url ?? ''),
+        messengerUrl: String(settings.data.messenger_url ?? ''),
+        googleMapsUrl: String(settings.data.google_maps_url ?? ''),
         storeAddress: String(settings.data.store_address ?? STORE_CONFIG.location),
         unpaidCancellationMinutes: Number(settings.data.unpaid_cancellation_minutes ?? 60),
       });
@@ -1316,8 +1319,62 @@ export default function App() {
                 </div>
               </div>
               <p className="text-stone-400 text-xs max-w-md">
-                АНУ болон БНСУ-ын дээд зэрэглэлийн чанартай хүнс, рамен, хүүхдийн живх, өргөн хэрэглээ, амин дэмийг шуурхай хүргэх цахим дэлгүүр.<br/>📍 {checkoutSettings.storeAddress}<br/>{checkoutSettings.storeEmail && <>✉️ {checkoutSettings.storeEmail}<br/></>}{checkoutSettings.facebookUrl && <>Facebook: {checkoutSettings.facebookUrl}</>}
+                АНУ болон БНСУ-ын дээд зэрэглэлийн чанартай хүнс, рамен, хүүхдийн живх, өргөн хэрэглээ, амин дэмийг шуурхай хүргэх цахим дэлгүүр.
               </p>
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-stone-400 pt-1">
+                {checkoutSettings.googleMapsUrl ? (
+                  <a
+                    href={checkoutSettings.googleMapsUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1.5 hover:text-amber-400 transition-colors"
+                  >
+                    <MapPin className="w-3.5 h-3.5 shrink-0" />
+                    <span>{checkoutSettings.storeAddress}</span>
+                  </a>
+                ) : (
+                  <span className="flex items-center gap-1.5">
+                    <MapPin className="w-3.5 h-3.5 shrink-0" />
+                    <span>{checkoutSettings.storeAddress}</span>
+                  </span>
+                )}
+                <a href={`tel:${checkoutSettings.storePhone}`} className="flex items-center gap-1.5 text-amber-400 font-bold hover:underline">
+                  <Phone className="w-3.5 h-3.5 shrink-0" />
+                  <span>{checkoutSettings.storePhone}</span>
+                </a>
+                {checkoutSettings.storeEmail && (
+                  <a href={`mailto:${checkoutSettings.storeEmail}`} className="flex items-center gap-1.5 hover:text-amber-400 transition-colors">
+                    <Mail className="w-3.5 h-3.5 shrink-0" />
+                    <span>{checkoutSettings.storeEmail}</span>
+                  </a>
+                )}
+                {checkoutSettings.facebookUrl && (
+                  <a
+                    href={checkoutSettings.facebookUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1.5 hover:text-blue-400 transition-colors"
+                  >
+                    <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M12 2C6.48 2 2 6.13 2 11.24c0 2.9 1.44 5.49 3.7 7.19V22l3.38-1.86c.9.25 1.86.38 2.92.38 5.52 0 10-4.13 10-9.24S17.52 2 12 2Zm1.01 12.44-2.55-2.72-4.98 2.72 5.48-5.82 2.61 2.72 4.92-2.72-5.48 5.82Z"/>
+                    </svg>
+                    <span>Facebook</span>
+                  </a>
+                )}
+                {checkoutSettings.messengerUrl && (
+                  <a
+                    href={checkoutSettings.messengerUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1.5 hover:text-sky-400 transition-colors"
+                  >
+                    <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M12 2C6.45 2 2 6.19 2 11.39c0 2.96 1.44 5.6 3.7 7.33V22l3.38-1.86c.9.25 1.86.39 2.92.39 5.55 0 10-4.19 10-9.39S17.55 2 12 2Zm1.19 12.64-2.55-2.72-4.98 2.72 5.48-5.82 2.61 2.72 4.92-2.72-5.48 5.82Z"/>
+                    </svg>
+                    <span>Messenger</span>
+                  </a>
+                )}
+              </div>
             </div>
 
             <div className="flex flex-wrap items-center gap-4 text-xs text-stone-300">
@@ -1349,12 +1406,6 @@ export default function App() {
                 </svg>
                 <span>Google Forms судалгаа</span>
               </button>
-              <span>•</span>
-              <span className="text-stone-400">{STORE_CONFIG.location}</span>
-              <span>•</span>
-              <a href={`tel:${checkoutSettings.storePhone}`} className="text-amber-400 font-bold hover:underline">
-                Утас: {checkoutSettings.storePhone}
-              </a>
               {isAdminAuthenticated && (
                 <>
                   <span>•</span>
@@ -1617,6 +1668,8 @@ export default function App() {
               store_phone: settings.storePhone,
               store_email: settings.storeEmail,
               facebook_url: settings.facebookUrl,
+              messenger_url: settings.messengerUrl,
+              google_maps_url: settings.googleMapsUrl,
               store_address: settings.storeAddress,
               unpaid_cancellation_minutes: settings.unpaidCancellationMinutes,
             });
@@ -1630,6 +1683,8 @@ export default function App() {
               storePhone: settings.storePhone,
               storeEmail: settings.storeEmail,
               facebookUrl: settings.facebookUrl,
+              messengerUrl: settings.messengerUrl,
+              googleMapsUrl: settings.googleMapsUrl,
               storeAddress: settings.storeAddress,
               unpaidCancellationMinutes: settings.unpaidCancellationMinutes,
             });

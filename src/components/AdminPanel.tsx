@@ -79,8 +79,8 @@ interface AdminPanelProps {
   onRefreshReviews?: () => void;
   onModerateReview?: (reviewId: string, approve: boolean) => Promise<void> | void;
   onDeleteReview?: (reviewId: string) => Promise<void> | void;
-  checkoutSettings?: { deliveryFee: number; freeDeliveryThreshold: number; bankName: string; accountNumber: string; iban: string; accountHolder: string; storePhone: string; storeEmail: string; facebookUrl: string; storeAddress: string; unpaidCancellationMinutes: number };
-  onSaveCheckoutSettings?: (settings: { deliveryFee: number; freeDeliveryThreshold: number; bankName: string; accountNumber: string; iban: string; accountHolder: string; storePhone: string; storeEmail: string; facebookUrl: string; storeAddress: string; unpaidCancellationMinutes: number }) => Promise<void> | void;
+  checkoutSettings?: { deliveryFee: number; freeDeliveryThreshold: number; bankName: string; accountNumber: string; iban: string; accountHolder: string; storePhone: string; storeEmail: string; facebookUrl: string; messengerUrl: string; googleMapsUrl: string; storeAddress: string; unpaidCancellationMinutes: number };
+  onSaveCheckoutSettings?: (settings: { deliveryFee: number; freeDeliveryThreshold: number; bankName: string; accountNumber: string; iban: string; accountHolder: string; storePhone: string; storeEmail: string; facebookUrl: string; messengerUrl: string; googleMapsUrl: string; storeAddress: string; unpaidCancellationMinutes: number }) => Promise<void> | void;
 }
 
 export interface LoyaltyMember {
@@ -128,7 +128,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   onRefreshReviews,
   onModerateReview,
   onDeleteReview,
-  checkoutSettings = { deliveryFee: 3000, freeDeliveryThreshold: 100000, bankName: '', accountNumber: '', iban: '', accountHolder: '', storePhone: '', storeEmail: '', facebookUrl: '', storeAddress: '', unpaidCancellationMinutes: 60 },
+  checkoutSettings = { deliveryFee: 3000, freeDeliveryThreshold: 100000, bankName: '', accountNumber: '', iban: '', accountHolder: '', storePhone: '', storeEmail: '', facebookUrl: '', messengerUrl: '', googleMapsUrl: '', storeAddress: '', unpaidCancellationMinutes: 60 },
   onSaveCheckoutSettings
 }) => {
   const [activeTab, setActiveTab] = useState<'products' | 'orders' | 'loyalty' | 'stats' | 'settings' | 'reviews'>('products');
@@ -152,7 +152,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
   useEffect(() => {
     setCheckoutDraft(checkoutSettings);
-  }, [checkoutSettings.deliveryFee, checkoutSettings.freeDeliveryThreshold, checkoutSettings.bankName, checkoutSettings.accountNumber, checkoutSettings.iban, checkoutSettings.accountHolder, checkoutSettings.storePhone, checkoutSettings.storeEmail, checkoutSettings.facebookUrl, checkoutSettings.storeAddress, checkoutSettings.unpaidCancellationMinutes]);
+  }, [checkoutSettings.deliveryFee, checkoutSettings.freeDeliveryThreshold, checkoutSettings.bankName, checkoutSettings.accountNumber, checkoutSettings.iban, checkoutSettings.accountHolder, checkoutSettings.storePhone, checkoutSettings.storeEmail, checkoutSettings.facebookUrl, checkoutSettings.messengerUrl, checkoutSettings.googleMapsUrl, checkoutSettings.storeAddress, checkoutSettings.unpaidCancellationMinutes]);
 
   const openNewComboForm = () => {
     setEditingCombo(null);
@@ -2208,10 +2208,20 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   <input type="email" value={checkoutDraft.storeEmail} onChange={(e) => setCheckoutDraft((value) => ({ ...value, storeEmail: e.target.value }))} className="mt-1.5 w-full px-3 py-2 border border-stone-300 rounded-xl bg-stone-50" />
                 </label>
                 <label className="text-xs font-bold text-stone-700">Facebook page холбоос
-                  <input value={checkoutDraft.facebookUrl} onChange={(e) => setCheckoutDraft((value) => ({ ...value, facebookUrl: e.target.value }))} className="mt-1.5 w-full px-3 py-2 border border-stone-300 rounded-xl bg-stone-50" />
+                  <input value={checkoutDraft.facebookUrl} onChange={(e) => setCheckoutDraft((value) => ({ ...value, facebookUrl: e.target.value }))}
+                    placeholder="https://facebook.com/..." className="mt-1.5 w-full px-3 py-2 border border-stone-300 rounded-xl bg-stone-50" />
+                </label>
+                <label className="text-xs font-bold text-stone-700">Messenger холбоос
+                  <input value={checkoutDraft.messengerUrl} onChange={(e) => setCheckoutDraft((value) => ({ ...value, messengerUrl: e.target.value }))}
+                    placeholder="https://m.me/..." className="mt-1.5 w-full px-3 py-2 border border-stone-300 rounded-xl bg-stone-50" />
                 </label>
                 <label className="text-xs font-bold text-stone-700 sm:col-span-2">Дэлгүүрийн хаяг
                   <input value={checkoutDraft.storeAddress} onChange={(e) => setCheckoutDraft((value) => ({ ...value, storeAddress: e.target.value }))} className="mt-1.5 w-full px-3 py-2 border border-stone-300 rounded-xl bg-stone-50" />
+                </label>
+                <label className="text-xs font-bold text-stone-700 sm:col-span-2">Google Maps хаягийн холбоос
+                  <input value={checkoutDraft.googleMapsUrl} onChange={(e) => setCheckoutDraft((value) => ({ ...value, googleMapsUrl: e.target.value }))}
+                    placeholder="https://maps.google.com/?q=..." className="mt-1.5 w-full px-3 py-2 border border-stone-300 rounded-xl bg-stone-50" />
+                  <span className="mt-1 block text-[10px] font-normal text-stone-500">Google Maps-аас байршлаа хайгаад Share холбоосыг энд хуулна уу.</span>
                 </label>
                 <label className="text-xs font-bold text-stone-700">Төлбөр хүлээх хугацаа (минут)
                   <input type="number" min="5" value={checkoutDraft.unpaidCancellationMinutes} onChange={(e) => setCheckoutDraft((value) => ({ ...value, unpaidCancellationMinutes: Math.max(5, Number(e.target.value) || 60) }))} className="mt-1.5 w-full px-3 py-2 border border-stone-300 rounded-xl bg-stone-50" />
