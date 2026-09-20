@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { X, Camera, Barcode, PackagePlus, MinusCircle, History, CheckCircle2, RefreshCw } from 'lucide-react';
 import { BrowserMultiFormatReader } from '@zxing/browser';
 import type { IScannerControls } from '@zxing/browser';
-import { deductInventoryByBarcode, getInventoryMovements, registerInventoryProduct, uploadProductImage, InventoryMovement } from '../services/supabaseAuth';
+import { addInventoryStock, deductInventoryByBarcode, getInventoryMovements, registerInventoryProduct, uploadProductImage, InventoryMovement } from '../services/supabaseAuth';
 import { CATEGORIES } from '../data/storeData';
 import { Product } from '../types';
 
@@ -25,6 +25,8 @@ export const InventoryCameraModal: React.FC<Props> = ({ isOpen, onClose, accessT
   const [message,setMessage]=useState('');
   const [busy,setBusy]=useState(false);
   const [history,setHistory]=useState<InventoryMovement[]>([]);
+  const [restockOf,setRestockOf]=useState<Product|null>(null);
+  const [restockQty,setRestockQty]=useState('1');
   const videoRef=useRef<HTMLVideoElement|null>(null);
   const streamRef=useRef<MediaStream|null>(null);
   const timerRef=useRef<number|undefined>();
@@ -45,8 +47,10 @@ export const InventoryCameraModal: React.FC<Props> = ({ isOpen, onClose, accessT
 
   // If this barcode was already registered before, pull its known details in so the
   // admin does not have to retype a product's name/price/etc. every time it is restocked.
-  const applyBarcode=(value:string)=>{
-    const existing=products.find(p=>p.barcode===value);
+  const applyBarcode=(value:string):Product|null=>{
+    const existing=products.find(p=>p.barcode===value)||null;
+    setRestockOf(existing);
+    setRestockQty('1');
     if(existing){
       setForm(current=>({
         ...current,
@@ -60,11 +64,25 @@ export const InventoryCameraModal: React.FC<Props> = ({ isOpen, onClose, accessT
         badge:existing.badge||'',
         description:existing.description||'',
       }));
-      setMessage(`"${existing.name}" энэ barcode-оор өмнө бүртгэгдсэн байна. Мэдээллийг автоматаар бөглөлөө — зөвхөн шинэ тоо ширхэгээ шалгаад бүртгээрэй.`);
+      setMessage(`"${existing.name}" энэ barcode-оор өмнө бүртгэгдсэн байна. Доор зөвхөн нэмж ирсэн тоо ширхэгээ оруулаад үлдэгдэлд нэмээрэй.`);
     } else {
       setField('barcode',value);
       setMessage('Код амжилттай уншигдлаа: '+value);
     }
+    return existing;
+  };
+
+  const addStock=async()=>{
+    if(!restockOf||Number(restockQty)<1){ setMessage('Нэмэх тоог зөв оруулна уу.'); return; }
+    setBusy(true); setMessage('');
+    try {
+      const result=await addInventoryStock(accessToken,form.barcode,Number(restockQty),note);
+      setMessage(`${String(result.name)}: ${String(result.stock_before)}ш → ${String(result.stock_after)}ш. Үлдэгдэл серверт шинэчлэгдлээ.`);
+      setForm(blank); setImage(null); setPreview(''); setImageOk(false); setRestockOf(null); setRestockQty('1'); setNote(''); setStep(1); onChanged();
+    } catch(e){
+      const raw=e instanceof Error?e.message:'';
+      setMessage(raw.includes('BARCODE_NOT_FOUND')?'Энэ barcode-той бараа олдсонгүй.':raw||'Үлдэгдэл нэмэх боломжгүй байна.');
+    } finally { setBusy(false); }
   };
 
   const chooseImage=async(file?:File)=>{
@@ -74,7 +92,7 @@ export const InventoryCameraModal: React.FC<Props> = ({ isOpen, onClose, accessT
       const ok=img.naturalWidth>=900&&img.naturalHeight>=900&&file.size>=40*1024&&file.size<=5*1024*1024;
       setImageOk(ok);
       setMessage(ok?'✓ Зургийн чанар хангалттай байна. Дараагийн алхам руу шилжиж байна...':'Зураг бүдэг эсвэл хэт жижиг байж болзошгүй. 900×900-аас дээш, тод зураг дахин авна уу.');
-      if(ok) window.setTimeout(()=>{ setStep(2); setMessage('Одоо barcode / QR код уншуулна уу.'); },700);
+      if(ok) window.setTimeout(()=>setStep(3),700);
     };
     img.src=URL.createObjectURL(file);
   };
@@ -87,8 +105,10 @@ export const InventoryCameraModal: React.FC<Props> = ({ isOpen, onClose, accessT
       if(videoRef.current){ videoRef.current.srcObject=stream; await videoRef.current.play(); }
 
       const handleDetected=(value:string)=>{
-        if(target==='register'){ applyBarcode(value); window.setTimeout(()=>setStep(3),600); }
-        else { setScan(value); setMessage('Код амжилттай уншигдлаа: '+value); }
+        if(target==='register'){
+          const existing=applyBarcode(value);
+          window.setTimeout(()=>setStep(existing?3:2),600);
+        } else { setScan(value); setMessage('Код амжилттай уншигдлаа: '+value); }
         stopCamera();
       };
 
@@ -144,11 +164,11 @@ export const InventoryCameraModal: React.FC<Props> = ({ isOpen, onClose, accessT
       </div>
       <main className="space-y-4 p-4 sm:p-6">
         {message&&<div className="rounded-xl bg-amber-50 p-3 text-sm text-amber-900">{message}</div>}
-        {((tab==='register'&&step===2)||tab==='deduct')&&<><video ref={videoRef} playsInline muted className={streamRef.current?'block w-full rounded-2xl bg-black':'hidden'} /></>}
+        {((tab==='register'&&step===1)||tab==='deduct')&&<><video ref={videoRef} playsInline muted className={streamRef.current?'block w-full rounded-2xl bg-black':'hidden'} /></>}
         {tab==='register'&&<div className="space-y-4">
           {/* Step indicator */}
           <div className="flex items-center gap-1.5">
-            {([[1,'Зураг'],[2,'Barcode/QR'],[3,'Мэдээлэл']] as const).map(([n,label],idx)=><React.Fragment key={n}>
+            {([[1,'Barcode/QR'],[2,'Зураг'],[3,'Мэдээлэл']] as const).map(([n,label],idx)=><React.Fragment key={n}>
               {idx>0&&<div className={`h-0.5 flex-1 rounded ${step>=n?'bg-rose-500':'bg-stone-200'}`}/>}
               <div className={`flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-black ${step===n?'bg-rose-600 text-white':step>n?'bg-emerald-100 text-emerald-700':'bg-stone-100 text-stone-400'}`}>
                 {step>n?<CheckCircle2 className="h-3 w-3"/>:<span>{n}</span>}
@@ -157,17 +177,30 @@ export const InventoryCameraModal: React.FC<Props> = ({ isOpen, onClose, accessT
             </React.Fragment>)}
           </div>
 
-          {step===1&&<section className="rounded-2xl border p-4"><h3 className="font-black">1. Барааны зураг</h3>{preview&&<img src={preview} className="mt-3 h-48 w-full rounded-xl object-cover" />}
-          <label className="mt-3 flex cursor-pointer items-center justify-center gap-2 rounded-xl bg-stone-900 p-3 text-sm font-bold text-white"><Camera className="h-4 w-4"/> {image&&!imageOk?'Зургийг дахин авах':'Зураг авах / оруулах'}<input type="file" accept="image/jpeg,image/png,image/webp" capture="environment" className="hidden" onChange={e=>void chooseImage(e.target.files?.[0])}/></label>
-          {image&&<p className={`mt-2 text-xs font-bold ${imageOk?'text-emerald-700':'text-rose-700'}`}>{imageOk?'✓ Зураг шаардлага хангалаа':'! Зургийг дахин авах шаардлагатай'}</p>}</section>}
-
-          {step===2&&<section className="rounded-2xl border p-4">
-            <div className="mb-1 flex items-center justify-between"><h3 className="font-black">2. QR / Barcode</h3><button type="button" onClick={()=>{stopCamera();setStep(1);}} className="text-xs font-bold text-stone-500 cursor-pointer">← Буцах</button></div>
+          {step===1&&<section className="rounded-2xl border p-4">
+            <h3 className="font-black">1. QR / Barcode</h3>
             <div className="mt-3 flex gap-2"><input value={form.barcode} onChange={e=>setField('barcode',e.target.value)} placeholder="Barcode эсвэл QR код" className="min-w-0 flex-1 rounded-xl border p-3"/><button onClick={()=>void startScanner('register')} className="rounded-xl bg-amber-400 px-3 font-bold"><Barcode/></button></div>
-            <button type="button" disabled={!form.barcode.trim()} onClick={()=>{stopCamera();applyBarcode(form.barcode.trim());setStep(3);}} className="mt-3 w-full rounded-xl bg-stone-900 p-3 text-sm font-bold text-white disabled:bg-stone-300 cursor-pointer">Үргэлжлүүлэх →</button>
+            <button type="button" disabled={!form.barcode.trim()} onClick={()=>{stopCamera();const existing=applyBarcode(form.barcode.trim());setStep(existing?3:2);}} className="mt-3 w-full rounded-xl bg-stone-900 p-3 text-sm font-bold text-white disabled:bg-stone-300 cursor-pointer">Үргэлжлүүлэх →</button>
           </section>}
 
-          {step===3&&<>
+          {step===2&&<section className="rounded-2xl border p-4"><h3 className="font-black">2. Барааны зураг</h3>{preview&&<img src={preview} className="mt-3 h-48 w-full rounded-xl object-cover" />}
+          <label className="mt-3 flex cursor-pointer items-center justify-center gap-2 rounded-xl bg-stone-900 p-3 text-sm font-bold text-white"><Camera className="h-4 w-4"/> {image&&!imageOk?'Зургийг дахин авах':'Зураг авах / оруулах'}<input type="file" accept="image/jpeg,image/png,image/webp" capture="environment" className="hidden" onChange={e=>void chooseImage(e.target.files?.[0])}/></label>
+          {image&&<p className={`mt-2 text-xs font-bold ${imageOk?'text-emerald-700':'text-rose-700'}`}>{imageOk?'✓ Зураг шаардлага хангалаа':'! Зургийг дахин авах шаардлагатай'}</p>}
+          <button type="button" onClick={()=>setStep(1)} className="mt-3 text-xs font-bold text-stone-500 cursor-pointer">← Буцах</button>
+          </section>}
+
+          {step===3&&restockOf&&<>
+            <section className="rounded-2xl border border-amber-300 bg-amber-50 p-4">
+              <div className="mb-1 flex items-center justify-between"><h3 className="font-black">Үлдэгдэлд нэмэх</h3><button type="button" onClick={()=>{setRestockOf(null);setStep(1);}} className="text-xs font-bold text-stone-500 cursor-pointer">← Буцах</button></div>
+              <p className="mt-1 text-sm font-bold text-stone-900">{restockOf.name}</p>
+              <p className="text-xs text-stone-600">Энэ barcode аль хэдийн бүртгэлтэй тул шинэ бараа биш, зөвхөн ирсэн тоог одоо байгаа үлдэгдэлд нэмнэ.</p>
+              <label className="mt-3 block text-xs font-bold">Нэмэгдэж ирсэн тоо ширхэг<input type="number" min="1" value={restockQty} onChange={e=>setRestockQty(e.target.value)} className="mt-1 w-full rounded-xl border p-3 font-normal"/></label>
+              <label className="mt-3 block text-xs font-bold">Тайлбар (заавал биш)<textarea value={note} onChange={e=>setNote(e.target.value)} className="mt-1 w-full rounded-xl border p-3 font-normal"/></label>
+            </section>
+            <button disabled={busy} onClick={()=>void addStock()} className="w-full rounded-xl bg-amber-500 p-3 font-black text-stone-950 disabled:bg-stone-300">{busy?'Шинэчилж байна...':'Үлдэгдэл нэмэх'}</button>
+          </>}
+
+          {step===3&&!restockOf&&<>
             <section className="rounded-2xl border p-4">
               <div className="mb-1 flex items-center justify-between"><h3 className="font-black">3. Барааны мэдээлэл</h3><button type="button" onClick={()=>setStep(2)} className="text-xs font-bold text-stone-500 cursor-pointer">← Буцах</button></div>
               <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">

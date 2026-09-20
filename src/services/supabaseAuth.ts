@@ -260,6 +260,12 @@ export async function deductInventoryByBarcode(token: string, barcode: string, q
   }, token);
 }
 
+export async function addInventoryStock(token: string, barcode: string, quantity: number, note = '') {
+  return request<Record<string, unknown>>('/rest/v1/rpc/admin_inventory_add_stock', {
+    method: 'POST', body: JSON.stringify({ scan_code: barcode, add_quantity: quantity, movement_note: note }),
+  }, token);
+}
+
 export async function getInventoryMovements(token: string) {
   return request<InventoryMovement[]>('/rest/v1/inventory_movements?select=*&order=created_at.desc&limit=50', { method: 'GET' }, token);
 }
