@@ -972,9 +972,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 const isLow = !isOut && availableStock <= 5;
 
                 return (
-                <div className="relative" key={prod.id}><label className="absolute right-2 top-2 z-20 rounded-lg bg-white/95 px-2 py-1 text-[10px] font-bold shadow"><input type="checkbox" checked={comboProductIds.includes(prod.id)} onChange={e=>setComboProductIds(v=>e.target.checked?[...v,prod.id]:v.filter(id=>id!==prod.id))} className="mr-1"/>Багц</label><div
+                <div className="relative" key={prod.id}><div
                   className={`bg-white rounded-2xl border transition-all shadow-xs hover:shadow-md flex flex-col overflow-hidden ${
-                    isOut ? 'border-rose-200 bg-stone-50/50' : isLow ? 'border-amber-300' : 'border-stone-200'
+                    comboProductIds.includes(prod.id) ? 'border-indigo-300 ring-2 ring-indigo-100' : isOut ? 'border-rose-200 bg-stone-50/50' : isLow ? 'border-amber-300' : 'border-stone-200'
                   }`}
                 >
                   {/* Image container */}
@@ -1135,6 +1135,20 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                         </div>
                       </div>
                     </div>
+
+                    <label className={`flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-[11px] font-bold cursor-pointer transition-colors border ${
+                      comboProductIds.includes(prod.id)
+                        ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                        : 'text-stone-400 border-transparent hover:bg-stone-50 hover:text-stone-600'
+                    }`}>
+                      <input
+                        type="checkbox"
+                        checked={comboProductIds.includes(prod.id)}
+                        onChange={e=>setComboProductIds(v=>e.target.checked?[...v,prod.id]:v.filter(id=>id!==prod.id))}
+                        className="accent-indigo-600"
+                      />
+                      <span>Багц үүсгэхэд сонгох</span>
+                    </label>
 
                     <div className="pt-2 border-t border-stone-100 flex items-center justify-between">
                       <div>
@@ -2022,134 +2036,143 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         {activeTab === 'settings' && (
           <div className="max-w-3xl space-y-6">
             {/* Store Branding (Official Logo & Physical Store Banner) */}
-            <div className="bg-white p-6 rounded-2xl border border-stone-200 shadow-xs space-y-5">
-              <div className="flex items-center justify-between pb-3 border-b border-stone-100">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
-                    <ImageIcon className="w-5 h-5" />
+            <div className="overflow-hidden rounded-3xl border border-stone-200 bg-white shadow-xs">
+              {/* Gradient header */}
+              <div className="relative overflow-hidden bg-gradient-to-r from-stone-950 via-stone-900 to-amber-950 p-6">
+                <div className="pointer-events-none absolute -right-8 -top-10 h-40 w-40 rounded-full bg-amber-500/25 blur-3xl" />
+                <div className="pointer-events-none absolute -bottom-12 left-1/3 h-32 w-32 rounded-full bg-rose-500/20 blur-3xl" />
+                <div className="relative flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/10 text-amber-300 backdrop-blur-sm">
+                      <ImageIcon className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h4 className="font-black text-white text-sm">Дэлгүүрийн Албан Ёсны Лого & Хаяг Баннер</h4>
+                      <p className="text-xs text-stone-300">Өөрийн жинхэнэ LOGO.png болон delguur_hayg.png файлуудыг ямар ч өөрчлөлтгүйгээр шууд оруулах</p>
+                    </div>
                   </div>
-                  <div>
-                    <h4 className="font-extrabold text-stone-900 text-sm">Дэлгүүрийн Албан Ёсны Лого & Хаяг Баннер</h4>
-                    <p className="text-xs text-stone-500">Өөрийн жинхэнэ LOGO.png болон delguur_hayg.png файлуудыг ямар ч өөрчлөлтгүйгээр шууд оруулах</p>
-                  </div>
+                  <span className="shrink-0 rounded-full bg-amber-400 px-3 py-1 text-[11px] font-black text-stone-950">
+                    100% Оригинал
+                  </span>
                 </div>
-                <span className="px-2.5 py-1 bg-amber-100 text-amber-800 text-[11px] font-bold rounded-full">
-                  100% Оригинал
-                </span>
               </div>
 
-              {brandingStatusMsg && (
-                <div className="p-3.5 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                  <span className="font-bold">{brandingStatusMsg}</span>
-                </div>
-              )}
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* 1. LOGO UPLOAD */}
-                <div className="p-4 rounded-xl border border-stone-200 bg-stone-50/70 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-black text-stone-900 flex items-center gap-1.5">
-                      <span>1. Албан ёсны Лого (LOGO.png)</span>
-                    </span>
-                    {customLogoUrl && (
-                      <button
-                        onClick={() => handleResetBranding('logo')}
-                        className="text-[11px] text-rose-600 hover:underline font-bold"
-                      >
-                        Сэргээх
-                      </button>
-                    )}
+              <div className="space-y-5 p-6">
+                {brandingStatusMsg && (
+                  <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-3.5 text-xs text-emerald-800">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span className="font-bold">{brandingStatusMsg}</span>
                   </div>
+                )}
 
-                  {/* Preview */}
-                  <div className="h-28 w-full bg-stone-900 rounded-xl flex items-center justify-center p-2 border border-stone-800 overflow-hidden">
-                    {customLogoUrl ? (
-                      <img
-                        src={customLogoUrl}
-                        alt="Custom Logo"
-                        className="max-h-full max-w-full object-contain"
-                        referrerPolicy="no-referrer"
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* 1. LOGO UPLOAD */}
+                  <div className="rounded-2xl border border-stone-200 bg-gradient-to-b from-amber-50/70 to-white p-4 space-y-3 transition-all hover:border-amber-300 hover:shadow-md">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-black text-stone-900 flex items-center gap-1.5">
+                        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-amber-500 text-[10px] font-black text-white">1</span>
+                        <span>Албан ёсны Лого (LOGO.png)</span>
+                      </span>
+                      {customLogoUrl && (
+                        <button
+                          onClick={() => handleResetBranding('logo')}
+                          className="text-[11px] text-rose-600 hover:underline font-bold"
+                        >
+                          Сэргээх
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Preview */}
+                    <div className="h-28 w-full bg-stone-950 rounded-xl flex items-center justify-center p-2 border border-dashed border-stone-700 overflow-hidden">
+                      {customLogoUrl ? (
+                        <img
+                          src={customLogoUrl}
+                          alt="Custom Logo"
+                          className="max-h-full max-w-full object-contain"
+                          referrerPolicy="no-referrer"
+                        />
+                      ) : (
+                        <div className="flex flex-col items-center gap-1.5 text-stone-500">
+                          <ImageIcon className="w-7 h-7" />
+                          <span className="text-[10px]">Та өөрийн LOGO.png файлаа энд сонгоно уу</span>
+                        </div>
+                      )}
+                    </div>
+
+                    <label className="w-full flex items-center justify-center gap-2 px-3 py-2.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold rounded-xl border border-amber-300 cursor-pointer shadow-xs transition-all">
+                      <Upload className="w-4 h-4" />
+                      <span>{customLogoUrl ? 'LOGO.png файлаа дахин солих' : 'LOGO.png файл сонгож оруулах'}</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        disabled={isUploadingBranding}
+                        onChange={(e) => {
+                          if (e.target.files && e.target.files[0]) {
+                            handleUploadBrandingImage('logo', e.target.files[0]);
+                          }
+                        }}
                       />
-                    ) : (
-                      <div className="flex flex-col items-center gap-1 text-stone-400">
-                        <ImageIcon className="w-6 h-6 text-stone-500" />
-                        <span className="text-[10px]">Та өөрийн LOGO.png файлаа энд сонгоно уу</span>
-                      </div>
-                    )}
+                    </label>
+                    <p className="text-[10px] text-stone-500 text-center">
+                      Таны оруулсан файл яг тэр чигтээ дээд навигаци, доод footer, баннер дээр харагдана.
+                    </p>
                   </div>
 
-                  <label className="w-full flex items-center justify-center gap-2 px-3 py-2.5 bg-white hover:bg-stone-100 text-stone-900 text-xs font-bold rounded-xl border border-stone-300 cursor-pointer shadow-2xs transition-all">
-                    <Upload className="w-4 h-4 text-amber-500" />
-                    <span>{customLogoUrl ? 'LOGO.png файлаа дахин солих' : 'LOGO.png файл сонгож оруулах'}</span>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      disabled={isUploadingBranding}
-                      onChange={(e) => {
-                        if (e.target.files && e.target.files[0]) {
-                          handleUploadBrandingImage('logo', e.target.files[0]);
-                        }
-                      }}
-                    />
-                  </label>
-                  <p className="text-[10px] text-stone-500 text-center">
-                    Таны оруулсан файл яг тэр чигтээ дээд навигаци, доод footer, баннер дээр харагдана.
-                  </p>
-                </div>
+                  {/* 2. STORE BANNER UPLOAD */}
+                  <div className="rounded-2xl border border-stone-200 bg-gradient-to-b from-indigo-50/70 to-white p-4 space-y-3 transition-all hover:border-indigo-300 hover:shadow-md">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-black text-stone-900 flex items-center gap-1.5">
+                        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-indigo-500 text-[10px] font-black text-white">2</span>
+                        <span>Дэлгүүрийн Хаяг (delguur_hayg.png)</span>
+                      </span>
+                      {customBannerUrl && (
+                        <button
+                          onClick={() => handleResetBranding('banner')}
+                          className="text-[11px] text-rose-600 hover:underline font-bold"
+                        >
+                          Сэргээх
+                        </button>
+                      )}
+                    </div>
 
-                {/* 2. STORE BANNER UPLOAD */}
-                <div className="p-4 rounded-xl border border-stone-200 bg-stone-50/70 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-black text-stone-900 flex items-center gap-1.5">
-                      <span>2. Дэлгүүрийн Хаяг (delguur_hayg.png)</span>
-                    </span>
-                    {customBannerUrl && (
-                      <button
-                        onClick={() => handleResetBranding('banner')}
-                        className="text-[11px] text-rose-600 hover:underline font-bold"
-                      >
-                        Сэргээх
-                      </button>
-                    )}
-                  </div>
+                    {/* Preview */}
+                    <div className="h-28 w-full bg-stone-950 rounded-xl flex items-center justify-center p-2 border border-dashed border-stone-700 overflow-hidden">
+                      {customBannerUrl ? (
+                        <img
+                          src={customBannerUrl}
+                          alt="Custom Store Banner"
+                          className="max-h-full max-w-full object-contain"
+                          referrerPolicy="no-referrer"
+                        />
+                      ) : (
+                        <div className="flex flex-col items-center gap-1.5 text-stone-500">
+                          <ImageIcon className="w-7 h-7" />
+                          <span className="text-[10px]">Та өөрийн delguur_hayg.png файлаа энд сонгоно уу</span>
+                        </div>
+                      )}
+                    </div>
 
-                  {/* Preview */}
-                  <div className="h-28 w-full bg-stone-900 rounded-xl flex items-center justify-center p-2 border border-stone-800 overflow-hidden">
-                    {customBannerUrl ? (
-                      <img
-                        src={customBannerUrl}
-                        alt="Custom Store Banner"
-                        className="max-h-full max-w-full object-contain"
-                        referrerPolicy="no-referrer"
+                    <label className="w-full flex items-center justify-center gap-2 px-3 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl border border-indigo-300 cursor-pointer shadow-xs transition-all">
+                      <Upload className="w-4 h-4" />
+                      <span>{customBannerUrl ? 'Хаяг баннераа дахин солих' : 'delguur_hayg.png файл сонгох'}</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        disabled={isUploadingBranding}
+                        onChange={(e) => {
+                          if (e.target.files && e.target.files[0]) {
+                            handleUploadBrandingImage('banner', e.target.files[0]);
+                          }
+                        }}
                       />
-                    ) : (
-                      <div className="flex flex-col items-center gap-1 text-stone-400">
-                        <ImageIcon className="w-6 h-6 text-stone-500" />
-                        <span className="text-[10px]">Та өөрийн delguur_hayg.png файлаа энд сонгоно уу</span>
-                      </div>
-                    )}
+                    </label>
+                    <p className="text-[10px] text-stone-500 text-center">
+                      Нүүр хуудасны дээд талд таны дэлгүүрийн жинхэнэ хаяг ямар ч өөрчлөлтгүй шууд тавигдана.
+                    </p>
                   </div>
-
-                  <label className="w-full flex items-center justify-center gap-2 px-3 py-2.5 bg-white hover:bg-stone-100 text-stone-900 text-xs font-bold rounded-xl border border-stone-300 cursor-pointer shadow-2xs transition-all">
-                    <Upload className="w-4 h-4 text-indigo-500" />
-                    <span>{customBannerUrl ? 'Хаяг баннераа дахин солих' : 'delguur_hayg.png файл сонгох'}</span>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      disabled={isUploadingBranding}
-                      onChange={(e) => {
-                        if (e.target.files && e.target.files[0]) {
-                          handleUploadBrandingImage('banner', e.target.files[0]);
-                        }
-                      }}
-                    />
-                  </label>
-                  <p className="text-[10px] text-stone-500 text-center">
-                    Нүүр хуудасны дээд талд таны дэлгүүрийн жинхэнэ хаяг ямар ч өөрчлөлтгүй шууд тавигдана.
-                  </p>
                 </div>
               </div>
             </div>

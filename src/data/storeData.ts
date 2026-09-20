@@ -130,7 +130,7 @@ export const PRODUCTS: Product[] = [
     weight: "462г",
     badge: "Уураг тэжээл",
     badge_color: "bg-sky-600",
-    image: "https://images.unsplash.com/photo-1590080875515-8a3a8dc5735e?auto=format&fit=crop&w=600&q=80",
+    image: "https://images.unsplash.com/photo-1757801602583-1c4dabe7ffb3?auto=format&fit=crop&w=600&q=80",
     description: "Уураг, амин дэмээр баялаг цэвэр самраар хийсэн торгомсог зөөлөн Америк самрын тос.",
     in_stock: true,
     rating: 5.0,
@@ -792,7 +792,7 @@ export const COMBOS: ComboPack[] = [
     badge: "Хэмнэлттэй 15%",
     price: 56000,
     orig_price: 66000,
-    image: "https://images.unsplash.com/photo-1590080875515-8a3a8dc5735e?auto=format&fit=crop&w=600&q=80",
+    image: "https://images.unsplash.com/photo-1757801602583-1c4dabe7ffb3?auto=format&fit=crop&w=600&q=80",
     description: "Skippy самрын тос (462г) + SPAM Classic лаазалсан мах + Kraft Mac & Cheese + Dr Pepper (2ш)",
     items: [
       "FOOD-007",
