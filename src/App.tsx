@@ -47,6 +47,7 @@ import { StoreHeroBanner } from './components/StoreHeroBanner';
 import { BeeEmblemLogo } from './components/BeeEmblemLogo';
 import { InventoryCameraModal } from './components/InventoryCameraModal';
 import { getStoreCustomerProfiles, getStoreOrders, getStoreSettings, saveStoreOrder, saveStoreProducts, saveStoreSettings, hasStoreAdminAccess, refreshSession, reportStoreOrderPayment, updateStoreOrderStatus, confirmStoreOrderPayment, verifyAdminPin, changeAdminPin, expireUnpaidOrdersAsAdmin, getAllReviewsForAdmin, moderateProductReview, deleteProductReview, getProductReviews } from './services/supabaseAuth';
+import { initAdminPushNotifications } from './services/pushNotifications';
 
 export default function App() {
   // The installed PWA and native Capacitor shells open only the secured admin flow.
@@ -519,6 +520,13 @@ export default function App() {
     setIsAdminOpen(false);
     setIsInventoryOpen(true);
   }, [isInventoryApp, isAdminAuthenticated, currentUser?.accessToken]);
+
+  // Registers this device for new-order push notifications once signed in as admin.
+  // A no-op in a regular browser tab; only does anything inside an installed native app.
+  useEffect(() => {
+    if (!isAdminAuthenticated || !currentUser?.accessToken) return;
+    void initAdminPushNotifications(currentUser.accessToken);
+  }, [isAdminAuthenticated, currentUser?.accessToken]);
 
   const handleSaveProduct = (product: Product) => {
     setProducts((prev) => {
@@ -1502,6 +1510,18 @@ export default function App() {
             status: 'new',
             paymentStatus: String((savedOrder as { payment_status?: string }).payment_status || 'Төлөөгүй')
           };
+          // Best-effort push notification to any admin devices with the app installed.
+          // Never blocks or fails the order if notifications are not set up or unreachable.
+          fetch('/api/notify-new-order', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              orderId: newOrder.orderId,
+              customerName: newOrder.customerName,
+              total: newOrder.total,
+              token: currentUser.accessToken,
+            }),
+          }).catch(() => {});
           const orderPhoneClean = order.phone?.replace(/\D/g, '').slice(-8) || '';
           const currentPhoneClean = currentUser?.phone?.replace(/\D/g, '').slice(-8) || '';
           const orderEmailClean = order.email?.trim().toLowerCase() || '';

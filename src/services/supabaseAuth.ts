@@ -279,6 +279,21 @@ export async function expireUnpaidOrdersAsAdmin(token: string) {
   return request<number>('/rest/v1/rpc/admin_expire_unpaid_store_orders', { method: 'POST', body: '{}' }, token);
 }
 
+/** Registers this device's FCM token so it receives new-order push notifications. Admin-only. */
+export async function registerAdminPushToken(token: string, deviceToken: string, platform: string) {
+  return request('/rest/v1/rpc/register_admin_push_token', {
+    method: 'POST',
+    body: JSON.stringify({ p_token: deviceToken, p_platform: platform }),
+  }, token);
+}
+
+export async function unregisterAdminPushToken(token: string, deviceToken: string) {
+  return request('/rest/v1/rpc/unregister_admin_push_token', {
+    method: 'POST',
+    body: JSON.stringify({ p_token: deviceToken }),
+  }, token);
+}
+
 export async function uploadProfileImage(token: string, file: File) {
   if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) throw new Error('Зөвхөн JPG, PNG эсвэл WEBP зураг оруулна.');
   if (file.size > 3 * 1024 * 1024) throw new Error('Зургийн хэмжээ 3MB-аас бага байх ёстой.');

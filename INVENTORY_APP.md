@@ -33,3 +33,37 @@ Android Studio-д **Build → Generate Signed Bundle / APK** сонгоно. App
 Native shell нь `https://www.uskmart.com/?admin=inventory`-оос ажлын дэлгэцээ нээдэг. Тиймээс сайт шинэчлэгдэхэд агуулах аппын логик, бараа, дүрэм серверээс шууд шинэчлэгдэнэ.
 
 Төв серверийн шинэчлэлтэй хамт агуулахын аппын өгөгдөл шууд шинэчлэгдэнэ.
+
+## Захиалга ирэхэд шууд push мэдэгдэл (шинэ)
+
+Хэрэглэгч захиалга хийх бүрд, энэ апп суулгасан бүх админ утсанд шууд push мэдэгдэл очно
+(`Firebase Cloud Messaging`, `@capacitor/push-notifications` ашиглана). Апп аль хэдийн
+энэ функцийг дуудахаар бэлэн болсон (`src/services/pushNotifications.ts`,
+`api/notify-new-order.ts`), гэхдээ ажиллуулахын тулд 3 алхам үлдсэн:
+
+**1. Supabase дээр хүснэгт/функц үүсгэх**
+
+`supabase/admin-push-notifications.sql`-ийг Supabase SQL Editor дээр нэг удаа ажиллуулна
+(`product-reviews.sql`-ийг өмнө нь яг адилхан ажиллуулсантай адил алхам).
+
+**2. Firebase-д Android апп бүртгэх**
+
+Төслийн Firebase project (`firebase-applet-config.json` дотор байгаа
+`gen-lang-client-0815856082`) руу орж:
+
+1. Project settings → **Add app → Android**. Package name: `mn.uskmart.inventory`
+   (`capacitor.inventory.config.ts`-ийн `appId`-тай яг адил байх ёстой).
+2. Татаж авсан `google-services.json`-г `npx cap add android`-аас үүссэн
+   `android/app/google-services.json` замд байрлуулна.
+3. Project settings → **Service accounts** → **Generate new private key**. Татаж авсан
+   JSON файлын БҮХ агуулгыг нэг мөрөнд хуулж, Vercel дээр орчны хувьсагч болгон
+   `FIREBASE_SERVICE_ACCOUNT_JSON` нэрээр хадгална (`.env.example`-д тайлбар бий).
+
+**3. Vercel дээр орчны хувьсагч нэмэх**
+
+- `FIREBASE_SERVICE_ACCOUNT_JSON` — дээрх алхамаас.
+- `SUPABASE_SERVICE_ROLE_KEY` — Supabase dashboard → Project Settings → API →
+  `service_role` түлхүүр (нууц, зөвхөн серверт ашиглагдана).
+
+Эдгээр 3 алхам дуусмагц, админ и-мэйлээрээ энэ аппаар нэвтрэх бүрд төхөөрөмж нь
+автоматаар бүртгэгдэж, шинэ захиалга ирэх бүрд push мэдэгдэл очно.
