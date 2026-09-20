@@ -3,12 +3,16 @@ import { X, Camera, Barcode, PackagePlus, MinusCircle, History, CheckCircle2, Re
 import { BrowserMultiFormatReader } from '@zxing/browser';
 import type { IScannerControls } from '@zxing/browser';
 import { deductInventoryByBarcode, getInventoryMovements, registerInventoryProduct, uploadProductImage, InventoryMovement } from '../services/supabaseAuth';
+import { CATEGORIES } from '../data/storeData';
+import { Product } from '../types';
 
-type Props = { isOpen: boolean; onClose: () => void; accessToken: string; onChanged: () => void };
+type Props = { isOpen: boolean; onClose: () => void; accessToken: string; onChanged: () => void; products: Product[] };
 type Tab = 'register' | 'deduct' | 'history';
-const blank = { name:'', stock:'', origin:'АНУ', category:'other', category_name:'Бусад', price:'', weight:'', badge:'', day_deal:'-1', description:'', barcode:'' };
+const ORIGINS = ['АНУ', 'БНСУ'] as const;
+const REGISTER_CATEGORIES = CATEGORIES.filter((c) => c.id !== 'all');
+const blank = { name:'', stock:'', origin:'АНУ', category:REGISTER_CATEGORIES[0].id, category_name:REGISTER_CATEGORIES[0].name, price:'', weight:'', badge:'', day_deal:'-1', description:'', barcode:'' };
 
-export const InventoryCameraModal: React.FC<Props> = ({ isOpen, onClose, accessToken, onChanged }) => {
+export const InventoryCameraModal: React.FC<Props> = ({ isOpen, onClose, accessToken, onChanged, products }) => {
   const [tab,setTab]=useState<Tab>('register');
   const [step,setStep]=useState<1|2|3>(1);
   const [form,setForm]=useState(blank);
@@ -39,6 +43,30 @@ export const InventoryCameraModal: React.FC<Props> = ({ isOpen, onClose, accessT
   const setField=(key:string,value:string)=>setForm(current=>({...current,[key]:value}));
   const loadHistory=async()=>{ try { setHistory(await getInventoryMovements(accessToken)); } catch { setMessage('Хөдөлгөөний түүх татагдсангүй.'); } };
 
+  // If this barcode was already registered before, pull its known details in so the
+  // admin does not have to retype a product's name/price/etc. every time it is restocked.
+  const applyBarcode=(value:string)=>{
+    const existing=products.find(p=>p.barcode===value);
+    if(existing){
+      setForm(current=>({
+        ...current,
+        barcode:value,
+        name:existing.name,
+        price:String(existing.price),
+        weight:existing.weight,
+        origin:existing.origin==='KR'?'БНСУ':'АНУ',
+        category:existing.category,
+        category_name:existing.category_name,
+        badge:existing.badge||'',
+        description:existing.description||'',
+      }));
+      setMessage(`"${existing.name}" энэ barcode-оор өмнө бүртгэгдсэн байна. Мэдээллийг автоматаар бөглөлөө — зөвхөн шинэ тоо ширхэгээ шалгаад бүртгээрэй.`);
+    } else {
+      setField('barcode',value);
+      setMessage('Код амжилттай уншигдлаа: '+value);
+    }
+  };
+
   const chooseImage=async(file?:File)=>{
     if(!file) return;
     setImageOk(false); setImage(file); setPreview(URL.createObjectURL(file));
@@ -59,8 +87,8 @@ export const InventoryCameraModal: React.FC<Props> = ({ isOpen, onClose, accessT
       if(videoRef.current){ videoRef.current.srcObject=stream; await videoRef.current.play(); }
 
       const handleDetected=(value:string)=>{
-        if(target==='register'){ setField('barcode',value); window.setTimeout(()=>setStep(3),600); } else setScan(value);
-        setMessage('Код амжилттай уншигдлаа: '+value);
+        if(target==='register'){ applyBarcode(value); window.setTimeout(()=>setStep(3),600); }
+        else { setScan(value); setMessage('Код амжилттай уншигдлаа: '+value); }
         stopCamera();
       };
 
@@ -86,7 +114,7 @@ export const InventoryCameraModal: React.FC<Props> = ({ isOpen, onClose, accessT
     setBusy(true); setMessage('');
     try {
       const imageUrl=await uploadProductImage(accessToken,image);
-      await registerInventoryProduct(accessToken,{...form,id:crypto.randomUUID(),stock:Number(form.stock),price:Number(form.price),day_deal:Number(form.day_deal),image:imageUrl,country:form.origin,flag:form.origin==='БНСУ'?'🇰🇷':'🇺🇸',rating:5,published:false,note:'Камерын апп-аар шинээр бүртгэв'});
+      await registerInventoryProduct(accessToken,{...form,id:crypto.randomUUID(),stock:Number(form.stock),price:Number(form.price),day_deal:Number(form.day_deal),image:imageUrl,country:form.origin,origin:form.origin==='БНСУ'?'KR':'US',flag:form.origin==='БНСУ'?'🇰🇷':'🇺🇸',rating:5,published:false,note:'Камерын апп-аар шинээр бүртгэв'});
       setMessage('Бараа амжилттай бүртгэгдлээ. Админ удирдлагаас шалгаж нийтлээрэй.'); setForm(blank); setImage(null); setPreview(''); setImageOk(false); setStep(1); onChanged();
     } catch(e){
       const raw=e instanceof Error?e.message:'';
@@ -136,14 +164,17 @@ export const InventoryCameraModal: React.FC<Props> = ({ isOpen, onClose, accessT
           {step===2&&<section className="rounded-2xl border p-4">
             <div className="mb-1 flex items-center justify-between"><h3 className="font-black">2. QR / Barcode</h3><button type="button" onClick={()=>{stopCamera();setStep(1);}} className="text-xs font-bold text-stone-500 cursor-pointer">← Буцах</button></div>
             <div className="mt-3 flex gap-2"><input value={form.barcode} onChange={e=>setField('barcode',e.target.value)} placeholder="Barcode эсвэл QR код" className="min-w-0 flex-1 rounded-xl border p-3"/><button onClick={()=>void startScanner('register')} className="rounded-xl bg-amber-400 px-3 font-bold"><Barcode/></button></div>
-            <button type="button" disabled={!form.barcode.trim()} onClick={()=>{stopCamera();setStep(3);}} className="mt-3 w-full rounded-xl bg-stone-900 p-3 text-sm font-bold text-white disabled:bg-stone-300 cursor-pointer">Үргэлжлүүлэх →</button>
+            <button type="button" disabled={!form.barcode.trim()} onClick={()=>{stopCamera();applyBarcode(form.barcode.trim());setStep(3);}} className="mt-3 w-full rounded-xl bg-stone-900 p-3 text-sm font-bold text-white disabled:bg-stone-300 cursor-pointer">Үргэлжлүүлэх →</button>
           </section>}
 
           {step===3&&<>
             <section className="rounded-2xl border p-4">
               <div className="mb-1 flex items-center justify-between"><h3 className="font-black">3. Барааны мэдээлэл</h3><button type="button" onClick={()=>setStep(2)} className="text-xs font-bold text-stone-500 cursor-pointer">← Буцах</button></div>
               <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                {[['name','Барааны нэр'],['stock','Тоо ширхэг'],['price','Зарах үнэ (₮)'],['weight','Жин / савалгаа'],['origin','Гарал үүсэл'],['category_name','Ангилал'],['badge','Онцлох тэмдэглэгээ']].map(([key,label])=><label key={key} className="text-xs font-bold">{label}<input value={(form as any)[key]} type={key==='stock'||key==='price'?'number':'text'} onChange={e=>setField(key,e.target.value)} className="mt-1 w-full rounded-xl border p-3 font-normal"/></label>)}
+                {[['name','Барааны нэр'],['stock','Тоо ширхэг'],['price','Зарах үнэ (₮)'],['weight','Жин / савалгаа']].map(([key,label])=><label key={key} className="text-xs font-bold">{label}<input value={(form as any)[key]} type={key==='stock'||key==='price'?'number':'text'} onChange={e=>setField(key,e.target.value)} className="mt-1 w-full rounded-xl border p-3 font-normal"/></label>)}
+                <label className="text-xs font-bold">Гарал үүсэл<select value={form.origin} onChange={e=>setField('origin',e.target.value)} className="mt-1 w-full rounded-xl border p-3 font-normal">{ORIGINS.map(o=><option key={o} value={o}>{o}</option>)}</select></label>
+                <label className="text-xs font-bold">Ангилал<select value={form.category} onChange={e=>{const cat=REGISTER_CATEGORIES.find(c=>c.id===e.target.value); setForm(current=>({...current,category:e.target.value,category_name:cat?.name||current.category_name}));}} className="mt-1 w-full rounded-xl border p-3 font-normal">{REGISTER_CATEGORIES.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
+                <label className="text-xs font-bold">Онцлох тэмдэглэгээ<input value={form.badge} onChange={e=>setField('badge',e.target.value)} className="mt-1 w-full rounded-xl border p-3 font-normal"/></label>
                 <label className="text-xs font-bold">Өдрийн хямдрал<select value={form.day_deal} onChange={e=>setField('day_deal',e.target.value)} className="mt-1 w-full rounded-xl border p-3 font-normal"><option value="-1">Хямдралгүй</option><option value="0">Ням</option><option value="1">Даваа</option><option value="2">Мягмар</option><option value="3">Лхагва</option><option value="4">Пүрэв</option><option value="5">Баасан</option><option value="6">Бямба</option></select></label>
               </div>
               <label className="mt-3 block text-xs font-bold">Тайлбар<textarea value={form.description} onChange={e=>setField('description',e.target.value)} className="mt-1 w-full rounded-xl border p-3 font-normal"/></label>

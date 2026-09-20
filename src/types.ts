@@ -6,6 +6,7 @@ export interface Product {
   origin: 'KR' | 'US';
   country: string;
   flag: string;
+  barcode?: string;
   price: number;
   weight: string;
   badge: string;
