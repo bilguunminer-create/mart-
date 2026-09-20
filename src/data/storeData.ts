@@ -585,7 +585,7 @@ export const DAILY_DEALS: Record<string, DailyDeal> = {
     discount_percent: 15,
     category: "snacks",
     tagline: "Reese's, Hershey's, Doritos болон бүх амттанууд 15% ХЯМДРАЛТАЙ!",
-    color: "from-amber-600 to-yellow-600"
+    color: "from-amber-500 to-yellow-500"
   },
   "3": {
     day_name: "Лхагва гараг",
@@ -593,7 +593,7 @@ export const DAILY_DEALS: Record<string, DailyDeal> = {
     discount_percent: 10,
     category: "vitamins",
     tagline: "Kirkland, Nature Made, Солонгос хүн орхоодой 10% ХЯМДРАЛТАЙ!",
-    color: "from-emerald-600 to-teal-700"
+    color: "from-orange-600 to-amber-600"
   },
   "4": {
     day_name: "Пүрэв гараг",
@@ -601,7 +601,7 @@ export const DAILY_DEALS: Record<string, DailyDeal> = {
     discount_percent: 12,
     category: "baby",
     tagline: "Хүүхдийн живх, нухаш, хүүхдийн зажилдаг амин дэмүүд 12% ХЯМДРАЛТАЙ!",
-    color: "from-indigo-600 to-pink-600"
+    color: "from-red-600 to-rose-600"
   },
   "5": {
     day_name: "Баасан гараг",
@@ -609,7 +609,7 @@ export const DAILY_DEALS: Record<string, DailyDeal> = {
     discount_percent: 15,
     category: "drinks",
     tagline: "Maxim кофе, Fiji ус, Binggrae сүү, Dr Pepper 15% ХЯМДРАЛТАЙ!",
-    color: "from-sky-600 to-blue-700"
+    color: "from-yellow-600 to-orange-600"
   },
   "6": {
     day_name: "Бямба гараг",
@@ -617,7 +617,7 @@ export const DAILY_DEALS: Record<string, DailyDeal> = {
     discount_percent: 10,
     category: "household",
     tagline: "Tide капсул, Dawn шингэн, нойтон салфетка, ахуйн бараа 10% ХЯМДРАЛТАЙ!",
-    color: "from-cyan-600 to-emerald-700"
+    color: "from-amber-600 to-orange-500"
   },
   "0": {
     day_name: "Ням гараг",
@@ -625,7 +625,7 @@ export const DAILY_DEALS: Record<string, DailyDeal> = {
     discount_percent: 20,
     category: "all",
     tagline: "Гэр бүлийн амралтын өдөрт зориулсан бүх багцууд 20% ХЯМДРАЛТАЙ!",
-    color: "from-purple-600 to-rose-600"
+    color: "from-rose-600 to-red-600"
   }
 };
 

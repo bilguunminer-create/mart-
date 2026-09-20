@@ -225,7 +225,7 @@ export const Header: React.FC<HeaderProps> = ({
               <button
                 id="google-forms-trigger-btn"
                 onClick={onOpenForms}
-                className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-semibold bg-white border border-stone-200 hover:border-purple-300 hover:bg-purple-50/60 text-stone-700 hover:text-purple-800 shadow-2xs transition-all cursor-pointer"
+                className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-semibold bg-white border border-stone-200 hover:border-amber-300 hover:bg-amber-50/60 text-stone-700 hover:text-amber-900 shadow-2xs transition-all cursor-pointer"
                 title="Google Forms - Санал асуулга & Судалгаа"
               >
                 <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">

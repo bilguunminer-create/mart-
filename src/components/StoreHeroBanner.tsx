@@ -85,9 +85,9 @@ export const StoreHeroBanner: React.FC<StoreHeroBannerProps> = ({ onExploreClick
 
   // Default high-fidelity layout
   return (
-    <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl shadow-xl border border-stone-800 bg-[#071329] text-white">
-      {/* Top Accent Stripe: Orange & Purple Gradient */}
-      <div className="h-1.5 w-full bg-gradient-to-r from-orange-500 via-rose-500 to-indigo-500" />
+    <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl shadow-xl border border-stone-800 bg-gradient-to-br from-stone-950 via-stone-900 to-[#241708] text-white">
+      {/* Top Accent Stripe: warm gold-to-rose, matching the logo's copper tones */}
+      <div className="h-1.5 w-full bg-gradient-to-r from-amber-400 via-amber-500 to-rose-500" />
 
       {/* Main Banner Body */}
       <div className="relative px-4 py-6 sm:px-8 sm:py-8 lg:px-10 lg:py-10 flex flex-col lg:flex-row items-center justify-between gap-6 lg:gap-8">
@@ -121,27 +121,27 @@ export const StoreHeroBanner: React.FC<StoreHeroBannerProps> = ({ onExploreClick
         </div>
 
         {/* Center Vertical Divider (Desktop) */}
-        <div className="hidden lg:block w-px h-28 bg-gradient-to-b from-transparent via-stone-700 to-transparent" />
+        <div className="hidden lg:block w-px h-28 bg-gradient-to-b from-transparent via-amber-800/50 to-transparent" />
 
         {/* Center & Right: Catchphrase & Value Proposition */}
         <div className="flex-1 text-center lg:text-left flex flex-col items-center lg:items-start gap-3">
           {/* Main Title Badge: АМЕРИК & СОЛОНГОС БАРАА */}
           <div className="flex flex-wrap items-center justify-center lg:justify-start gap-2">
             <h2 className="text-xl sm:text-3xl lg:text-4xl font-black tracking-tight text-white drop-shadow-md">
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-400">АМЕРИК</span>
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-300 to-amber-500">АМЕРИК</span>
               {' & '}
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-rose-500 to-red-400">СОЛОНГОС</span>
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-rose-400 to-rose-500">СОЛОНГОС</span>
               {' '}БАРАА
             </h2>
           </div>
 
           {/* Sub Banner Pill: ХЯМД & ЧАНАРТАЙ ОНЦЛОХ ДЭЛГҮҮР */}
-          <div className="inline-flex flex-wrap items-center justify-center gap-2 sm:gap-3 bg-gradient-to-r from-rose-600 via-purple-600 to-cyan-500 px-4 py-1.5 sm:py-2 rounded-full shadow-lg border border-white/20">
+          <div className="inline-flex flex-wrap items-center justify-center gap-2 sm:gap-3 bg-gradient-to-r from-amber-600 to-rose-600 px-4 py-1.5 sm:py-2 rounded-full shadow-lg border border-white/20">
             <span className="font-extrabold text-xs sm:text-sm text-white tracking-wide uppercase drop-shadow-xs">
               ✨ ХЯМД & ЧАНАРТАЙ
             </span>
             <span className="hidden sm:inline-block text-white/50">•</span>
-            <span className="font-bold text-xs sm:text-sm text-amber-200 tracking-wide uppercase drop-shadow-xs">
+            <span className="font-bold text-xs sm:text-sm text-amber-100 tracking-wide uppercase drop-shadow-xs">
               ОНЦЛОХ ДЭЛГҮҮР
             </span>
           </div>
