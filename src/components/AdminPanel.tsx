@@ -940,12 +940,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 </select>
               </div>
 
-              <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2">
-                <span className="text-[11px] font-bold text-amber-900">Онцлох:</span>
+              <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2" title="Сонгосон бараа нүүр хуудсанд багцуудын өмнө онцгойлон гарна.">
+                <span className="text-[11px] font-bold text-amber-900">⭐ Онцлох бараа:</span>
                 <select value={featuredProductDraft} onChange={e=>setFeaturedProductDraft(e.target.value)} className="max-w-40 bg-transparent text-xs font-semibold outline-none">
-                  <option value="">Сонгох</option>{products.filter(p=>p.in_stock && p.published!==false).map(p=><option key={p.id} value={p.id}>{p.name}</option>)}
+                  <option value="">Сонгоогүй</option>{products.filter(p=>p.in_stock && p.published!==false).map(p=><option key={p.id} value={p.id}>{p.name}</option>)}
                 </select>
-                <button type="button" onClick={()=>onSaveFeaturedProduct && void onSaveFeaturedProduct(featuredProductDraft)} className="text-[11px] font-black text-amber-800">Хадгалах</button>
+                <button type="button" onClick={()=>onSaveFeaturedProduct && void onSaveFeaturedProduct(featuredProductDraft)} className="text-[11px] font-black text-amber-800 hover:underline cursor-pointer">Хадгалах</button>
               </div>
               <button type="button" onClick={openNewComboForm} className="px-3 py-2.5 border border-indigo-200 bg-indigo-50 text-indigo-800 text-xs font-bold rounded-xl">
                 Шинэ багц үүсгэх{comboProductIds.length > 0 ? ` (${comboProductIds.length} сонгосон)` : ''}
@@ -2175,14 +2175,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   </div>
                 </div>
               </div>
-            </div>
-
-            <div className="bg-white p-6 rounded-2xl border border-stone-200 shadow-xs space-y-3">
-              <div><h4 className="font-extrabold text-stone-900 text-sm">Өнөөдрийн онцлох бараа</h4><p className="text-xs text-stone-500">Сонгосон бараа нүүр хуудсанд багцуудын өмнө онцгойлон гарна.</p></div>
-              <select value={featuredProductDraft} onChange={e=>setFeaturedProductDraft(e.target.value)} className="w-full rounded-xl border border-stone-300 bg-stone-50 px-3 py-2 text-sm">
-                <option value="">Онцлох бараа сонгоогүй</option>{products.filter(p=>p.published!==false && p.in_stock).map(p=><option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
-              <button type="button" onClick={()=>{ if(onSaveFeaturedProduct) Promise.resolve(onSaveFeaturedProduct(featuredProductDraft)); }} className="rounded-xl bg-amber-500 px-4 py-2 text-xs font-bold text-stone-950">Онцлох барааг хадгалах</button>
             </div>
 
             {/* Delivery & bank transfer settings */}
