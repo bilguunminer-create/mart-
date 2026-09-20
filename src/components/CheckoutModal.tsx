@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { X, CheckCircle2, QrCode, CreditCard, Banknote, Truck, ShieldCheck, Copy, Check, Printer, Award, Phone, Mail } from 'lucide-react';
 import { CartItem, LoyaltyTier, OrderDetails, UserProfile } from '../types';
-import { STORE_CONFIG, LOYALTY_TIERS, formatMNT, getStoredLoyaltyTiers, calculateLoyaltyTierBySpent } from '../data/storeData';
+import { STORE_CONFIG, LOYALTY_TIERS, formatMNT, formatOrderNumber, getStoredLoyaltyTiers, calculateLoyaltyTierBySpent } from '../data/storeData';
 import { getLoyaltyWallet } from '../services/supabaseAuth';
 import { printOrderReceipt } from '../utils/printReceipt';
 
@@ -199,7 +199,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
               </div>
               <h3 className="text-2xl font-black text-stone-900">Захиалга амжилттай баталгаажлаа!</h3>
               <p className="text-sm text-stone-600">
-                Захиалгын дугаар: <strong className="text-rose-600 font-mono text-base">{completedOrder.orderId}</strong>
+                Захиалгын дугаар: <strong className="text-rose-600 font-mono text-base">{formatOrderNumber(completedOrder)}</strong>
               </p>
               <p className="text-xs text-stone-500">
                 Манай менежер таны <strong>{completedOrder.phone}</strong> дугаарт удахгүй холбогдож хүргэлтийг эхлүүлнэ.

@@ -130,7 +130,7 @@ export type StoreCustomerProfile = {
 };
 
 export type StoreOrderRecord = {
-  id: string; customer_id: string; customer_name: string; phone: string; address: string;
+  id: string; order_number?: number; customer_id: string; customer_name: string; phone: string; address: string;
   note: string; items: Array<{ productId: string; title: string; quantity: number; price: number }>;
   subtotal: number; daily_discount: number; vip_discount: number; delivery_fee: number;
   total: number; created_at: string; status: string; payment_status?: string; payment_reported_at?: string | null;

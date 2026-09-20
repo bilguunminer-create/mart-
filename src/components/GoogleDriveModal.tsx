@@ -36,7 +36,7 @@ import {
   DriveFileItem 
 } from '../services/googleDriveService';
 import { OrderDetails, Product } from '../types';
-import { formatMNT } from '../data/storeData';
+import { formatMNT, formatOrderNumber } from '../data/storeData';
 
 interface GoogleDriveModalProps {
   isOpen: boolean;
@@ -173,7 +173,7 @@ export const GoogleDriveModal: React.FC<GoogleDriveModalProps> = ({
       // 1. Generate CSV
       const headers = ['Order ID', 'Date', 'Customer Name', 'Phone', 'District', 'Address', 'Subtotal', 'Discount', 'Delivery Fee', 'Total', 'Payment Method', 'Status'];
       const rows = orders.map((o) => [
-        o.orderId,
+        formatOrderNumber(o),
         o.date,
         `"${(o.customerName || '').replace(/"/g, '""')}"`,
         o.phone,

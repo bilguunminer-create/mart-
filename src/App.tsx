@@ -25,6 +25,7 @@ import {
   LOYALTY_TIERS, 
   STORE_CONFIG, 
   formatMNT,
+  formatOrderNumber,
   getStoredLoyaltyTiers,
   getStoredCashbackPct,
   calculateLoyaltyTierBySpent
@@ -200,6 +201,7 @@ export default function App() {
       if (ordersResult.status === 'fulfilled') {
         const mapped = ordersResult.value.map((order) => ({
           orderId: order.id,
+          orderNumber: order.order_number,
           customerId: order.customer_id,
           customerName: order.customer_name,
           phone: order.phone,
@@ -232,7 +234,7 @@ export default function App() {
           if (knownOrderIds) {
             const arrived = mapped.filter((o) => !knownOrderIds!.has(o.orderId));
             if (arrived.length > 0) {
-              const names = arrived.slice(0, 3).map((o) => `#${o.orderId}`).join(', ');
+              const names = arrived.slice(0, 3).map((o) => formatOrderNumber(o)).join(', ');
               showToast(`🔔 Шинэ захиалга ирлээ: ${names}${arrived.length > 3 ? ` (+${arrived.length - 3})` : ''}`);
             }
           }
@@ -582,7 +584,8 @@ export default function App() {
     void updateStoreOrderStatus(currentUser.accessToken, orderId, databaseStatus)
       .then(() => {
         setOrders((prev) => prev.map((o) => (o.orderId === orderId ? { ...o, status } : o)));
-        showToast(`Захиалга #${orderId} төлөв төв санд хадгалагдлаа`);
+        const target = orders.find((o) => o.orderId === orderId);
+        showToast(`Захиалга ${target ? formatOrderNumber(target) : `#${orderId}`} төлөв төв санд хадгалагдлаа`);
       })
       .catch((error) => {
         const message = error instanceof Error ? error.message : '';
@@ -1507,6 +1510,7 @@ export default function App() {
           const newOrder: OrderDetails = {
             ...order,
             orderId: String((savedOrder as { id?: string }).id || order.orderId),
+            orderNumber: (savedOrder as { order_number?: number }).order_number,
             status: 'new',
             paymentStatus: String((savedOrder as { payment_status?: string }).payment_status || 'Төлөөгүй')
           };
@@ -1567,7 +1571,7 @@ export default function App() {
 
           setOrders((prev) => [newOrder, ...prev]);
           setCart([]);
-          showToast(`Захиалга #${newOrder.orderId} амжилттай бүртгэгдлээ! Таны бүртгэл дээр түүх хадгалагдлаа.${promotionMsg}`);
+          showToast(`Захиалга ${formatOrderNumber(newOrder)} амжилттай бүртгэгдлээ! Таны бүртгэл дээр түүх хадгалагдлаа.${promotionMsg}`);
           return newOrder;
         }}
       />

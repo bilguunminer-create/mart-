@@ -831,3 +831,11 @@ export const CATEGORIES = [
 export const formatMNT = (amount: number): string => {
   return new Intl.NumberFormat('mn-MN').format(Math.round(amount)) + ' ₮';
 };
+
+/** US000001-style unified order number. Falls back to a short id for orders placed
+ * before the sequential numbering migration ran (or before a fresh load supplies it). */
+export const formatOrderNumber = (order: { orderNumber?: number; orderId: string }): string => {
+  return order.orderNumber
+    ? `US${String(order.orderNumber).padStart(6, '0')}`
+    : `#${order.orderId.slice(-8)}`;
+};

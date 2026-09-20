@@ -47,6 +47,7 @@ import {
   CATEGORIES,
   LOYALTY_TIERS,
   formatMNT,
+  formatOrderNumber,
   getStoredLoyaltyTiers,
   getStoredCashbackPct,
   calculateLoyaltyTierBySpent
@@ -1287,7 +1288,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-stone-100">
                       <div className="flex items-center gap-3">
                         <span className="font-mono font-black text-sm text-stone-900 bg-stone-100 px-2.5 py-1 rounded-lg">
-                          #{order.orderId}
+                          {formatOrderNumber(order)}
                         </span>
                         {getStatusBadge(currentStatus)}
                         <span className="text-xs text-stone-400 flex items-center gap-1">
@@ -1602,7 +1603,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       <p className="text-xs font-black text-stone-800">Захиалсан барааны дэлгэрэнгүй</p>
                       {profileOrders.length === 0 ? <p className="text-xs text-stone-400">Захиалга бүртгэгдээгүй.</p> : profileOrders.map((order) => (
                         <div key={order.orderId} className="rounded-xl border border-stone-200 bg-white p-3">
-                          <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs"><span className="font-mono font-bold">#{order.orderId.slice(0, 8)}</span><span className="font-black">{formatMNT(order.total)}</span><span className="font-bold text-emerald-700">{order.status === 'delivered' ? 'Хүргэгдсэн' : order.status === 'shipping' ? 'Хүргэлтэд' : order.status === 'confirmed' ? 'Баталгаажсан' : order.status === 'cancelled' ? 'Цуцалсан' : 'Шинэ'}</span><span className="text-stone-500">{order.date}</span></div>
+                          <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs"><span className="font-mono font-bold">{formatOrderNumber(order)}</span><span className="font-black">{formatMNT(order.total)}</span><span className="font-bold text-emerald-700">{order.status === 'delivered' ? 'Хүргэгдсэн' : order.status === 'shipping' ? 'Хүргэлтэд' : order.status === 'confirmed' ? 'Баталгаажсан' : order.status === 'cancelled' ? 'Цуцалсан' : 'Шинэ'}</span><span className="text-stone-500">{order.date}</span></div>
                           <div className="mt-2 flex flex-wrap gap-1.5">{order.items.map((item) => <span key={item.id} className="px-2 py-1 rounded-lg bg-stone-50 border border-stone-200 text-[11px]">{item.name} <strong>×{item.quantity}</strong> · {formatMNT(item.price * item.quantity)}</span>)}</div>
                         </div>
                       ))}
@@ -1923,7 +1924,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                             <p className="text-stone-500">Захиалга бүртгэгдээгүй байна.</p>
                           ) : member.orders.map((order) => (
                             <div key={order.orderId} className="flex flex-wrap justify-between gap-2 border-t border-blue-100 py-2 first:border-t-0">
-                              <span className="font-mono font-bold text-stone-700">#{order.orderId}</span>
+                              <span className="font-mono font-bold text-stone-700">{formatOrderNumber(order)}</span>
                               <span>{order.items.reduce((sum, item) => sum + item.quantity, 0)} бараа · {formatMNT(order.total)}</span>
                               <span className="font-bold text-blue-700">{order.status === 'delivered' ? 'Хүргэгдсэн' : order.status === 'shipping' ? 'Хүргэлтэд' : order.status === 'confirmed' ? 'Баталгаажсан' : order.status === 'cancelled' ? 'Цуцалсан' : 'Шинэ'}</span>
                               <span className="text-stone-500">{order.date}</span>

@@ -74,6 +74,7 @@ export interface CartItem {
 
 export interface OrderDetails {
   orderId: string;
+  orderNumber?: number;
   customerName: string;
   customerId?: string;
   phone: string;
