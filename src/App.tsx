@@ -860,6 +860,92 @@ export default function App() {
     });
   }, [products, searchQuery, selectedCategory, selectedOrigin, showDealsOnly, selectedDay, currentDeal]);
 
+  // The installed warehouse app is single-purpose: it must never show the public
+  // storefront underneath. Before admin login it shows only a focused login screen;
+  // once authenticated it shows only the inventory camera tool.
+  if (isInventoryApp) {
+    if (!isAdminAuthenticated) {
+      return (
+        <div className="min-h-screen bg-stone-950 flex flex-col items-center justify-center gap-6 p-6 text-center">
+          <BeeEmblemLogo size={64} className="w-16 h-16" />
+          <div>
+            <h1 className="text-xl font-black text-white">US&K Агуулах</h1>
+            <p className="text-sm text-stone-400 mt-1">Зөвхөн ажилтны админ бүртгэлээр нэвтэрнэ</p>
+          </div>
+          <button
+            type="button"
+            onClick={handleOpenAdmin}
+            className="bg-amber-400 hover:bg-amber-300 text-stone-950 font-bold px-6 py-3 rounded-xl cursor-pointer transition-colors"
+          >
+            Админ бүртгэлээр нэвтрэх
+          </button>
+
+          <UserProfileModal
+            isOpen={isProfileOpen}
+            onClose={() => setIsProfileOpen(false)}
+            user={currentUser}
+            onSaveUser={(updatedUser) => {
+              setCurrentUser(updatedUser);
+              localStorage.setItem('usk_current_user', JSON.stringify(updatedUser));
+              showToast('Хэрэглэгчийн мэдээлэл шинэчлэгдлээ.');
+            }}
+            onLogoutUser={() => {
+              setCurrentUser(null);
+              localStorage.removeItem('usk_current_user');
+              showToast('Бүртгэлээс гарлаа.');
+            }}
+            orders={orders}
+            activeLoyalty={activeLoyalty}
+            totalSpent={userTotalSpent}
+          />
+          <AdminLoginModal
+            isOpen={isAdminLoginOpen}
+            onClose={() => setIsAdminLoginOpen(false)}
+            onLogin={handleAdminLogin}
+          />
+
+          {toastMessage && (
+            <div className="fixed bottom-6 right-6 z-50 bg-stone-900/95 backdrop-blur-md text-white px-4 py-3 rounded-2xl shadow-2xl border border-stone-700 flex items-center gap-2.5 text-xs font-semibold">
+              <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+              <span>{toastMessage}</span>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    return (
+      <div className="min-h-screen bg-stone-950 flex flex-col items-center justify-center gap-4 p-6 text-center">
+        {!isInventoryOpen && (
+          <button
+            type="button"
+            onClick={() => setIsInventoryOpen(true)}
+            className="bg-amber-400 hover:bg-amber-300 text-stone-950 font-bold px-6 py-3 rounded-xl cursor-pointer transition-colors"
+          >
+            Агуулах хэсэг нээх
+          </button>
+        )}
+        {currentUser?.accessToken && (
+          <InventoryCameraModal
+            isOpen={isInventoryOpen}
+            onClose={() => setIsInventoryOpen(false)}
+            accessToken={currentUser.accessToken}
+            onChanged={() => {
+              setIsInventoryOpen(false);
+              window.location.reload();
+            }}
+          />
+        )}
+        {toastMessage && (
+          <div className="fixed bottom-6 right-6 z-50 bg-stone-900/95 backdrop-blur-md text-white px-4 py-3 rounded-2xl shadow-2xl border border-stone-700 flex items-center gap-2.5 text-xs font-semibold">
+            <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+            <span>{toastMessage}</span>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-stone-50 flex flex-col font-sans selection:bg-rose-500 selection:text-white">
       {/* Admin Mode Floating Top Strip */}
