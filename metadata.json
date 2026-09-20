@@ -1,0 +1,6 @@
+{
+  "name": "US&K Family Mart",
+  "description": "АНУ болон БНСУ-ын чанартай хүнс, витамин, өргөн хэрэглээний барааны онлайн хүргэлтийн дэлгүүр",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
