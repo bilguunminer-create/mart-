@@ -104,18 +104,29 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs overflow-y-auto">
-      <div className="relative w-full max-w-xl bg-white rounded-3xl shadow-2xl border border-stone-200 overflow-hidden my-6 flex flex-col">
-        {/* Close Button */}
-        <button
-          onClick={onClose}
-          className="absolute top-4 right-4 z-10 w-9 h-9 rounded-full bg-black/50 hover:bg-black/75 text-white flex items-center justify-center transition-colors cursor-pointer"
-        >
-          <X className="w-5 h-5" />
-        </button>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs overflow-y-auto"
+      onClick={onClose}
+    >
+      <div
+        className="relative w-full max-w-xl bg-white rounded-3xl shadow-2xl border border-stone-200 my-6 flex flex-col"
+        onClick={(event) => event.stopPropagation()}
+      >
+        {/* Close Button: sticky so it stays reachable even after scrolling the modal content. (position:fixed does not
+            work here because the backdrop's blur filter creates its own containing block for fixed descendants; and the
+            card itself must not use overflow-hidden, since that would make sticky stick to the card instead of the
+            viewport. Corner rounding is applied to the first/last child below instead.) */}
+        <div className="sticky top-0 z-20 h-0">
+          <button
+            onClick={onClose}
+            className="absolute top-4 right-4 w-9 h-9 rounded-full bg-black/50 hover:bg-black/75 text-white flex items-center justify-center transition-colors cursor-pointer"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
 
         {/* Product Image Banner */}
-        <div className="relative aspect-16/10 w-full bg-stone-100 overflow-hidden">
+        <div className="relative aspect-16/10 w-full bg-stone-100 overflow-hidden rounded-t-3xl">
           <img
             src={product.image}
             alt={product.name}
@@ -271,7 +282,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
         </div>
 
         {/* Reviews & Ratings */}
-        <div className="border-t border-stone-200 bg-stone-50/60 p-6 space-y-4">
+        <div className="border-t border-stone-200 bg-stone-50/60 p-6 space-y-4 rounded-b-3xl">
           <div className="flex items-center justify-between">
             <h4 className="font-black text-stone-900 text-sm flex items-center gap-2">
               <MessageSquare className="w-4 h-4 text-rose-600" />
