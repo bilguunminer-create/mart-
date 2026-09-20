@@ -3,6 +3,7 @@ import path from "path";
 import fs from "fs";
 import { createServer as createViteServer } from "vite";
 import nodemailer, { type Transporter } from "nodemailer";
+import { checkRateLimit, clientIp } from "./api/_rateLimit";
 
 // In-memory OTP storage: email -> { code, expiresAt, name }
 interface OtpEntry {
@@ -72,8 +73,11 @@ async function startServer() {
   app.post("/api/upload-branding", (req, res) => {
     try {
       const { type, dataBase64 } = req.body;
-      if (!type || !dataBase64) {
-        return res.status(400).json({ error: "Зургийн төрөл болон өгөгдөл шаардлагатай." });
+      if (type !== "logo" && type !== "banner") {
+        return res.status(400).json({ error: "Зургийн төрөл буруу байна." });
+      }
+      if (!dataBase64) {
+        return res.status(400).json({ error: "Зургийн өгөгдөл шаардлагатай." });
       }
 
       // Extract base64 image data
@@ -112,6 +116,16 @@ async function startServer() {
       }
 
       const cleanEmail = email.trim().toLowerCase();
+
+      // Rate limit: at most 3 sends per email per 10 minutes, and at most 20 sends
+      // per IP per 10 minutes, to stop mailbombing an arbitrary victim address.
+      if (!checkRateLimit(`send-email:${cleanEmail}`, 3, 10 * 60 * 1000)) {
+        return res.status(429).json({ error: "Хэт олон удаа код хүссэн байна. 10 минутын дараа дахин оролдоно уу." });
+      }
+      if (!checkRateLimit(`send-ip:${clientIp(req)}`, 20, 10 * 60 * 1000)) {
+        return res.status(429).json({ error: "Хэт олон хүсэлт илгээгдлээ. Түр хүлээгээд дахин оролдоно уу." });
+      }
+
       // Generate 6-digit OTP
       const code = Math.floor(100000 + Math.random() * 900000).toString();
       const expiresAt = Date.now() + 10 * 60 * 1000; // 10 minutes expiry
@@ -212,6 +226,15 @@ async function startServer() {
 
       const cleanEmail = email.trim().toLowerCase();
       const cleanCode = code.trim();
+
+      // Rate limit verification attempts so the 6-digit code cannot be brute-forced
+      // within its 10-minute lifetime (1,000,000 possible codes, otherwise unthrottled).
+      if (!checkRateLimit(`verify-email:${cleanEmail}`, 8, 10 * 60 * 1000)) {
+        return res.status(429).json({ error: "Хэт олон удаа буруу код оруулсан байна. Шинэ код хүсээд дахин оролдоно уу." });
+      }
+      if (!checkRateLimit(`verify-ip:${clientIp(req)}`, 30, 10 * 60 * 1000)) {
+        return res.status(429).json({ error: "Хэт олон хүсэлт илгээгдлээ. Түр хүлээгээд дахин оролдоно уу." });
+      }
 
       // 1. First check stateless cryptographic token if present
       if (token && typeof token === "string" && token.includes(".")) {

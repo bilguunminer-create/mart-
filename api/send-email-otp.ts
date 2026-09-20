@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import nodemailer from 'nodemailer';
+import { checkRateLimit, clientIp } from './_rateLimit';
 
 // Global cache for serverless environment
 const globalOtpStore = (global as any).__otpStore || new Map<string, { code: string; expiresAt: number; name?: string }>();
@@ -18,11 +19,17 @@ function getOtpSecret(): string {
   return secret;
 }
 
+const ALLOWED_ORIGINS = new Set(['https://www.uskmart.com', 'https://uskmart.com']);
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  // CORS headers
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
+  // CORS: only the site's own origin may call this cross-origin; same-origin calls
+  // (the normal case) are unaffected by these headers either way.
+  const origin = req.headers.origin;
+  if (typeof origin === 'string' && ALLOWED_ORIGINS.has(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+  }
+  res.setHeader('Access-Control-Allow-Methods', 'OPTIONS,POST');
   res.setHeader(
     'Access-Control-Allow-Headers',
     'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version'
@@ -43,6 +50,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const cleanEmail = email.trim().toLowerCase();
+
+    // Rate limit: at most 3 sends per email per 10 minutes, and at most 20 sends
+    // per IP per 10 minutes, to stop mailbombing an arbitrary victim address.
+    if (!checkRateLimit(`send-email:${cleanEmail}`, 3, 10 * 60 * 1000)) {
+      return res.status(429).json({ error: 'Хэт олон удаа код хүссэн байна. 10 минутын дараа дахин оролдоно уу.' });
+    }
+    if (!checkRateLimit(`send-ip:${clientIp(req)}`, 20, 10 * 60 * 1000)) {
+      return res.status(429).json({ error: 'Хэт олон хүсэлт илгээгдлээ. Түр хүлээгээд дахин оролдоно уу.' });
+    }
+
     const code = Math.floor(100000 + Math.random() * 900000).toString();
     const expiresAt = Date.now() + 10 * 60 * 1000; // 10 minutes
 
