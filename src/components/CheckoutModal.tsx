@@ -41,6 +41,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [walletPoints, setWalletPoints] = useState(0);
   const [usePoints, setUsePoints] = useState(false);
+  const [useLoyaltyDiscount, setUseLoyaltyDiscount] = useState(true);
   const [isReportingPayment, setIsReportingPayment] = useState(false);
   const [paymentReported, setPaymentReported] = useState(false);
 
@@ -120,7 +121,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const subtotal = items.reduce((sum, item) => sum + item.originalPrice * item.quantity, 0);
   const itemsPriceAfterDailyDeal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const loyaltyDiscountPct = accountLoyaltyTier ? accountLoyaltyTier.discount_pct : 0;
-  const loyaltyDiscountAmount = Math.round((itemsPriceAfterDailyDeal * loyaltyDiscountPct) / 100);
+  const loyaltyDiscountAmount = useLoyaltyDiscount ? Math.round((itemsPriceAfterDailyDeal * loyaltyDiscountPct) / 100) : 0;
 
   const isGoldVIP = accountLoyaltyTier?.id === 'gold';
   const isDalanzadgadDelivery = district === 'Өмнөговь, Даланзадгад';
@@ -402,14 +403,26 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                     </div>
 
                     {accountLoyaltyTier ? (
-                      <div className="flex items-center justify-between p-2 rounded-xl bg-amber-500/10 border border-amber-400/30 text-amber-900">
-                        <div className="flex items-center gap-1.5 font-bold">
-                          <Award className="w-4 h-4 text-amber-600" />
-                          <span>{accountLoyaltyTier.name} түвшин ({accountLoyaltyTier.discount_pct}% хөнгөлөлт)</span>
+                      <div className="rounded-xl bg-amber-500/10 border border-amber-400/30 p-2 space-y-2 text-amber-900">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-1.5 font-bold">
+                            <Award className="w-4 h-4 text-amber-600" />
+                            <span>{accountLoyaltyTier.name} түвшин ({accountLoyaltyTier.discount_pct}% хөнгөлөлт)</span>
+                          </div>
+                          <span className="font-black text-rose-600">
+                            -{formatMNT(Math.round((itemsPriceAfterDailyDeal * loyaltyDiscountPct) / 100))}
+                          </span>
                         </div>
-                        <span className="font-black text-rose-600">
-                          -{formatMNT(loyaltyDiscountAmount)} хөнгөлөгдөнө
-                        </span>
+                        <div className="grid grid-cols-2 gap-2">
+                          <button type="button" onClick={() => setUseLoyaltyDiscount(true)}
+                            className={`rounded-xl border px-3 py-2 text-xs font-bold transition-colors ${useLoyaltyDiscount ? 'border-amber-600 bg-amber-600 text-white' : 'border-amber-300 bg-white text-amber-800'}`}>
+                            Хөнгөлөлт ашиглах
+                          </button>
+                          <button type="button" onClick={() => setUseLoyaltyDiscount(false)}
+                            className={`rounded-xl border px-3 py-2 text-xs font-bold transition-colors ${!useLoyaltyDiscount ? 'border-stone-700 bg-stone-800 text-white' : 'border-stone-200 bg-white text-stone-700'}`}>
+                            Энэ удаад бүү хэрэглэ
+                          </button>
+                        </div>
                       </div>
                     ) : (
                       <div className="text-[11px] text-stone-600 flex items-center justify-between bg-white/70 p-2 rounded-xl border border-stone-200">
