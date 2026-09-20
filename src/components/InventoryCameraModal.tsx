@@ -8,6 +8,7 @@ const blank = { name:'', stock:'', origin:'АНУ', category:'other', category_n
 
 export const InventoryCameraModal: React.FC<Props> = ({ isOpen, onClose, accessToken, onChanged }) => {
   const [tab,setTab]=useState<Tab>('register');
+  const [step,setStep]=useState<1|2|3>(1);
   const [form,setForm]=useState(blank);
   const [image,setImage]=useState<File|null>(null);
   const [preview,setPreview]=useState('');
@@ -32,7 +33,13 @@ export const InventoryCameraModal: React.FC<Props> = ({ isOpen, onClose, accessT
   const chooseImage=async(file?:File)=>{
     if(!file) return;
     setImageOk(false); setImage(file); setPreview(URL.createObjectURL(file));
-    const img=new Image(); img.onload=()=>{ const ok=img.naturalWidth>=900&&img.naturalHeight>=900&&file.size>=40*1024&&file.size<=5*1024*1024; setImageOk(ok); setMessage(ok?'Зургийн хэмжээ шаардлага хангалаа. Одоо barcode / QR код уншуулна уу.':'Зураг бүдэг эсвэл хэт жижиг байж болзошгүй. 900×900-аас дээш, тод зураг дахин авна уу.'); }; img.src=URL.createObjectURL(file);
+    const img=new Image(); img.onload=()=>{
+      const ok=img.naturalWidth>=900&&img.naturalHeight>=900&&file.size>=40*1024&&file.size<=5*1024*1024;
+      setImageOk(ok);
+      setMessage(ok?'✓ Зургийн чанар хангалттай байна. Дараагийн алхам руу шилжиж байна...':'Зураг бүдэг эсвэл хэт жижиг байж болзошгүй. 900×900-аас дээш, тод зураг дахин авна уу.');
+      if(ok) window.setTimeout(()=>{ setStep(2); setMessage('Одоо barcode / QR код уншуулна уу.'); },700);
+    };
+    img.src=URL.createObjectURL(file);
   };
 
   const startScanner=async(target:'register'|'deduct')=>{
@@ -44,7 +51,7 @@ export const InventoryCameraModal: React.FC<Props> = ({ isOpen, onClose, accessT
       const Detector=(window as any).BarcodeDetector;
       if(!Detector){ setMessage('Энэ төхөөрөмж barcode автоматаар уншихыг дэмжихгүй байна. Кодоо гараар оруулна уу.'); return; }
       const detector=new Detector({formats:['ean_13','ean_8','upc_a','upc_e','code_128','code_39','qr_code']});
-      timerRef.current=window.setInterval(async()=>{ try { if(!videoRef.current) return; const found=await detector.detect(videoRef.current); const value=found?.[0]?.rawValue; if(value){ if(target==='register') setField('barcode',value); else setScan(value); setMessage('Код амжилттай уншигдлаа: '+value); stopCamera(); } } catch {} },500);
+      timerRef.current=window.setInterval(async()=>{ try { if(!videoRef.current) return; const found=await detector.detect(videoRef.current); const value=found?.[0]?.rawValue; if(value){ if(target==='register'){ setField('barcode',value); window.setTimeout(()=>setStep(3),600); } else setScan(value); setMessage('Код амжилттай уншигдлаа: '+value); stopCamera(); } } catch {} },500);
     } catch { setMessage('Камер нээх зөвшөөрөл өгнө үү.'); }
   };
 
@@ -55,7 +62,7 @@ export const InventoryCameraModal: React.FC<Props> = ({ isOpen, onClose, accessT
     try {
       const imageUrl=await uploadProductImage(accessToken,image);
       await registerInventoryProduct(accessToken,{...form,id:crypto.randomUUID(),stock:Number(form.stock),price:Number(form.price),day_deal:Number(form.day_deal),image:imageUrl,country:form.origin,flag:form.origin==='БНСУ'?'🇰🇷':'🇺🇸',rating:5,published:false,note:'Камерын апп-аар шинээр бүртгэв'});
-      setMessage('Бараа амжилттай бүртгэгдлээ. Админ удирдлагаас шалгаж нийтлээрэй.'); setForm(blank); setImage(null); setPreview(''); setImageOk(false); onChanged();
+      setMessage('Бараа амжилттай бүртгэгдлээ. Админ удирдлагаас шалгаж нийтлээрэй.'); setForm(blank); setImage(null); setPreview(''); setImageOk(false); setStep(1); onChanged();
     } catch(e){ setMessage(e instanceof Error?e.message:'Бүртгэх боломжгүй байна.'); } finally { setBusy(false); }
   };
 
@@ -79,17 +86,40 @@ export const InventoryCameraModal: React.FC<Props> = ({ isOpen, onClose, accessT
       </div>
       <main className="space-y-4 p-4 sm:p-6">
         {message&&<div className="rounded-xl bg-amber-50 p-3 text-sm text-amber-900">{message}</div>}
-        {(tab==='register'||tab==='deduct')&&<><video ref={videoRef} playsInline muted className={streamRef.current?'block w-full rounded-2xl bg-black':'hidden'} /></>}
+        {((tab==='register'&&step===2)||tab==='deduct')&&<><video ref={videoRef} playsInline muted className={streamRef.current?'block w-full rounded-2xl bg-black':'hidden'} /></>}
         {tab==='register'&&<div className="space-y-4">
-          <section className="rounded-2xl border p-4"><h3 className="font-black">1. Барааны зураг</h3>{preview&&<img src={preview} className="mt-3 h-48 w-full rounded-xl object-cover" />}
-          <label className="mt-3 flex cursor-pointer items-center justify-center gap-2 rounded-xl bg-stone-900 p-3 text-sm font-bold text-white"><Camera className="h-4 w-4"/> Зураг авах / оруулах<input type="file" accept="image/jpeg,image/png,image/webp" capture="environment" className="hidden" onChange={e=>void chooseImage(e.target.files?.[0])}/></label>
-          {image&&<p className={`mt-2 text-xs font-bold ${imageOk?'text-emerald-700':'text-rose-700'}`}>{imageOk?'✓ Зураг шаардлага хангалаа':'! Зургийг дахин авах шаардлагатай'}</p>}</section>
-          <section className="rounded-2xl border p-4"><h3 className="font-black">2. QR / Barcode</h3><div className="mt-3 flex gap-2"><input value={form.barcode} onChange={e=>setField('barcode',e.target.value)} placeholder="Barcode эсвэл QR код" className="min-w-0 flex-1 rounded-xl border p-3"/><button onClick={()=>void startScanner('register')} className="rounded-xl bg-amber-400 px-3 font-bold"><Barcode/></button></div></section>
-          <section className="rounded-2xl border p-4"><h3 className="font-black">3. Барааны мэдээлэл</h3><div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-            {[['name','Барааны нэр'],['stock','Тоо ширхэг'],['price','Зарах үнэ (₮)'],['weight','Жин / савалгаа'],['origin','Гарал үүсэл'],['category_name','Ангилал'],['badge','Онцлох тэмдэглэгээ']].map(([key,label])=><label key={key} className="text-xs font-bold">{label}<input value={(form as any)[key]} type={key==='stock'||key==='price'?'number':'text'} onChange={e=>setField(key,e.target.value)} className="mt-1 w-full rounded-xl border p-3 font-normal"/></label>)}
-            <label className="text-xs font-bold">Өдрийн хямдрал<select value={form.day_deal} onChange={e=>setField('day_deal',e.target.value)} className="mt-1 w-full rounded-xl border p-3 font-normal"><option value="-1">Хямдралгүй</option><option value="0">Ням</option><option value="1">Даваа</option><option value="2">Мягмар</option><option value="3">Лхагва</option><option value="4">Пүрэв</option><option value="5">Баасан</option><option value="6">Бямба</option></select></label>
-          </div><label className="mt-3 block text-xs font-bold">Тайлбар<textarea value={form.description} onChange={e=>setField('description',e.target.value)} className="mt-1 w-full rounded-xl border p-3 font-normal"/></label></section>
-          <button disabled={busy} onClick={()=>void register()} className="w-full rounded-xl bg-rose-600 p-3 font-black text-white disabled:bg-stone-300">{busy?'Хадгалж байна...':'Админд шалгуулахаар бүртгэх'}</button>
+          {/* Step indicator */}
+          <div className="flex items-center gap-1.5">
+            {([[1,'Зураг'],[2,'Barcode/QR'],[3,'Мэдээлэл']] as const).map(([n,label],idx)=><React.Fragment key={n}>
+              {idx>0&&<div className={`h-0.5 flex-1 rounded ${step>=n?'bg-rose-500':'bg-stone-200'}`}/>}
+              <div className={`flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-black ${step===n?'bg-rose-600 text-white':step>n?'bg-emerald-100 text-emerald-700':'bg-stone-100 text-stone-400'}`}>
+                {step>n?<CheckCircle2 className="h-3 w-3"/>:<span>{n}</span>}
+                <span>{label}</span>
+              </div>
+            </React.Fragment>)}
+          </div>
+
+          {step===1&&<section className="rounded-2xl border p-4"><h3 className="font-black">1. Барааны зураг</h3>{preview&&<img src={preview} className="mt-3 h-48 w-full rounded-xl object-cover" />}
+          <label className="mt-3 flex cursor-pointer items-center justify-center gap-2 rounded-xl bg-stone-900 p-3 text-sm font-bold text-white"><Camera className="h-4 w-4"/> {image&&!imageOk?'Зургийг дахин авах':'Зураг авах / оруулах'}<input type="file" accept="image/jpeg,image/png,image/webp" capture="environment" className="hidden" onChange={e=>void chooseImage(e.target.files?.[0])}/></label>
+          {image&&<p className={`mt-2 text-xs font-bold ${imageOk?'text-emerald-700':'text-rose-700'}`}>{imageOk?'✓ Зураг шаардлага хангалаа':'! Зургийг дахин авах шаардлагатай'}</p>}</section>}
+
+          {step===2&&<section className="rounded-2xl border p-4">
+            <div className="mb-1 flex items-center justify-between"><h3 className="font-black">2. QR / Barcode</h3><button type="button" onClick={()=>{stopCamera();setStep(1);}} className="text-xs font-bold text-stone-500 cursor-pointer">← Буцах</button></div>
+            <div className="mt-3 flex gap-2"><input value={form.barcode} onChange={e=>setField('barcode',e.target.value)} placeholder="Barcode эсвэл QR код" className="min-w-0 flex-1 rounded-xl border p-3"/><button onClick={()=>void startScanner('register')} className="rounded-xl bg-amber-400 px-3 font-bold"><Barcode/></button></div>
+            <button type="button" disabled={!form.barcode.trim()} onClick={()=>{stopCamera();setStep(3);}} className="mt-3 w-full rounded-xl bg-stone-900 p-3 text-sm font-bold text-white disabled:bg-stone-300 cursor-pointer">Үргэлжлүүлэх →</button>
+          </section>}
+
+          {step===3&&<>
+            <section className="rounded-2xl border p-4">
+              <div className="mb-1 flex items-center justify-between"><h3 className="font-black">3. Барааны мэдээлэл</h3><button type="button" onClick={()=>setStep(2)} className="text-xs font-bold text-stone-500 cursor-pointer">← Буцах</button></div>
+              <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                {[['name','Барааны нэр'],['stock','Тоо ширхэг'],['price','Зарах үнэ (₮)'],['weight','Жин / савалгаа'],['origin','Гарал үүсэл'],['category_name','Ангилал'],['badge','Онцлох тэмдэглэгээ']].map(([key,label])=><label key={key} className="text-xs font-bold">{label}<input value={(form as any)[key]} type={key==='stock'||key==='price'?'number':'text'} onChange={e=>setField(key,e.target.value)} className="mt-1 w-full rounded-xl border p-3 font-normal"/></label>)}
+                <label className="text-xs font-bold">Өдрийн хямдрал<select value={form.day_deal} onChange={e=>setField('day_deal',e.target.value)} className="mt-1 w-full rounded-xl border p-3 font-normal"><option value="-1">Хямдралгүй</option><option value="0">Ням</option><option value="1">Даваа</option><option value="2">Мягмар</option><option value="3">Лхагва</option><option value="4">Пүрэв</option><option value="5">Баасан</option><option value="6">Бямба</option></select></label>
+              </div>
+              <label className="mt-3 block text-xs font-bold">Тайлбар<textarea value={form.description} onChange={e=>setField('description',e.target.value)} className="mt-1 w-full rounded-xl border p-3 font-normal"/></label>
+            </section>
+            <button disabled={busy} onClick={()=>void register()} className="w-full rounded-xl bg-rose-600 p-3 font-black text-white disabled:bg-stone-300">{busy?'Хадгалж байна...':'Админд шалгуулахаар бүртгэх'}</button>
+          </>}
         </div>}
         {tab==='deduct'&&<div className="space-y-4"><section className="rounded-2xl border p-4"><h3 className="font-black">Barcode / QR уншуулаад зарлага хасах</h3><div className="mt-3 flex gap-2"><input value={scan} onChange={e=>setScan(e.target.value)} placeholder="Код уншуулна уу" className="min-w-0 flex-1 rounded-xl border p-3"/><button onClick={()=>void startScanner('deduct')} className="rounded-xl bg-amber-400 px-3 font-bold"><Barcode/></button></div><label className="mt-3 block text-xs font-bold">Хасах тоо<input type="number" min="1" value={deductQty} onChange={e=>setDeductQty(e.target.value)} className="mt-1 w-full rounded-xl border p-3"/></label><label className="mt-3 block text-xs font-bold">Тайлбар<textarea value={note} onChange={e=>setNote(e.target.value)} className="mt-1 w-full rounded-xl border p-3"/></label><button disabled={busy} onClick={()=>void deduct()} className="mt-4 w-full rounded-xl bg-rose-600 p-3 font-black text-white disabled:bg-stone-300">{busy?'Шалгаж байна...':'Үлдэгдлээс хасах'}</button><p className="mt-2 text-xs text-stone-500">Сервер үлдэгдлийг дахин шалгана. Үлдэгдэл хүрэхгүй бол хасалт хийгдэхгүй.</p></section></div>}
         {tab==='history'&&<div><button onClick={()=>void loadHistory()} className="mb-3 flex items-center gap-1 text-sm font-bold"><RefreshCw className="h-4 w-4"/> Шинэчлэх</button><div className="space-y-2">{history.map(m=><article key={m.id} className="rounded-xl border p-3 text-sm"><div className="flex justify-between gap-2"><b>{m.product_name}</b><span className={m.quantity<0?'text-rose-600':'text-emerald-700'}>{m.quantity>0?'+':''}{m.quantity}ш</span></div><p className="text-xs text-stone-500">{m.stock_before}ш → {m.stock_after}ш · {new Date(m.created_at).toLocaleString('mn-MN')}</p>{m.note&&<p className="mt-1 text-xs">{m.note}</p>}</article>)}{!history.length&&<p className="rounded-xl bg-stone-50 p-4 text-sm text-stone-500">Хөдөлгөөний түүх одоогоор байхгүй.</p>}</div></div>}
