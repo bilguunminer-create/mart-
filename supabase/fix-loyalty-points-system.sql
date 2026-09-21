@@ -85,12 +85,15 @@ $function$;
 -- One-time correction for orders already delivered under the buggy formula:
 -- top up the shortfall for any order that redeemed points, instead of
 -- re-awarding the full amount (which would double-pay orders that already
--- got the smaller, wrong amount).
+-- got the smaller, wrong amount). event_type only allows earned/redeemed/
+-- reversed, and (order_id, event_type) is unique, so the existing 'earned'
+-- row for that order is topped up in place rather than inserting a second one.
 -- ---------------------------------------------------------------------------
 do $$
 declare
   rec record;
   correct_earned integer;
+  existing_ledger_id uuid;
   already_earned integer;
   shortfall integer;
 begin
@@ -99,19 +102,19 @@ begin
     where so.status = 'Дууссан' and not so.is_demo and so.points_discount > 0
   loop
     correct_earned := floor(greatest(0, rec.total - rec.delivery_fee) * 0.01)::integer;
-    select coalesce(sum(points), 0) into already_earned
+    select id, points into existing_ledger_id, already_earned
       from public.loyalty_point_ledger
       where order_id = rec.id and event_type = 'earned';
-    shortfall := correct_earned - already_earned;
-    if shortfall > 0 then
-      insert into public.loyalty_point_ledger(user_id, order_id, event_type, points)
-      values (rec.customer_id, rec.id, 'earn_correction', shortfall);
-      insert into public.loyalty_wallets(user_id, available_points, lifetime_earned)
-      values (rec.customer_id, shortfall, shortfall)
-      on conflict (user_id) do update
-        set available_points = public.loyalty_wallets.available_points + shortfall,
-            lifetime_earned = public.loyalty_wallets.lifetime_earned + shortfall,
-            updated_at = now();
+    if existing_ledger_id is not null then
+      shortfall := correct_earned - already_earned;
+      if shortfall > 0 then
+        update public.loyalty_point_ledger set points = correct_earned where id = existing_ledger_id;
+        update public.loyalty_wallets
+          set available_points = available_points + shortfall,
+              lifetime_earned = lifetime_earned + shortfall,
+              updated_at = now()
+          where user_id = rec.customer_id;
+      end if;
     end if;
   end loop;
 end $$;
@@ -119,13 +122,10 @@ end $$;
 -- ---------------------------------------------------------------------------
 -- 2 & 3. Real admin tools: read every member's actual wallet, and grant
 -- points that land in that same wallet instead of the admin's own browser.
---
--- Assumption (not independently confirmed against the live schema): order_id
--- on loyalty_point_ledger allows null, since an admin grant is not tied to
--- any order. If that assumption is wrong, admin_grant_loyalty_points below
--- will simply fail with a clear Postgres not-null-violation error rather
--- than silently corrupting anything -- report that error back and the insert
--- can be adjusted.
+-- event_type only allows earned/redeemed/reversed (confirmed against the
+-- live constraint), so a grant is recorded as 'earned' with order_id null --
+-- the unique (order_id, event_type) constraint does not block this, since
+-- Postgres treats every null as distinct from every other null.
 -- ---------------------------------------------------------------------------
 create or replace function public.admin_list_loyalty_wallets()
  returns setof public.loyalty_wallets
@@ -153,7 +153,7 @@ begin
   if amount = 0 then raise exception 'INVALID_AMOUNT'; end if;
 
   insert into public.loyalty_point_ledger(user_id, order_id, event_type, points)
-  values (target_user_id, null, 'admin_grant', amount);
+  values (target_user_id, null, case when amount > 0 then 'earned' else 'reversed' end, amount);
 
   insert into public.loyalty_wallets(user_id, available_points, lifetime_earned)
   values (target_user_id, greatest(0, amount), greatest(0, amount))
