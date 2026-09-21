@@ -17,9 +17,11 @@
 -- in src/services/supabaseAuth.ts (updateStoreOrderStatus) is updated to
 -- match in the same commit as this file.
 --
--- Run this once in the Supabase SQL Editor. CREATE OR REPLACE can rename
--- parameters without dropping the function first (only a type or return
--- change would require that), so existing grants on it are unaffected.
+-- Run this once in the Supabase SQL Editor. Postgres refuses to rename a
+-- parameter via CREATE OR REPLACE (42P13) -- it must be dropped first, which
+-- also drops its grants, so they are re-applied below in the same script.
+
+drop function if exists public.store_order_status(uuid, text);
 
 create or replace function public.store_order_status(p_order_id uuid, p_next_status text)
  returns void
@@ -80,3 +82,6 @@ begin
   end if;
 end;
 $function$;
+
+revoke all on function public.store_order_status(uuid, text) from public, anon;
+grant execute on function public.store_order_status(uuid, text) to authenticated;
