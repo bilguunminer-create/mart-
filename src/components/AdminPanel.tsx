@@ -60,6 +60,8 @@ interface AdminPanelProps {
   products: Product[];
   orders: OrderDetails[];
   memberProfiles?: Array<{ user_id: string; name: string; phone: string; address: string; created_at?: string }>;
+  loyaltyWallets?: Array<{ user_id: string; available_points: number; lifetime_earned: number }>;
+  onGrantBonusPoints?: (userId: string, amount: number) => Promise<void>;
   onSaveProduct: (product: Product) => void;
   onDeleteProduct: (productId: string) => void;
   onToggleStock: (productId: string) => void;
@@ -97,6 +99,7 @@ export interface LoyaltyMember {
   cashPoints: number;
   bonusPoints: number;
   totalPoints: number;
+  hasRealAccount: boolean;
   nextTier: {
     name: string;
     remaining: number;
@@ -109,6 +112,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   products,
   orders,
   memberProfiles = [],
+  loyaltyWallets = [],
+  onGrantBonusPoints,
   onSaveProduct,
   onDeleteProduct,
   onToggleStock,
@@ -266,34 +271,32 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   });
 
   // Modal for rewarding bonus points
-  const [bonusTarget, setBonusTarget] = useState<{ email: string; name: string; currentPoints: number } | null>(null);
+  const [bonusTarget, setBonusTarget] = useState<{ userId: string; email: string; name: string; currentPoints: number } | null>(null);
   const [bonusAmountInput, setBonusAmountInput] = useState<number>(5000);
   const [bonusSuccessMsg, setBonusSuccessMsg] = useState<string | null>(null);
+  const [bonusErrorMsg, setBonusErrorMsg] = useState<string | null>(null);
+  const [isGrantingBonus, setIsGrantingBonus] = useState(false);
 
   // Modal for changing manual tier override
   const [tierOverrideTarget, setTierOverrideTarget] = useState<{ email: string; name: string; currentTierId: string } | null>(null);
 
-  // Save custom bonuses helper
-  const handleGrantBonus = (email: string, amount: number) => {
-    setCustomLoyaltyData((prev) => {
-      const existing = prev[email] || {};
-      const nextPoints = (existing.bonusPoints || 0) + amount;
-      const updated = {
-        ...prev,
-        [email]: { ...existing, bonusPoints: nextPoints }
-      };
-      try {
-        localStorage.setItem('usk_loyalty_bonuses', JSON.stringify(updated));
-      } catch {
-        // ignore
-      }
-      return updated;
-    });
-    setBonusSuccessMsg(`${amount.toLocaleString()} лояалти оноо амжилттай олгогдлоо!`);
-    setTimeout(() => {
-      setBonusSuccessMsg(null);
-      setBonusTarget(null);
-    }, 1500);
+  // Grants points that land in the member's real Supabase wallet.
+  const handleGrantBonus = async (userId: string, amount: number) => {
+    if (!onGrantBonusPoints) return;
+    setBonusErrorMsg(null);
+    setIsGrantingBonus(true);
+    try {
+      await onGrantBonusPoints(userId, amount);
+      setBonusSuccessMsg(`${amount.toLocaleString()} лояалти оноо амжилттай олгогдлоо!`);
+      setTimeout(() => {
+        setBonusSuccessMsg(null);
+        setBonusTarget(null);
+      }, 1500);
+    } catch (error) {
+      setBonusErrorMsg(error instanceof Error ? error.message : 'Оноо олгох боломжгүй байна.');
+    } finally {
+      setIsGrantingBonus(false);
+    }
   };
 
   const handleSetTierOverride = (email: string, tierId: string) => {
@@ -393,6 +396,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
   // Group all orders by the Supabase user ID. This keeps a profile and all of
   // its orders in one member record, even if the user changes name, phone, or email.
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const walletByUserId = useMemo(() => {
+    const map: Record<string, { available_points: number; lifetime_earned: number }> = {};
+    loyaltyWallets.forEach((w) => { map[w.user_id] = w; });
+    return map;
+  }, [loyaltyWallets]);
+
   const loyaltyMembers = useMemo<LoyaltyMember[]>(() => {
     const memberMap: Record<string, {
       name: string;
@@ -454,7 +464,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       const effectiveTier = override?.forceTier
         ? loyaltyTiersConfig.find((tier) => tier.id === override.forceTier) || autoTier
         : autoTier;
-      const bonusPoints = override?.bonusPoints || 0;
+      const wallet = walletByUserId[id];
+      const hasRealAccount = UUID_RE.test(id);
 
       const ascTiers = [...loyaltyTiersConfig].sort((a, b) => a.threshold - b.threshold);
       const nextTierTarget = ascTiers.find((tier) => totalSpent < tier.threshold);
@@ -480,13 +491,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         lastOrderDate: lastOrder,
         tier: effectiveTier,
         cashPoints: 0,
-        bonusPoints,
-        totalPoints: bonusPoints,
+        bonusPoints: wallet?.lifetime_earned ?? 0,
+        totalPoints: wallet?.available_points ?? 0,
+        hasRealAccount,
         nextTier: nextTierInfo,
         orders: info.orders,
       };
     }).sort((a, b) => b.totalSpent - a.totalSpent);
-  }, [orders, memberProfiles, customLoyaltyData, loyaltyTiersConfig]);
+  }, [orders, memberProfiles, customLoyaltyData, loyaltyTiersConfig, walletByUserId]);
 
   // Filtered loyalty members
   const filteredLoyaltyMembers = useMemo(() => {
@@ -1867,7 +1879,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                             <span className="text-[10px] text-stone-500">оноо</span>
                           </div>
                           <span className="block text-[10px] text-stone-400">
-                            {member.bonusPoints > 0 ? `Бонус: +${member.bonusPoints.toLocaleString()}` : 'Бонус оноо олгогдоогүй'}
+                            {member.bonusPoints > 0 ? `Нийт хуримтлуулсан: ${member.bonusPoints.toLocaleString()}` : 'Оноо хуримтлуулаагүй'}
                           </span>
                         </div>
 
@@ -1905,16 +1917,23 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                           {expandedMemberId === member.id ? 'Захиалга хаах' : `Захиалга (${member.orderCount})`}
                         </button>
                         <button
+                          disabled={!member.hasRealAccount || !onGrantBonusPoints}
                           onClick={() => {
+                            setBonusErrorMsg(null);
                             setBonusTarget({
+                              userId: member.id,
                               email: member.email || member.id,
                               name: member.name,
                               currentPoints: member.totalPoints
                             });
                             setBonusAmountInput(5000);
                           }}
-                          className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold rounded-xl cursor-pointer transition-all flex items-center gap-1 shadow-2xs"
-                          title="Хэрэглэгчид бонус оноо бэлэглэх"
+                          className={`px-3 py-1.5 border text-xs font-bold rounded-xl transition-all flex items-center gap-1 shadow-2xs ${
+                            !member.hasRealAccount || !onGrantBonusPoints
+                              ? 'bg-stone-50 text-stone-300 border-stone-200 cursor-not-allowed'
+                              : 'bg-rose-50 hover:bg-rose-100 text-rose-700 border-rose-200 cursor-pointer'
+                          }`}
+                          title={member.hasRealAccount ? 'Хэрэглэгчид бонус оноо бэлэглэх' : 'Энэ хэрэглэгч бүртгэлгүй тул оноо олгох боломжгүй (зочноор захиалсан)'}
                         >
                           <Gift className="w-3.5 h-3.5" />
                           <span>Бонус оноо</span>
@@ -2535,6 +2554,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               </div>
             )}
 
+            {bonusErrorMsg && (
+              <div className="p-3 bg-rose-50 border border-rose-200 text-rose-800 rounded-xl text-xs font-bold">
+                {bonusErrorMsg}
+              </div>
+            )}
+
             <div className="space-y-2">
               <label className="block text-xs font-bold text-stone-700">
                 Нэмж олгох бонус оноо (₮):
@@ -2575,11 +2600,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               </button>
               <button
                 type="button"
-                onClick={() => handleGrantBonus(bonusTarget.email, bonusAmountInput)}
-                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl shadow-md cursor-pointer flex items-center gap-1.5"
+                disabled={isGrantingBonus}
+                onClick={() => handleGrantBonus(bonusTarget.userId, bonusAmountInput)}
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 disabled:opacity-60 disabled:cursor-not-allowed text-white text-xs font-bold rounded-xl shadow-md cursor-pointer flex items-center gap-1.5"
               >
                 <Gift className="w-3.5 h-3.5" />
-                <span>Оноо олгох</span>
+                <span>{isGrantingBonus ? 'Олгож байна...' : 'Оноо олгох'}</span>
               </button>
             </div>
           </div>

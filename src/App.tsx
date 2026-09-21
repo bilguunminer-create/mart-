@@ -52,7 +52,7 @@ import { BeeEmblemLogo } from './components/BeeEmblemLogo';
 const InventoryCameraModal = React.lazy(() =>
   import('./components/InventoryCameraModal').then((m) => ({ default: m.InventoryCameraModal }))
 );
-import { getStoreCustomerProfiles, getStoreOrders, getStoreSettings, saveStoreOrder, saveStoreProducts, saveStoreSettings, hasStoreAdminAccess, refreshSession, reportStoreOrderPayment, updateStoreOrderStatus, confirmStoreOrderPayment, verifyAdminPin, changeAdminPin, expireUnpaidOrdersAsAdmin, getAllReviewsForAdmin, moderateProductReview, deleteProductReview, getProductReviews } from './services/supabaseAuth';
+import { getStoreCustomerProfiles, getStoreOrders, getStoreSettings, saveStoreOrder, saveStoreProducts, saveStoreSettings, hasStoreAdminAccess, refreshSession, reportStoreOrderPayment, updateStoreOrderStatus, confirmStoreOrderPayment, verifyAdminPin, changeAdminPin, expireUnpaidOrdersAsAdmin, getAllReviewsForAdmin, moderateProductReview, deleteProductReview, getProductReviews, adminListLoyaltyWallets, adminGrantLoyaltyPoints, AdminLoyaltyWallet } from './services/supabaseAuth';
 import { initAdminPushNotifications } from './services/pushNotifications';
 
 export default function App() {
@@ -119,6 +119,7 @@ export default function App() {
   const [orders, setOrders] = useState<OrderDetails[]>([]);
 
   const [memberProfiles, setMemberProfiles] = useState<Array<{ user_id: string; name: string; phone: string; address: string; created_at?: string }>>([]);
+  const [loyaltyWallets, setLoyaltyWallets] = useState<AdminLoyaltyWallet[]>([]);
 
   // Admin states
   const [isAdminOpen, setIsAdminOpen] = useState(false);
@@ -199,9 +200,10 @@ export default function App() {
         try { await expireUnpaidOrdersAsAdmin(token); } catch { /* not fatal to the rest of the refresh */ }
       }
 
-      const [ordersResult, profilesResult] = await Promise.allSettled([
+      const [ordersResult, profilesResult, walletsResult] = await Promise.allSettled([
         getStoreOrders(token),
         getStoreCustomerProfiles(token),
+        isAdminAuthenticated ? adminListLoyaltyWallets(token) : Promise.resolve([]),
       ]);
       if (!active) return;
       const failures: string[] = [];
@@ -261,6 +263,13 @@ export default function App() {
         console.error('[Admin] Гишүүдийн мэдээлэл татахад алдаа гарлаа:', profilesResult.reason);
         setMemberProfiles([]);
         failures.push('хэрэглэгчийн мэдээлэл');
+      }
+
+      if (walletsResult.status === 'fulfilled') {
+        setLoyaltyWallets(walletsResult.value as AdminLoyaltyWallet[]);
+      } else if (isAdminAuthenticated) {
+        console.error('[Admin] Лояалти оноо татахад алдаа гарлаа:', walletsResult.reason);
+        failures.push('лояалти оноо');
       }
 
       if (failures.length > 0) {
@@ -1732,6 +1741,20 @@ export default function App() {
           products={products}
           orders={orders}
           memberProfiles={memberProfiles}
+          loyaltyWallets={loyaltyWallets}
+          onGrantBonusPoints={async (userId, amount) => {
+            if (!currentUser?.accessToken) throw new Error('Админ и-мэйлээр нэвтэрнэ үү.');
+            await adminGrantLoyaltyPoints(currentUser.accessToken, userId, amount);
+            setLoyaltyWallets((previous) => {
+              const existing = previous.find((w) => w.user_id === userId);
+              if (existing) {
+                return previous.map((w) => w.user_id === userId
+                  ? { ...w, available_points: Math.max(0, w.available_points + amount), lifetime_earned: w.lifetime_earned + Math.max(0, amount) }
+                  : w);
+              }
+              return [...previous, { user_id: userId, available_points: Math.max(0, amount), lifetime_earned: Math.max(0, amount) }];
+            });
+          }}
           onSaveProduct={handleSaveProduct}
           onDeleteProduct={handleDeleteProduct}
           onToggleStock={handleToggleStock}

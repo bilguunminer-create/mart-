@@ -125,6 +125,21 @@ export async function getLoyaltyWallet(token: string) {
   return rows[0] || { available_points: 0, lifetime_earned: 0 };
 }
 
+export type AdminLoyaltyWallet = LoyaltyWallet & { user_id: string };
+
+/** Admin-only: every member's real point balance, not just the caller's own. */
+export async function adminListLoyaltyWallets(token: string) {
+  return request<AdminLoyaltyWallet[]>('/rest/v1/rpc/admin_list_loyalty_wallets', { method: 'POST', body: '{}' }, token);
+}
+
+/** Admin-only: grants points that land in the member's real wallet. */
+export async function adminGrantLoyaltyPoints(token: string, targetUserId: string, amount: number) {
+  return request('/rest/v1/rpc/admin_grant_loyalty_points', {
+    method: 'POST',
+    body: JSON.stringify({ target_user_id: targetUserId, amount }),
+  }, token);
+}
+
 export type StoreCustomerProfile = {
   user_id: string; name: string; phone: string; address: string; avatar_url?: string; created_at?: string;
 };
