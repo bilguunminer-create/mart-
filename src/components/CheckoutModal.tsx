@@ -11,6 +11,7 @@ interface CheckoutModalProps {
   items: CartItem[];
   orders: OrderDetails[];
   currentUser?: UserProfile | null;
+  activeLoyalty?: LoyaltyTier | null;
   dailyDiscountTotal: number;
   paymentSettings: { deliveryFee: number; freeDeliveryThreshold: number; bankName: string; accountNumber: string; iban: string; accountHolder: string };
   onReportPayment?: (orderId: string) => Promise<void>;
@@ -23,6 +24,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   items,
   orders,
   currentUser,
+  activeLoyalty,
   dailyDiscountTotal,
   paymentSettings,
   onReportPayment,
@@ -95,8 +97,14 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
       .reduce((sum, o) => sum + (o.total || 0), 0);
   }, [accountOrders]);
 
-  // Loyalty tier dynamically calculated for this account (phone or email)
+  // Loyalty tier for this checkout. A logged-in customer always uses the same
+  // tier already resolved for their account elsewhere in the app (activeLoyalty),
+  // instead of recomputing it here from whatever phone/email happens to be typed
+  // into this form -- that recomputation only exists so a signed-out guest who
+  // types a phone number they have ordered under before can still be recognized.
   const accountLoyaltyTier = useMemo<LoyaltyTier | null>(() => {
+    if (currentUser) return activeLoyalty ?? null;
+
     const activeTiers = getStoredLoyaltyTiers();
     // Check manual override if any
     try {
@@ -114,7 +122,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     }
 
     return calculateLoyaltyTierBySpent(accountSpent, activeTiers);
-  }, [accountSpent, cleanEmail, cleanPhone]);
+  }, [accountSpent, cleanEmail, cleanPhone, currentUser, activeLoyalty]);
 
   if (!isOpen) return null;
 

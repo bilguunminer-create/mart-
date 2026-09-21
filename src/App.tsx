@@ -1629,6 +1629,7 @@ export default function App() {
         items={cart}
         orders={orders}
         currentUser={currentUser}
+        activeLoyalty={activeLoyalty}
         dailyDiscountTotal={dailyDiscountTotal}
         paymentSettings={checkoutSettings}
         onReportPayment={async (orderId) => {
