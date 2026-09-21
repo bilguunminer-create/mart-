@@ -1,36 +1,20 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { DEFAULT_STORE_LOGO } from '../data/brandAssets';
 
-export const BeeEmblemLogo: React.FC<{ 
-  className?: string; 
+export const BeeEmblemLogo: React.FC<{
+  className?: string;
   size?: number;
   alt?: string;
-}> = ({ 
-  className = "w-11 h-11", 
+  logoUrl?: string | null;
+}> = ({
+  className = "w-11 h-11",
   size = 44,
-  alt = "US&K Family Mart Logo"
+  alt = "US&K Family Mart Logo",
+  logoUrl
 }) => {
-  const [customLogo, setCustomLogo] = useState<string | null>(() => {
-    try {
-      return localStorage.getItem('usk_custom_logo') || DEFAULT_STORE_LOGO;
-    } catch {
-      return null;
-    }
-  });
+  const customLogo = logoUrl || DEFAULT_STORE_LOGO;
 
-  useEffect(() => {
-    const handleUpdate = () => {
-      try {
-        setCustomLogo(localStorage.getItem('usk_custom_logo') || null);
-      } catch {
-        // ignore
-      }
-    };
-    window.addEventListener('usk_branding_updated', handleUpdate);
-    return () => window.removeEventListener('usk_branding_updated', handleUpdate);
-  }, []);
-
-  // If user uploaded the exact original image file, render it directly
+  // If an admin-uploaded (or bundled default) logo image is set, render it directly
   if (customLogo) {
     return (
       <img

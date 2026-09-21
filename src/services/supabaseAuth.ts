@@ -263,6 +263,19 @@ export async function uploadProductImage(token: string, file: File) {
   return `${SUPABASE_URL}/storage/v1/object/public/product-images/${path}`;
 }
 
+export async function uploadBrandingImage(token: string, file: File, kind: 'logo' | 'banner') {
+  if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) throw new Error('Зөвхөн JPG, PNG эсвэл WEBP зураг оруулна.');
+  if (file.size > 8 * 1024 * 1024) throw new Error('Зургийн хэмжээ 8MB-аас бага байх ёстой.');
+  const path = `branding/${kind}/${crypto.randomUUID()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, '-')}`;
+  const response = await fetch(`${SUPABASE_URL}/storage/v1/object/product-images/${path}`, {
+    method: 'POST',
+    headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${token}`, 'Content-Type': file.type, 'x-upsert': 'false' },
+    body: file,
+  });
+  if (!response.ok) throw new Error('Зургийг серверт хадгалах боломжгүй байна.');
+  return `${SUPABASE_URL}/storage/v1/object/public/product-images/${path}`;
+}
+
 export async function uploadCategoryImage(token: string, file: File) {
   if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) throw new Error('Зөвхөн JPG, PNG эсвэл WEBP зураг оруулна.');
   if (file.size > 5 * 1024 * 1024) throw new Error('Зургийн хэмжээ 5MB-аас бага байх ёстой.');

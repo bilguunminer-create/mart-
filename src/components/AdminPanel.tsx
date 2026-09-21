@@ -41,7 +41,6 @@ import {
   Upload,
   MessageSquareText
 } from 'lucide-react';
-import { processImageFile } from '../utils/imageUtils';
 import { Product, OrderDetails, LoyaltyTier, ComboPack, ProductReview } from '../types';
 import {
   CATEGORIES,
@@ -61,6 +60,10 @@ interface AdminPanelProps {
   products: Product[];
   orders: OrderDetails[];
   memberProfiles?: Array<{ user_id: string; name: string; phone: string; address: string; created_at?: string }>;
+  storeLogoUrl?: string | null;
+  storeBannerUrl?: string | null;
+  onSaveBranding?: (kind: 'logo' | 'banner', file: File) => Promise<void>;
+  onResetBranding?: (kind: 'logo' | 'banner') => Promise<void>;
   categoryImages?: Record<string, string[]>;
   onSaveCategoryImages?: (categoryId: string, files: File[]) => Promise<void>;
   loyaltyWallets?: Array<{ user_id: string; available_points: number; lifetime_earned: number }>;
@@ -115,6 +118,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   products,
   orders,
   memberProfiles = [],
+  storeLogoUrl = null,
+  storeBannerUrl = null,
+  onSaveBranding,
+  onResetBranding,
   categoryImages = {},
   onSaveCategoryImages,
   loyaltyWallets = [],
@@ -321,23 +328,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     setTierOverrideTarget(null);
   };
 
-  // Branding Customization state (Exact user LOGO and Banner)
-  const [customLogoUrl, setCustomLogoUrl] = useState<string | null>(() => {
-    try {
-      return localStorage.getItem('usk_custom_logo') || null;
-    } catch {
-      return null;
-    }
-  });
-  const [customBannerUrl, setCustomBannerUrl] = useState<string | null>(() => {
-    try {
-      return localStorage.getItem('usk_custom_banner') || null;
-    } catch {
-      return null;
-    }
-  });
-  const [isUploadingBranding, setIsUploadingBranding] = useState(false);
+  // Branding: logo and banner uploads go to Supabase Storage and
+  // store_settings.data (store_logo_url / store_banner_url), not localStorage,
+  // so every visitor and every admin session sees the same real images.
+  const [uploadingBrandingKind, setUploadingBrandingKind] = useState<'logo' | 'banner' | null>(null);
   const [brandingStatusMsg, setBrandingStatusMsg] = useState<string | null>(null);
+  const [brandingErrorMsg, setBrandingErrorMsg] = useState<string | null>(null);
 
   // Category tile images: uploaded files go straight to Supabase Storage and
   // store_settings.data.category_images, never localStorage -- every visitor
@@ -361,63 +357,34 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   };
 
   const handleUploadBrandingImage = async (type: 'logo' | 'banner', file: File) => {
+    if (!onSaveBranding) return;
     if (!file.type.startsWith('image/')) {
-      alert('Зөвхөн зурган файл (PNG, JPG, WEBP) сонгоно уу.');
+      setBrandingErrorMsg('Зөвхөн зурган файл (PNG, JPG, WEBP) сонгоно уу.');
       return;
     }
-
+    setBrandingErrorMsg(null);
+    setUploadingBrandingKind(type);
     try {
-      setIsUploadingBranding(true);
-      setBrandingStatusMsg(`${type === 'logo' ? 'Лого' : 'Баннер'} файлыг боловсруулж байна...`);
-
-      // Compress/process to avoid blowing storage while maintaining sharpness
-      const maxDim = type === 'logo' ? 600 : 1600;
-      const base64Data = await processImageFile(file, maxDim, maxDim, 0.92);
-
-      // Save to localStorage
-      const storageKey = type === 'logo' ? 'usk_custom_logo' : 'usk_custom_banner';
-      try {
-        localStorage.setItem(storageKey, base64Data);
-      } catch {
-        // quota exceeded fallback
-      }
-
-      // Also persist to server endpoint
-      try {
-        await fetch('/api/upload-branding', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ type, dataBase64: base64Data })
-        });
-      } catch {
-        // ignore server network issues
-      }
-
-      if (type === 'logo') {
-        setCustomLogoUrl(base64Data);
-      } else {
-        setCustomBannerUrl(base64Data);
-      }
-
-      // Notify entire app of branding change
-      window.dispatchEvent(new Event('usk_branding_updated'));
-      setBrandingStatusMsg(`Таны ${type === 'logo' ? 'лого' : 'хаяг баннер'} амжилттай солигдлоо! Ямар ч өөрчлөлтгүйгээр суулаа.`);
+      await onSaveBranding(type, file);
+      setBrandingStatusMsg(`Таны ${type === 'logo' ? 'лого' : 'хаяг баннер'} амжилттай төв санд хадгалагдлаа.`);
       setTimeout(() => setBrandingStatusMsg(null), 3500);
-    } catch (err: any) {
-      alert('Зураг оруулахад алдаа гарлаа: ' + (err.message || ''));
+    } catch (error) {
+      setBrandingErrorMsg(error instanceof Error ? error.message : 'Зураг оруулахад алдаа гарлаа.');
     } finally {
-      setIsUploadingBranding(false);
+      setUploadingBrandingKind(null);
     }
   };
 
-  const handleResetBranding = (type: 'logo' | 'banner') => {
-    const storageKey = type === 'logo' ? 'usk_custom_logo' : 'usk_custom_banner';
-    localStorage.removeItem(storageKey);
-    if (type === 'logo') setCustomLogoUrl(null);
-    if (type === 'banner') setCustomBannerUrl(null);
-    window.dispatchEvent(new Event('usk_branding_updated'));
-    setBrandingStatusMsg(`${type === 'logo' ? 'Лого' : 'Баннер'}-г анхдагч хэв маягт буцаалаа.`);
-    setTimeout(() => setBrandingStatusMsg(null), 3000);
+  const handleResetBranding = async (type: 'logo' | 'banner') => {
+    if (!onResetBranding) return;
+    setBrandingErrorMsg(null);
+    try {
+      await onResetBranding(type);
+      setBrandingStatusMsg(`${type === 'logo' ? 'Лого' : 'Баннер'}-г анхдагч хэв маягт буцаалаа.`);
+      setTimeout(() => setBrandingStatusMsg(null), 3000);
+    } catch (error) {
+      setBrandingErrorMsg(error instanceof Error ? error.message : 'Сэргээх боломжгүй байна.');
+    }
   };
 
   // Group all orders by the Supabase user ID. This keeps a profile and all of
@@ -2128,6 +2095,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     <span className="font-bold">{brandingStatusMsg}</span>
                   </div>
                 )}
+                {brandingErrorMsg && (
+                  <div className="flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 p-3.5 text-xs text-rose-800">
+                    <span className="font-bold">{brandingErrorMsg}</span>
+                  </div>
+                )}
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {/* 1. LOGO UPLOAD */}
@@ -2137,7 +2109,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                         <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-amber-500 text-[10px] font-black text-white">1</span>
                         <span>Албан ёсны Лого (LOGO.png)</span>
                       </span>
-                      {customLogoUrl && (
+                      {storeLogoUrl && (
                         <button
                           onClick={() => handleResetBranding('logo')}
                           className="text-[11px] text-rose-600 hover:underline font-bold"
@@ -2149,9 +2121,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
                     {/* Preview */}
                     <div className="h-28 w-full bg-stone-950 rounded-xl flex items-center justify-center p-2 border border-dashed border-stone-700 overflow-hidden">
-                      {customLogoUrl ? (
+                      {storeLogoUrl ? (
                         <img
-                          src={customLogoUrl}
+                          src={storeLogoUrl}
                           alt="Custom Logo"
                           className="max-h-full max-w-full object-contain"
                           referrerPolicy="no-referrer"
@@ -2166,12 +2138,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
                     <label className="w-full flex items-center justify-center gap-2 px-3 py-2.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold rounded-xl border border-amber-300 cursor-pointer shadow-xs transition-all">
                       <Upload className="w-4 h-4" />
-                      <span>{customLogoUrl ? 'LOGO.png файлаа дахин солих' : 'LOGO.png файл сонгож оруулах'}</span>
+                      <span>{uploadingBrandingKind === 'logo' ? 'Хадгалж байна...' : storeLogoUrl ? 'LOGO.png файлаа дахин солих' : 'LOGO.png файл сонгож оруулах'}</span>
                       <input
                         type="file"
                         accept="image/*"
                         className="hidden"
-                        disabled={isUploadingBranding}
+                        disabled={uploadingBrandingKind !== null}
                         onChange={(e) => {
                           if (e.target.files && e.target.files[0]) {
                             handleUploadBrandingImage('logo', e.target.files[0]);
@@ -2180,7 +2152,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       />
                     </label>
                     <p className="text-[10px] text-stone-500 text-center">
-                      Таны оруулсан файл яг тэр чигтээ дээд навигаци, доод footer, баннер дээр харагдана.
+                      Таны оруулсан файл төв санд хадгалагдаж, дээд навигаци, доод footer, баннер дээр бүх хэрэглэгчид харагдана.
                     </p>
                   </div>
 
@@ -2191,7 +2163,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                         <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-indigo-500 text-[10px] font-black text-white">2</span>
                         <span>Дэлгүүрийн Хаяг (delguur_hayg.png)</span>
                       </span>
-                      {customBannerUrl && (
+                      {storeBannerUrl && (
                         <button
                           onClick={() => handleResetBranding('banner')}
                           className="text-[11px] text-rose-600 hover:underline font-bold"
@@ -2203,9 +2175,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
                     {/* Preview */}
                     <div className="h-28 w-full bg-stone-950 rounded-xl flex items-center justify-center p-2 border border-dashed border-stone-700 overflow-hidden">
-                      {customBannerUrl ? (
+                      {storeBannerUrl ? (
                         <img
-                          src={customBannerUrl}
+                          src={storeBannerUrl}
                           alt="Custom Store Banner"
                           className="max-h-full max-w-full object-contain"
                           referrerPolicy="no-referrer"
@@ -2220,12 +2192,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
                     <label className="w-full flex items-center justify-center gap-2 px-3 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl border border-indigo-300 cursor-pointer shadow-xs transition-all">
                       <Upload className="w-4 h-4" />
-                      <span>{customBannerUrl ? 'Хаяг баннераа дахин солих' : 'delguur_hayg.png файл сонгох'}</span>
+                      <span>{uploadingBrandingKind === 'banner' ? 'Хадгалж байна...' : storeBannerUrl ? 'Хаяг баннераа дахин солих' : 'delguur_hayg.png файл сонгох'}</span>
                       <input
                         type="file"
                         accept="image/*"
                         className="hidden"
-                        disabled={isUploadingBranding}
+                        disabled={uploadingBrandingKind !== null}
                         onChange={(e) => {
                           if (e.target.files && e.target.files[0]) {
                             handleUploadBrandingImage('banner', e.target.files[0]);
@@ -2234,7 +2206,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       />
                     </label>
                     <p className="text-[10px] text-stone-500 text-center">
-                      Нүүр хуудасны дээд талд таны дэлгүүрийн жинхэнэ хаяг ямар ч өөрчлөлтгүй шууд тавигдана.
+                      Нүүр хуудасны дээд талд таны дэлгүүрийн жинхэнэ хаяг төв санд хадгалагдаж, бүх хэрэглэгчид адилхан харагдана.
                     </p>
                   </div>
                 </div>

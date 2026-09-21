@@ -23,6 +23,7 @@ interface HeaderProps {
   dailyDealTitle: string;
   storePhone: string;
   freeDeliveryThreshold: number;
+  logoUrl?: string | null;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -43,7 +44,8 @@ export const Header: React.FC<HeaderProps> = ({
   setSelectedDay,
   dailyDealTitle,
   storePhone,
-  freeDeliveryThreshold
+  freeDeliveryThreshold,
+  logoUrl
 }) => {
   const logoClickCountRef = useRef(0);
   const logoTimerRef = useRef<any>(null);
@@ -120,7 +122,7 @@ export const Header: React.FC<HeaderProps> = ({
             title="US&K Family Mart"
           >
             <div className="relative group-hover:scale-105 transition-transform shrink-0">
-              <BeeEmblemLogo size={46} className="w-11 h-11" />
+              <BeeEmblemLogo size={46} className="w-11 h-11" logoUrl={logoUrl} />
             </div>
             <div>
               <div className="flex items-center gap-2">

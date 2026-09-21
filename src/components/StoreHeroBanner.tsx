@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { MapPin, Clock, Phone, Sparkles } from 'lucide-react';
 import { BeeEmblemLogo } from './BeeEmblemLogo';
 import { DEFAULT_STORE_BANNER } from '../data/brandAssets';
@@ -6,30 +6,14 @@ import { DEFAULT_STORE_BANNER } from '../data/brandAssets';
 interface StoreHeroBannerProps {
   onExploreClick?: () => void;
   storePhone?: string;
+  logoUrl?: string | null;
+  bannerUrl?: string | null;
 }
 
-export const StoreHeroBanner: React.FC<StoreHeroBannerProps> = ({ onExploreClick, storePhone = '7700-1122' }) => {
-  const [customBanner, setCustomBanner] = useState<string | null>(() => {
-    try {
-      return localStorage.getItem('usk_custom_banner') || DEFAULT_STORE_BANNER;
-    } catch {
-      return null;
-    }
-  });
+export const StoreHeroBanner: React.FC<StoreHeroBannerProps> = ({ onExploreClick, storePhone = '7700-1122', logoUrl, bannerUrl }) => {
+  const customBanner = bannerUrl || DEFAULT_STORE_BANNER;
 
-  useEffect(() => {
-    const handleUpdate = () => {
-      try {
-        setCustomBanner(localStorage.getItem('usk_custom_banner') || null);
-      } catch {
-        // ignore
-      }
-    };
-    window.addEventListener('usk_branding_updated', handleUpdate);
-    return () => window.removeEventListener('usk_branding_updated', handleUpdate);
-  }, []);
-
-  // If user uploaded the exact original delguur_hayg.png file, show the raw full image directly
+  // If an admin-uploaded (or bundled default) banner image is set, show the raw full image directly
   if (customBanner) {
     return (
       <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl shadow-xl border border-stone-800 bg-stone-950">
@@ -98,7 +82,7 @@ export const StoreHeroBanner: React.FC<StoreHeroBannerProps> = ({ onExploreClick
             {/* Ambient glow behind logo */}
             <div className="absolute -inset-2 rounded-full bg-amber-500/20 blur-xl group-hover:bg-amber-500/30 transition-all pointer-events-none" />
             <div className="relative bg-stone-900/90 p-2 sm:p-2.5 rounded-2xl border border-amber-500/40 shadow-inner">
-              <BeeEmblemLogo size={74} className="w-16 h-16 sm:w-20 sm:h-20" />
+              <BeeEmblemLogo size={74} className="w-16 h-16 sm:w-20 sm:h-20" logoUrl={logoUrl} />
             </div>
           </div>
 

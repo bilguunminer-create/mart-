@@ -52,7 +52,7 @@ import { BeeEmblemLogo } from './components/BeeEmblemLogo';
 const InventoryCameraModal = React.lazy(() =>
   import('./components/InventoryCameraModal').then((m) => ({ default: m.InventoryCameraModal }))
 );
-import { getStoreCustomerProfiles, getStoreOrders, getStoreSettings, saveStoreOrder, saveStoreProducts, saveStoreSettings, hasStoreAdminAccess, refreshSession, reportStoreOrderPayment, updateStoreOrderStatus, confirmStoreOrderPayment, verifyAdminPin, changeAdminPin, expireUnpaidOrdersAsAdmin, getAllReviewsForAdmin, moderateProductReview, deleteProductReview, getProductReviews, adminListLoyaltyWallets, adminGrantLoyaltyPoints, AdminLoyaltyWallet, uploadCategoryImage } from './services/supabaseAuth';
+import { getStoreCustomerProfiles, getStoreOrders, getStoreSettings, saveStoreOrder, saveStoreProducts, saveStoreSettings, hasStoreAdminAccess, refreshSession, reportStoreOrderPayment, updateStoreOrderStatus, confirmStoreOrderPayment, verifyAdminPin, changeAdminPin, expireUnpaidOrdersAsAdmin, getAllReviewsForAdmin, moderateProductReview, deleteProductReview, getProductReviews, adminListLoyaltyWallets, adminGrantLoyaltyPoints, AdminLoyaltyWallet, uploadCategoryImage, uploadBrandingImage } from './services/supabaseAuth';
 import { initAdminPushNotifications } from './services/pushNotifications';
 
 export default function App() {
@@ -79,6 +79,8 @@ export default function App() {
   const [comboPacks, setComboPacks] = useState<ComboPack[]>(COMBOS);
   const [featuredProductId, setFeaturedProductId] = useState('');
   const [categoryImages, setCategoryImages] = useState<Record<string, string[]>>({});
+  const [storeLogoUrl, setStoreLogoUrl] = useState<string | null>(null);
+  const [storeBannerUrl, setStoreBannerUrl] = useState<string | null>(null);
   const [checkoutSettings, setCheckoutSettings] = useState<{ deliveryFee: number; freeDeliveryThreshold: number; bankName: string; accountNumber: string; iban: string; accountHolder: string; storePhone: string; storeEmail: string; facebookUrl: string; messengerUrl: string; googleMapsUrl: string; storeAddress: string; unpaidCancellationMinutes: number }>({
     deliveryFee: 3000, freeDeliveryThreshold: STORE_CONFIG.free_delivery_threshold, bankName: '', accountNumber: '', iban: '', accountHolder: '', storePhone: STORE_CONFIG.phone, storeEmail: '', facebookUrl: '', messengerUrl: '', googleMapsUrl: '', storeAddress: STORE_CONFIG.location, unpaidCancellationMinutes: 60,
   });
@@ -90,6 +92,8 @@ export default function App() {
       if (savedCategoryImages && typeof savedCategoryImages === 'object') {
         setCategoryImages(savedCategoryImages as Record<string, string[]>);
       }
+      setStoreLogoUrl(settings.data.store_logo_url ? String(settings.data.store_logo_url) : null);
+      setStoreBannerUrl(settings.data.store_banner_url ? String(settings.data.store_banner_url) : null);
       const remoteProducts = settings.data.products;
       if (!Array.isArray(remoteProducts)) return;
       setProducts(remoteProducts.map((product: any) => {
@@ -902,7 +906,7 @@ export default function App() {
     if (!isAdminAuthenticated) {
       return (
         <div className="min-h-screen bg-stone-950 flex flex-col items-center justify-center gap-6 p-6 text-center">
-          <BeeEmblemLogo size={64} className="w-16 h-16" />
+          <BeeEmblemLogo size={64} className="w-16 h-16" logoUrl={storeLogoUrl} />
           <div>
             <h1 className="text-xl font-black text-white">US&K Агуулах</h1>
             <p className="text-sm text-stone-400 mt-1">Зөвхөн ажилтны админ бүртгэлээр нэвтэрнэ</p>
@@ -1066,12 +1070,15 @@ export default function App() {
         dailyDealTitle={currentDeal.title}
         storePhone={checkoutSettings.storePhone}
         freeDeliveryThreshold={checkoutSettings.freeDeliveryThreshold}
+        logoUrl={storeLogoUrl}
       />
 
       {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 py-6 space-y-8">
         {/* Official Store Banner: US&K Family Mart Даланзадгад хот */}
         <StoreHeroBanner
+          logoUrl={storeLogoUrl}
+          bannerUrl={storeBannerUrl}
           onExploreClick={() => {
             const el = document.getElementById('catalog-section');
             if (el) el.scrollIntoView({ behavior: 'smooth' });
@@ -1457,7 +1464,7 @@ export default function App() {
           <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 pb-8 border-b border-stone-800">
             <div className="space-y-2">
               <div className="flex items-center gap-3">
-                <BeeEmblemLogo size={38} className="w-9 h-9 shrink-0" />
+                <BeeEmblemLogo size={38} className="w-9 h-9 shrink-0" logoUrl={storeLogoUrl} />
                 <div>
                   <span className="font-black text-white text-lg tracking-tight block">US&K Family Mart</span>
                   <span className="text-[10px] text-amber-400 font-bold uppercase tracking-wider">Даланзадгад хот • 09:00 - 20:00</span>
@@ -1747,6 +1754,23 @@ export default function App() {
           products={products}
           orders={orders}
           memberProfiles={memberProfiles}
+          storeLogoUrl={storeLogoUrl}
+          storeBannerUrl={storeBannerUrl}
+          onSaveBranding={async (kind, file) => {
+            if (!currentUser?.accessToken) throw new Error('Админ и-мэйлээр нэвтэрнэ үү.');
+            const token = currentUser.accessToken;
+            const url = await uploadBrandingImage(token, file, kind);
+            await saveStoreSettings(token, kind === 'logo' ? { store_logo_url: url } : { store_banner_url: url });
+            if (kind === 'logo') setStoreLogoUrl(url); else setStoreBannerUrl(url);
+            showToast(`${kind === 'logo' ? 'Лого' : 'Хаяг баннер'} төв санд хадгалагдлаа.`);
+          }}
+          onResetBranding={async (kind) => {
+            if (!currentUser?.accessToken) throw new Error('Админ и-мэйлээр нэвтэрнэ үү.');
+            const token = currentUser.accessToken;
+            await saveStoreSettings(token, kind === 'logo' ? { store_logo_url: null } : { store_banner_url: null });
+            if (kind === 'logo') setStoreLogoUrl(null); else setStoreBannerUrl(null);
+            showToast(`${kind === 'logo' ? 'Лого' : 'Хаяг баннер'} үндсэн зураг руу сэргээгдлээ.`);
+          }}
           categoryImages={categoryImages}
           onSaveCategoryImages={async (categoryId, files) => {
             if (!currentUser?.accessToken) throw new Error('Админ и-мэйлээр нэвтэрнэ үү.');
