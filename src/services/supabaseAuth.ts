@@ -189,7 +189,7 @@ export async function confirmStoreOrderPayment(token: string, orderId: string) {
 export async function updateStoreOrderStatus(token: string, orderId: string, status: string) {
   await request('/rest/v1/rpc/store_order_status', {
     method: 'POST',
-    body: JSON.stringify({ order_id: orderId, next_status: status }),
+    body: JSON.stringify({ p_order_id: orderId, p_next_status: status }),
   }, token);
 }
 
