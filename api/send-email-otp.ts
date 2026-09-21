@@ -13,8 +13,11 @@ const globalOtpStore = (global as any).__otpStore || new Map<string, { code: str
 function getOtpSecret(): string {
   const secret = process.env.OTP_SECRET;
   if (!secret) {
-    console.warn('[Email OTP] OTP_SECRET тохируулаагүй тул түр зуурын анхдагч түлхүүр ашиглаж байна. Production дээр OTP_SECRET-ийг заавал тохируулна уу.');
-    return 'usk-mart-static-otp-v1';
+    // A hardcoded fallback here would let anyone who has read this source
+    // compute a valid OTP verification signature for any email, bypassing
+    // the emailed code entirely -- refuse to run rather than silently
+    // accept forgeable tokens.
+    throw new Error('OTP_SECRET тохируулаагүй байна. Vercel-ийн Environment Variables-д OTP_SECRET-ийг заавал тохируулна уу.');
   }
   return secret;
 }

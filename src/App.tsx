@@ -227,6 +227,7 @@ export default function App() {
           customerId: order.customer_id,
           customerName: order.customer_name,
           phone: order.phone,
+          email: order.email,
           address: order.address,
           district: 'Өмнөговь, Даланзадгад',
           notes: order.note || '',
@@ -475,7 +476,7 @@ export default function App() {
     try {
       if (!await hasStoreAdminAccess(currentUser.accessToken)) {
         setIsProfileOpen(true);
-        showToast('Энэ бүртгэл админ эрхгүй байна. uskfamilymart@gmail.com эсвэл bilguunminer@gmail.com хаягаар нэвтэрнэ үү.');
+        showToast('Энэ бүртгэл админ эрхгүй байна. Зөвшөөрөгдсөн админ и-мэйл хаягаараа нэвтэрнэ үү.');
         return;
       }
     } catch {
@@ -1624,6 +1625,7 @@ export default function App() {
           const savedOrder = await saveStoreOrder(currentUser.accessToken, {
             customerName: order.customerName,
             phone: order.phone,
+            email: order.email,
             address: order.address,
             notes: order.notes,
             deliveryMode: order.district === 'Өмнөговь, Даланзадгад' ? 'delivery' : 'vehicle',

@@ -88,7 +88,7 @@ export async function updatePassword(token: string, password: string) {
 }
 
 export async function saveStoreOrder(token: string, order: {
-  customerName: string; phone: string; address: string; notes: string;
+  customerName: string; phone: string; email?: string; address: string; notes: string;
   deliveryMode?: 'delivery' | 'vehicle';
   total: number; pointsToUse?: number; items: Array<{ id: string; quantity: number }>;
 }) {
@@ -97,6 +97,7 @@ export async function saveStoreOrder(token: string, order: {
     expectedTotal: Math.round(order.total),
     name: order.customerName,
     phone: order.phone.replace(/\D/g, '').slice(-8),
+    email: order.email ? order.email.trim().toLowerCase() : undefined,
     address: order.address,
     note: order.notes || '',
     deliveryMode: order.deliveryMode || 'delivery',
@@ -145,7 +146,7 @@ export type StoreCustomerProfile = {
 };
 
 export type StoreOrderRecord = {
-  id: string; order_number?: number; customer_id: string; customer_name: string; phone: string; address: string;
+  id: string; order_number?: number; customer_id: string; customer_name: string; phone: string; email?: string; address: string;
   note: string; items: Array<{ productId: string; title: string; quantity: number; price: number }>;
   subtotal: number; daily_discount: number; vip_discount: number; delivery_fee: number;
   total: number; created_at: string; status: string; payment_status?: string; payment_reported_at?: string | null;
@@ -361,7 +362,14 @@ export async function uploadProfileImage(token: string, file: File) {
 }
 
 export async function saveProfileAvatar(token: string, avatarUrl: string) {
-  await request('/rest/v1/customer_profiles?user_id=eq.' + encodeURIComponent(JSON.parse(atob(token.split('.')[1])).sub), {
+  let userId: string;
+  try {
+    userId = JSON.parse(atob(token.split('.')[1])).sub;
+    if (!userId) throw new Error('empty sub');
+  } catch {
+    throw new Error('Хэрэглэгчийн бүртгэл баталгаажаагүй байна. Дахин нэвтэрнэ үү.');
+  }
+  await request('/rest/v1/customer_profiles?user_id=eq.' + encodeURIComponent(userId), {
     method: 'PATCH', body: JSON.stringify({ avatar_url: avatarUrl }),
   }, token);
 }
