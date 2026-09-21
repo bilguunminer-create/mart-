@@ -7,6 +7,7 @@ export interface Product {
   country: string;
   flag: string;
   price: number;
+  old_price?: number;
   weight: string;
   badge: string;
   badge_color: string;

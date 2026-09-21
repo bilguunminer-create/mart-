@@ -691,15 +691,19 @@ export default function App() {
         : currentDeal?.category === product.category
     );
     const discountPercent = isDealActive ? (currentDeal?.discount_percent || 10) : 0;
-    const finalPrice = discountPercent > 0 
+    const finalPrice = discountPercent > 0
       ? Math.round(product.price * (1 - discountPercent / 100))
       : product.price;
 
+    // A standing sale (admin-set old_price) only shows when today's rotating
+    // daily deal is not already discounting this product.
+    const hasStandingSale = !isDealActive && product.old_price != null && product.old_price > product.price;
+
     return {
       price: finalPrice,
-      originalPrice: product.price,
+      originalPrice: isDealActive ? product.price : (hasStandingSale ? product.old_price! : product.price),
       discountPercent,
-      isDealActive
+      isDealActive: isDealActive || hasStandingSale
     };
   };
 
@@ -892,7 +896,8 @@ export default function App() {
             ? product.day_deal === selectedDay
             : currentDeal.category === product.category
         );
-        if (!isDeal) return false;
+        const hasStandingSale = !isDeal && product.old_price != null && product.old_price > product.price;
+        if (!isDeal && !hasStandingSale) return false;
       }
 
       return true;

@@ -21,6 +21,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   const [category, setCategory] = useState('food');
   const [origin, setOrigin] = useState<'KR' | 'US'>('KR');
   const [price, setPrice] = useState<number>(0);
+  const [oldPrice, setOldPrice] = useState<number | ''>('');
   const [weight, setWeight] = useState('');
   const [badge, setBadge] = useState('');
   const [badgeColor, setBadgeColor] = useState('bg-rose-500');
@@ -47,6 +48,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       setCategory(productToEdit.category);
       setOrigin(productToEdit.origin);
       setPrice(productToEdit.price);
+      setOldPrice(productToEdit.old_price ?? '');
       setWeight(productToEdit.weight);
       setBadge(productToEdit.badge || '');
       setBadgeColor(productToEdit.badge_color || 'bg-rose-500');
@@ -71,6 +73,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       setCategory('food');
       setOrigin('KR');
       setPrice(5000);
+      setOldPrice('');
       setWeight('100г');
       setBadge('Шинэ');
       setBadgeColor('bg-rose-500');
@@ -136,6 +139,12 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       return;
     }
 
+    const cleanOldPrice = oldPrice === '' ? undefined : Number(oldPrice);
+    if (cleanOldPrice !== undefined && (isNaN(cleanOldPrice) || cleanOldPrice <= cleanPrice)) {
+      setFormError('Хуучин үнэ нь одоогийн үнээс их байх ёстой (эсвэл хоосон орхино уу).');
+      return;
+    }
+
     const cleanImage = image.trim();
     if (!cleanImage) {
       setFormError('Барааны зургийг оруулна уу (файлаар эсвэл линкээр).');
@@ -168,6 +177,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       country: origin === 'KR' ? 'БНСУ' : 'АНУ',
       flag: origin === 'KR' ? '🇰🇷' : '🇺🇸',
       price: cleanPrice,
+      old_price: cleanOldPrice,
       weight: weight.trim().slice(0, 50) || '1ш',
       badge: badge.trim().slice(0, 30),
       badge_color: badgeColor,
@@ -418,6 +428,24 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                 onChange={(e) => setPrice(Number(e.target.value))}
                 className="w-full px-3.5 py-2 text-xs border border-stone-300 rounded-xl focus:outline-none focus:border-rose-500 font-bold"
               />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-stone-800 mb-1">
+                Хуучин үнэ (хямдралын өмнөх, заавал биш)
+              </label>
+              <input
+                type="number"
+                min={100}
+                step={100}
+                placeholder="Жишээ: 18500"
+                value={oldPrice}
+                onChange={(e) => setOldPrice(e.target.value === '' ? '' : Number(e.target.value))}
+                className="w-full px-3.5 py-2 text-xs border border-stone-300 rounded-xl focus:outline-none focus:border-rose-500 font-bold"
+              />
+              <p className="text-[10px] text-stone-500 mt-1">
+                Дээрх Үнэ талбарт хямдарсан үнийг, энд хямдралаас өмнөх үнийг оруулна. Каталог дээр хуучин үнэ шугам татагдсан хэлбэрээр харагдана.
+              </p>
             </div>
 
             <div>

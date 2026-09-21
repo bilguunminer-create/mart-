@@ -32,10 +32,14 @@ export const ProductCard: React.FC<ProductCardProps> = ({
       : currentDeal?.category === product.category
   );
   const discountPercent = isDealActive ? (currentDeal?.discount_percent || 10) : 0;
-  
-  const finalPrice = discountPercent > 0 
+
+  const finalPrice = discountPercent > 0
     ? Math.round(product.price * (1 - discountPercent / 100))
     : product.price;
+
+  // A standing sale (admin-set old_price) only shows when today's rotating deal isn't already discounting this product.
+  const hasStandingSale = !isDealActive && product.old_price != null && product.old_price > product.price;
+  const standingSalePercent = hasStandingSale ? Math.round(((product.old_price! - product.price) / product.old_price!) * 100) : 0;
 
   const availableStock = product.stock_quantity !== undefined 
     ? product.stock_quantity 
@@ -73,6 +77,12 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           {isDealActive && !isOutOfStock && (
             <span className="bg-rose-600 text-white text-[10px] sm:text-xs font-black px-2 py-0.5 rounded-md shadow-xs animate-pulse">
               -{discountPercent}% Онцгой
+            </span>
+          )}
+
+          {hasStandingSale && !isOutOfStock && (
+            <span className="bg-rose-600 text-white text-[10px] sm:text-xs font-black px-2 py-0.5 rounded-md shadow-xs">
+              -{standingSalePercent}% Хямдрал
             </span>
           )}
 
@@ -153,6 +163,11 @@ export const ProductCard: React.FC<ProductCardProps> = ({
                 {isDealActive && (
                   <span className="text-xs text-stone-500 line-through">
                     {formatMNT(product.price)}
+                  </span>
+                )}
+                {hasStandingSale && (
+                  <span className="text-xs text-stone-500 line-through">
+                    {formatMNT(product.old_price!)}
                   </span>
                 )}
               </div>
