@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+@theme {
+  --font-serif: "Fraunces", ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
+}
+
 :root {
   color-scheme: light;
   -webkit-text-size-adjust: 100%;

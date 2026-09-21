@@ -46,9 +46,9 @@ export const ProductCard: React.FC<ProductCardProps> = ({
 
   return (
     <div className={`group relative flex flex-col bg-white rounded-2xl border transition-all duration-300 ${
-      isOutOfStock 
-        ? 'border-stone-200 opacity-80' 
-        : 'border-stone-200/90 hover:shadow-xl hover:border-rose-300'
+      isOutOfStock
+        ? 'border-stone-200 opacity-80'
+        : 'border-stone-200/90 hover:-translate-y-1.5 hover:shadow-xl hover:shadow-stone-900/10 hover:border-amber-300'
     }`}>
       {/* Top Image Container */}
       <div className="relative aspect-4/3 w-full bg-stone-100 overflow-hidden cursor-pointer" onClick={() => onOpenDetail(product)}>
@@ -130,7 +130,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           {/* Title */}
           <h3 
             onClick={() => onOpenDetail(product)}
-            className="font-bold text-stone-900 text-sm sm:text-base leading-snug line-clamp-2 hover:text-rose-600 transition-colors cursor-pointer"
+            className="font-serif font-semibold text-stone-900 text-sm sm:text-base leading-snug line-clamp-2 hover:text-rose-600 transition-colors cursor-pointer"
             title={product.name}
           >
             {product.name}

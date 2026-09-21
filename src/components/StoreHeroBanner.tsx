@@ -127,7 +127,7 @@ export const StoreHeroBanner: React.FC<StoreHeroBannerProps> = ({ onExploreClick
         <div className="flex-1 text-center lg:text-left flex flex-col items-center lg:items-start gap-3">
           {/* Main Title Badge: АМЕРИК & СОЛОНГОС БАРАА */}
           <div className="flex flex-wrap items-center justify-center lg:justify-start gap-2">
-            <h2 className="text-xl sm:text-3xl lg:text-4xl font-black tracking-tight text-white drop-shadow-md">
+            <h2 className="font-serif text-xl sm:text-3xl lg:text-4xl font-semibold tracking-tight text-white drop-shadow-md">
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-300 to-amber-500">АМЕРИК</span>
               {' & '}
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-rose-400 to-rose-500">СОЛОНГОС</span>

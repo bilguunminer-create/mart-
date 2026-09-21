@@ -163,7 +163,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               </span>
             </div>
 
-            <h3 className="text-xl sm:text-2xl font-black text-stone-900 leading-tight">
+            <h3 className="font-serif text-xl sm:text-2xl font-semibold text-stone-900 leading-tight">
               {product.name}
             </h3>
 
