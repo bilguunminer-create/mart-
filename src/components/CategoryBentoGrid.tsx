@@ -18,6 +18,17 @@ const CATEGORY_ICONS: Record<string, LucideIcon> = {
   beauty: Sparkle
 };
 
+// Real product photography representing each category, so the tiles show what's actually sold rather than generic icon art.
+const CATEGORY_IMAGES: Record<string, string> = {
+  food: '/categories/food.jpg',
+  drinks: '/categories/drinks.jpg',
+  vitamins: '/categories/vitamins.jpg',
+  baby: '/categories/baby.jpg',
+  household: '/categories/household.jpg',
+  snacks: '/categories/snacks.jpg',
+  beauty: '/categories/beauty.jpg'
+};
+
 // First tile renders as the large 2x2 hero cell; the rest fill the remaining grid cells.
 const HERO_CATEGORY_ID = 'food';
 
@@ -42,12 +53,23 @@ export const CategoryBentoGrid: React.FC<CategoryBentoGridProps> = ({ products, 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 auto-rows-[132px] sm:auto-rows-[150px]">
         <button
           onClick={() => onSelectCategory(heroTile.id)}
-          className="group col-span-2 row-span-2 rounded-2xl p-5 flex flex-col justify-between text-left bg-gradient-to-br from-amber-600 to-rose-700 text-white shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all cursor-pointer"
+          className="group relative col-span-2 row-span-2 rounded-2xl overflow-hidden text-left shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all cursor-pointer"
         >
-          <HeroIcon className="w-8 h-8 text-white/90" strokeWidth={1.6} />
-          <div>
-            <p className="font-serif font-semibold text-lg sm:text-xl leading-snug">{heroTile.name}</p>
-            <p className="text-xs text-white/80 mt-0.5">{countFor(heroTile.id)} бараа</p>
+          <img
+            src={CATEGORY_IMAGES[heroTile.id]}
+            alt={heroTile.name}
+            referrerPolicy="no-referrer"
+            className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-stone-950/85 via-stone-950/25 to-stone-950/10" />
+          <div className="relative h-full p-5 flex flex-col justify-between">
+            <span className="w-10 h-10 rounded-xl bg-white/15 backdrop-blur-xs flex items-center justify-center">
+              <HeroIcon className="w-5 h-5 text-white" strokeWidth={1.8} />
+            </span>
+            <div>
+              <p className="font-serif font-semibold text-lg sm:text-xl leading-snug text-white drop-shadow-sm">{heroTile.name}</p>
+              <p className="text-xs text-white/85 mt-0.5">{countFor(heroTile.id)} бараа</p>
+            </div>
           </div>
         </button>
 
@@ -57,12 +79,23 @@ export const CategoryBentoGrid: React.FC<CategoryBentoGridProps> = ({ products, 
             <button
               key={cat.id}
               onClick={() => onSelectCategory(cat.id)}
-              className="group rounded-2xl p-4 flex flex-col justify-between text-left bg-stone-100 hover:bg-amber-50 border border-stone-200/70 hover:border-amber-300 shadow-xs hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer"
+              className="group relative rounded-2xl overflow-hidden text-left shadow-xs hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer"
             >
-              <Icon className="w-6 h-6 text-stone-700 group-hover:text-amber-700 transition-colors" strokeWidth={1.6} />
-              <div>
-                <p className="font-bold text-stone-900 text-sm leading-snug">{cat.name}</p>
-                <p className="text-[11px] text-stone-500 mt-0.5">{countFor(cat.id)} бараа</p>
+              <img
+                src={CATEGORY_IMAGES[cat.id]}
+                alt={cat.name}
+                referrerPolicy="no-referrer"
+                className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-stone-950/80 via-stone-950/15 to-transparent" />
+              <div className="relative h-full p-4 flex flex-col justify-between">
+                <span className="w-8 h-8 rounded-lg bg-white/15 backdrop-blur-xs flex items-center justify-center">
+                  <Icon className="w-4 h-4 text-white" strokeWidth={1.8} />
+                </span>
+                <div>
+                  <p className="font-bold text-white text-sm leading-snug drop-shadow-sm">{cat.name}</p>
+                  <p className="text-[11px] text-white/80 mt-0.5">{countFor(cat.id)} бараа</p>
+                </div>
               </div>
             </button>
           );
