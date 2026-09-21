@@ -24,7 +24,7 @@ export const CombosSection: React.FC<CombosSectionProps> = ({
             <Sparkles className="w-4 h-4" />
             <span>Хэмнэлттэй багцууд</span>
           </div>
-          <h2 className="text-xl sm:text-2xl font-black text-stone-900 tracking-tight">
+          <h2 className="font-serif text-xl sm:text-2xl font-semibold text-stone-900 tracking-tight">
             Бэлэн Комбо Багцууд
           </h2>
           <p className="text-stone-500 text-xs sm:text-sm mt-0.5">

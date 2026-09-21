@@ -1047,7 +1047,7 @@ export default function App() {
         <section id="catalog-section" className="space-y-4 pt-4 border-t border-stone-200">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
             <div>
-              <h2 className="text-xl sm:text-2xl font-black text-stone-900 tracking-tight flex items-center gap-2">
+              <h2 className="font-serif text-xl sm:text-2xl font-semibold text-stone-900 tracking-tight flex items-center gap-2">
                 <span>Барааны Каталог</span>
                 <span className="text-xs font-bold text-stone-600 bg-stone-200 px-2 py-0.5 rounded-full">
                   {filteredProducts.length} бараа

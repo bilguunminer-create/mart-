@@ -38,7 +38,7 @@ export const DailyDealBanner: React.FC<DailyDealBannerProps> = ({
             </span>
           </div>
 
-          <h2 className="text-xl sm:text-2xl lg:text-3xl font-extrabold tracking-tight text-white">
+          <h2 className="font-serif text-xl sm:text-2xl lg:text-3xl font-semibold tracking-tight text-white">
             {deal.title} <span className="text-rose-400">-{deal.discount_percent}%</span>
           </h2>
 
