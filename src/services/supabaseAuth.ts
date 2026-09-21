@@ -88,7 +88,7 @@ export async function updatePassword(token: string, password: string) {
 }
 
 export async function saveStoreOrder(token: string, order: {
-  customerName: string; phone: string; email?: string; address: string; notes: string;
+  customerName: string; phone: string; address: string; notes: string;
   deliveryMode?: 'delivery' | 'vehicle';
   total: number; pointsToUse?: number; items: Array<{ id: string; quantity: number }>;
 }) {
@@ -97,7 +97,6 @@ export async function saveStoreOrder(token: string, order: {
     expectedTotal: Math.round(order.total),
     name: order.customerName,
     phone: order.phone.replace(/\D/g, '').slice(-8),
-    email: order.email ? order.email.trim().toLowerCase() : undefined,
     address: order.address,
     note: order.notes || '',
     deliveryMode: order.deliveryMode || 'delivery',

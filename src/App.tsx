@@ -1625,7 +1625,6 @@ export default function App() {
           const savedOrder = await saveStoreOrder(currentUser.accessToken, {
             customerName: order.customerName,
             phone: order.phone,
-            email: order.email,
             address: order.address,
             notes: order.notes,
             deliveryMode: order.district === 'Өмнөговь, Даланзадгад' ? 'delivery' : 'vehicle',
