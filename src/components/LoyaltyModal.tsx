@@ -33,9 +33,12 @@ export const LoyaltyModal: React.FC<LoyaltyModalProps> = ({
     });
   }, [orders, currentUser]);
 
+  // Tier progress counts only delivered orders, matching how it is computed
+  // everywhere else (checkout, profile, admin members list) -- a still-open
+  // order must not count toward a tier the customer has not actually earned yet.
   const totalSpent = useMemo(
     () => accountOrders
-      .filter((order) => order.status !== 'cancelled')
+      .filter((order) => order.status === 'delivered')
       .reduce((sum, order) => sum + (order.total || 0), 0),
     [accountOrders],
   );

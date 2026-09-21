@@ -458,20 +458,6 @@ export default function App() {
     }
   }, [cart]);
 
-  // Sync loyalty to localStorage
-  useEffect(() => {
-    try {
-      if (activeLoyalty) {
-        localStorage.setItem('gobi_mart_loyalty', JSON.stringify(activeLoyalty));
-      } else {
-        localStorage.removeItem('gobi_mart_loyalty');
-      }
-    } catch {
-      // ignore storage errors
-    }
-  }, [activeLoyalty]);
-
-
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => {
