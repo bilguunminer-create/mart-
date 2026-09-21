@@ -2,17 +2,17 @@ import React, { useEffect, useRef, useState } from 'react';
 import { X, Camera, Barcode, PackagePlus, MinusCircle, History, CheckCircle2, RefreshCw } from 'lucide-react';
 import { BrowserMultiFormatReader } from '@zxing/browser';
 import type { IScannerControls } from '@zxing/browser';
-import { addInventoryStock, deductInventoryByBarcode, getInventoryMovements, registerInventoryProduct, uploadProductImage, InventoryMovement } from '../services/supabaseAuth';
+import { addInventoryStock, deductInventoryByBarcode, getInventoryMovements, lookupInventoryBarcode, registerInventoryProduct, uploadProductImage, InventoryMovement } from '../services/supabaseAuth';
 import { CATEGORIES } from '../data/storeData';
-import { Product } from '../types';
 
-type Props = { isOpen: boolean; onClose: () => void; accessToken: string; onChanged: () => void; products: Product[] };
+type Props = { isOpen: boolean; onClose: () => void; accessToken: string; onChanged: () => void };
 type Tab = 'register' | 'deduct' | 'history';
+type LookedUpProduct = { id?: string; name?: string; price?: number; weight?: string; origin?: string; category?: string; category_name?: string; badge?: string; description?: string; stock?: number };
 const ORIGINS = ['АНУ', 'БНСУ'] as const;
 const REGISTER_CATEGORIES = CATEGORIES.filter((c) => c.id !== 'all');
 const blank = { name:'', stock:'', origin:'АНУ', category:REGISTER_CATEGORIES[0].id, category_name:REGISTER_CATEGORIES[0].name, price:'', weight:'', badge:'', day_deal:'-1', description:'', barcode:'' };
 
-export const InventoryCameraModal: React.FC<Props> = ({ isOpen, onClose, accessToken, onChanged, products }) => {
+export const InventoryCameraModal: React.FC<Props> = ({ isOpen, onClose, accessToken, onChanged }) => {
   const [tab,setTab]=useState<Tab>('register');
   const [step,setStep]=useState<1|2|3>(1);
   const [form,setForm]=useState(blank);
@@ -25,7 +25,8 @@ export const InventoryCameraModal: React.FC<Props> = ({ isOpen, onClose, accessT
   const [message,setMessage]=useState('');
   const [busy,setBusy]=useState(false);
   const [history,setHistory]=useState<InventoryMovement[]>([]);
-  const [restockOf,setRestockOf]=useState<Product|null>(null);
+  const [restockOf,setRestockOf]=useState<LookedUpProduct|null>(null);
+  const [lookingUp,setLookingUp]=useState(false);
   const [restockQty,setRestockQty]=useState('1');
   const videoRef=useRef<HTMLVideoElement|null>(null);
   const streamRef=useRef<MediaStream|null>(null);
@@ -47,26 +48,32 @@ export const InventoryCameraModal: React.FC<Props> = ({ isOpen, onClose, accessT
 
   // If this barcode was already registered before, pull its known details in so the
   // admin does not have to retype a product's name/price/etc. every time it is restocked.
-  const applyBarcode=(value:string):Product|null=>{
-    const existing=products.find(p=>p.barcode===value)||null;
+  // Barcodes map to products through a separate inventory_barcodes table server-side
+  // (not a field on the product itself), so this has to be a real lookup call, not a
+  // search through the locally-known product list.
+  const applyBarcode=async(value:string):Promise<LookedUpProduct|null>=>{
+    setField('barcode',value);
+    setLookingUp(true);
+    let existing:LookedUpProduct|null=null;
+    try { existing=(await lookupInventoryBarcode(accessToken,value)) as LookedUpProduct|null; } catch { existing=null; }
+    setLookingUp(false);
     setRestockOf(existing);
     setRestockQty('1');
     if(existing){
       setForm(current=>({
         ...current,
         barcode:value,
-        name:existing.name,
-        price:String(existing.price),
-        weight:existing.weight,
-        origin:existing.origin==='KR'?'БНСУ':'АНУ',
-        category:existing.category,
-        category_name:existing.category_name,
-        badge:existing.badge||'',
-        description:existing.description||'',
+        name:existing!.name||'',
+        price:existing!.price!=null?String(existing!.price):'',
+        weight:existing!.weight||'',
+        origin:existing!.origin==='KR'?'БНСУ':'АНУ',
+        category:existing!.category||current.category,
+        category_name:existing!.category_name||current.category_name,
+        badge:existing!.badge||'',
+        description:existing!.description||'',
       }));
       setMessage(`"${existing.name}" энэ barcode-оор өмнө бүртгэгдсэн байна. Доор зөвхөн нэмж ирсэн тоо ширхэгээ оруулаад үлдэгдэлд нэмээрэй.`);
     } else {
-      setField('barcode',value);
       setMessage('Код амжилттай уншигдлаа: '+value);
     }
     return existing;
@@ -105,11 +112,10 @@ export const InventoryCameraModal: React.FC<Props> = ({ isOpen, onClose, accessT
       if(videoRef.current){ videoRef.current.srcObject=stream; await videoRef.current.play(); }
 
       const handleDetected=(value:string)=>{
-        if(target==='register'){
-          const existing=applyBarcode(value);
-          window.setTimeout(()=>setStep(existing?3:2),600);
-        } else { setScan(value); setMessage('Код амжилттай уншигдлаа: '+value); }
         stopCamera();
+        if(target==='register'){
+          void applyBarcode(value).then((existing)=>window.setTimeout(()=>setStep(existing?3:2),600));
+        } else { setScan(value); setMessage('Код амжилттай уншигдлаа: '+value); }
       };
 
       // The native BarcodeDetector API is fast when available, but many WebViews
@@ -180,7 +186,7 @@ export const InventoryCameraModal: React.FC<Props> = ({ isOpen, onClose, accessT
           {step===1&&<section className="rounded-2xl border p-4">
             <h3 className="font-black">1. QR / Barcode</h3>
             <div className="mt-3 flex gap-2"><input value={form.barcode} onChange={e=>setField('barcode',e.target.value)} placeholder="Barcode эсвэл QR код" className="min-w-0 flex-1 rounded-xl border p-3"/><button onClick={()=>void startScanner('register')} className="rounded-xl bg-amber-400 px-3 font-bold"><Barcode/></button></div>
-            <button type="button" disabled={!form.barcode.trim()} onClick={()=>{stopCamera();const existing=applyBarcode(form.barcode.trim());setStep(existing?3:2);}} className="mt-3 w-full rounded-xl bg-stone-900 p-3 text-sm font-bold text-white disabled:bg-stone-300 cursor-pointer">Үргэлжлүүлэх →</button>
+            <button type="button" disabled={!form.barcode.trim()||lookingUp} onClick={()=>{stopCamera();void applyBarcode(form.barcode.trim()).then((existing)=>setStep(existing?3:2));}} className="mt-3 w-full rounded-xl bg-stone-900 p-3 text-sm font-bold text-white disabled:bg-stone-300 cursor-pointer">{lookingUp?'Шалгаж байна...':'Үргэлжлүүлэх →'}</button>
           </section>}
 
           {step===2&&<section className="rounded-2xl border p-4"><h3 className="font-black">2. Барааны зураг</h3>{preview&&<img src={preview} className="mt-3 h-48 w-full rounded-xl object-cover" />}
@@ -192,7 +198,7 @@ export const InventoryCameraModal: React.FC<Props> = ({ isOpen, onClose, accessT
           {step===3&&restockOf&&<>
             <section className="rounded-2xl border border-amber-300 bg-amber-50 p-4">
               <div className="mb-1 flex items-center justify-between"><h3 className="font-black">Үлдэгдэлд нэмэх</h3><button type="button" onClick={()=>{setRestockOf(null);setStep(1);}} className="text-xs font-bold text-stone-500 cursor-pointer">← Буцах</button></div>
-              <p className="mt-1 text-sm font-bold text-stone-900">{restockOf.name}</p>
+              <p className="mt-1 text-sm font-bold text-stone-900">{restockOf.name||form.barcode}</p>
               <p className="text-xs text-stone-600">Энэ barcode аль хэдийн бүртгэлтэй тул шинэ бараа биш, зөвхөн ирсэн тоог одоо байгаа үлдэгдэлд нэмнэ.</p>
               <label className="mt-3 block text-xs font-bold">Нэмэгдэж ирсэн тоо ширхэг<input type="number" min="1" value={restockQty} onChange={e=>setRestockQty(e.target.value)} className="mt-1 w-full rounded-xl border p-3 font-normal"/></label>
               <label className="mt-3 block text-xs font-bold">Тайлбар (заавал биш)<textarea value={note} onChange={e=>setNote(e.target.value)} className="mt-1 w-full rounded-xl border p-3 font-normal"/></label>

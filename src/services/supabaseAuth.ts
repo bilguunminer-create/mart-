@@ -262,7 +262,13 @@ export async function deductInventoryByBarcode(token: string, barcode: string, q
 
 export async function addInventoryStock(token: string, barcode: string, quantity: number, note = '') {
   return request<Record<string, unknown>>('/rest/v1/rpc/admin_inventory_add_stock', {
-    method: 'POST', body: JSON.stringify({ scan_code: barcode, add_quantity: quantity, movement_note: note }),
+    method: 'POST', body: JSON.stringify({ scan_code: barcode, addition_quantity: quantity, movement_note: note }),
+  }, token);
+}
+
+export async function lookupInventoryBarcode(token: string, barcode: string) {
+  return request<Record<string, unknown> | null>('/rest/v1/rpc/admin_lookup_barcode', {
+    method: 'POST', body: JSON.stringify({ scan_code: barcode }),
   }, token);
 }
 

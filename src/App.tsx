@@ -933,7 +933,6 @@ export default function App() {
           <React.Suspense fallback={null}>
             <InventoryCameraModal
               isOpen={isInventoryOpen}
-              products={products}
               onClose={() => setIsInventoryOpen(false)}
               accessToken={currentUser.accessToken}
               onChanged={() => {
@@ -1813,7 +1812,6 @@ export default function App() {
         <React.Suspense fallback={null}>
           <InventoryCameraModal
             isOpen={isInventoryOpen}
-            products={products}
             onClose={() => setIsInventoryOpen(false)}
             accessToken={currentUser.accessToken}
             onChanged={() => {
