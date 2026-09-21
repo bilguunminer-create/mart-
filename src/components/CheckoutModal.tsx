@@ -432,28 +432,17 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                         </span>
                       </div>
                     )}
+
+                    <div className="flex items-center justify-between rounded-xl bg-white/70 p-2 border border-stone-200">
+                      <span className="text-stone-700 font-medium">Боломжтой бонус оноо:</span>
+                      <span className="font-black text-emerald-700">{formatMNT(walletPoints)}</span>
+                    </div>
+                    <button type="button" disabled={walletPoints <= 0} onClick={() => setUsePoints((value) => !value)}
+                      className={`w-full rounded-xl border px-3 py-2 text-xs font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${usePoints ? 'border-emerald-600 bg-emerald-600 text-white' : 'border-emerald-200 bg-white text-emerald-800'}`}>
+                      {usePoints ? `✓ Бүх бонус ашиглаж байна (${formatMNT(pointsDiscount)})` : 'Бүх бонус ашиглах'}
+                    </button>
                   </div>
                 )}
-
-                <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-3 space-y-2">
-                    <div className="text-xs text-emerald-950">
-                      <strong className="block">Боломжтой бонус оноо: {formatMNT(walletPoints)}</strong>
-                      <span>Бонусоо энэ захиалгад ашиглах эсэхээ сонгоно уу.</span>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <button type="button" disabled={walletPoints <= 0} onClick={() => setUsePoints(true)}
-                        className={`rounded-xl border px-3 py-2 text-xs font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${usePoints ? 'border-emerald-600 bg-emerald-600 text-white' : 'border-emerald-200 bg-white text-emerald-800'}`}>
-                        Ашиглах
-                      </button>
-                      <button type="button" onClick={() => setUsePoints(false)}
-                        className={`rounded-xl border px-3 py-2 text-xs font-bold transition-colors ${!usePoints ? 'border-stone-700 bg-stone-800 text-white' : 'border-stone-200 bg-white text-stone-700'}`}>
-                        Үргэлжлүүлэн хуримтлуулах
-                      </button>
-                    </div>
-                    <p className="text-[11px] text-emerald-800">
-                      {usePoints ? `Энэ захиалгад ${formatMNT(pointsDiscount)} бонус оноо ашиглана.` : 'Бонус оноо таны дансанд бүрэн хадгалагдана.'}
-                    </p>
-                  </div>
 
                 <div>
                   <label className="block text-xs font-semibold text-stone-700 mb-1">
