@@ -690,62 +690,8 @@ export const LOYALTY_TIERS: LoyaltyTier[] = [
   }
 ];
 
-export const getStoredLoyaltyTiers = (): LoyaltyTier[] => {
-  try {
-    const saved = localStorage.getItem('usk_loyalty_tiers_config');
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed;
-      }
-    }
-  } catch {
-    // fallback
-  }
-  return LOYALTY_TIERS;
-};
-
-export const saveStoredLoyaltyTiers = (tiers: LoyaltyTier[]): void => {
-  try {
-    localStorage.setItem('usk_loyalty_tiers_config', JSON.stringify(tiers));
-    window.dispatchEvent(new CustomEvent('usk_loyalty_config_updated', { detail: { tiers } }));
-  } catch (err) {
-    console.error('Failed to save loyalty tiers', err);
-  }
-};
-
-export const resetStoredLoyaltyTiers = (): LoyaltyTier[] => {
-  try {
-    localStorage.removeItem('usk_loyalty_tiers_config');
-    localStorage.removeItem('usk_loyalty_cashback_pct');
-    window.dispatchEvent(new CustomEvent('usk_loyalty_config_updated', { detail: { tiers: LOYALTY_TIERS } }));
-  } catch (err) {
-    console.error('Failed to reset loyalty tiers', err);
-  }
-  return LOYALTY_TIERS;
-};
-
-export const getStoredCashbackPct = (): number => {
-  try {
-    const saved = localStorage.getItem('usk_loyalty_cashback_pct');
-    if (saved !== null) return Number(saved);
-  } catch {
-    // fallback
-  }
-  return 0;
-};
-
-export const saveStoredCashbackPct = (pct: number): void => {
-  try {
-    localStorage.setItem('usk_loyalty_cashback_pct', String(pct));
-    window.dispatchEvent(new CustomEvent('usk_loyalty_config_updated', { detail: { cashbackPct: pct } }));
-  } catch (err) {
-    console.error('Failed to save cashback pct', err);
-  }
-};
-
 export const calculateLoyaltyTierBySpent = (totalSpent: number, tiers?: LoyaltyTier[]): LoyaltyTier | null => {
-  const currentTiers = tiers || getStoredLoyaltyTiers();
+  const currentTiers = tiers && tiers.length > 0 ? tiers : LOYALTY_TIERS;
   // Sort descending by threshold
   const sorted = [...currentTiers].sort((a, b) => b.threshold - a.threshold);
   for (const tier of sorted) {

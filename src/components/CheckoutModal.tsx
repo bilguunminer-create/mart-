@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { X, CheckCircle2, QrCode, CreditCard, Banknote, Truck, ShieldCheck, Copy, Check, Printer, Award, Phone, Mail } from 'lucide-react';
 import { CartItem, LoyaltyTier, OrderDetails, UserProfile } from '../types';
-import { STORE_CONFIG, LOYALTY_TIERS, formatMNT, formatOrderNumber, getStoredLoyaltyTiers, calculateLoyaltyTierBySpent } from '../data/storeData';
+import { STORE_CONFIG, LOYALTY_TIERS, formatMNT, formatOrderNumber, calculateLoyaltyTierBySpent } from '../data/storeData';
 import { getLoyaltyWallet } from '../services/supabaseAuth';
 import { printOrderReceipt } from '../utils/printReceipt';
 
@@ -12,6 +12,7 @@ interface CheckoutModalProps {
   orders: OrderDetails[];
   currentUser?: UserProfile | null;
   activeLoyalty?: LoyaltyTier | null;
+  loyaltyTiers?: LoyaltyTier[];
   dailyDiscountTotal: number;
   paymentSettings: { deliveryFee: number; freeDeliveryThreshold: number; bankName: string; accountNumber: string; iban: string; accountHolder: string };
   onReportPayment?: (orderId: string) => Promise<void>;
@@ -25,6 +26,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   orders,
   currentUser,
   activeLoyalty,
+  loyaltyTiers,
   dailyDiscountTotal,
   paymentSettings,
   onReportPayment,
@@ -104,25 +106,11 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   // types a phone number they have ordered under before can still be recognized.
   const accountLoyaltyTier = useMemo<LoyaltyTier | null>(() => {
     if (currentUser) return activeLoyalty ?? null;
-
-    const activeTiers = getStoredLoyaltyTiers();
-    // Check manual override if any
-    try {
-      const saved = localStorage.getItem('usk_loyalty_bonuses');
-      if (saved) {
-        const bonuses = JSON.parse(saved);
-        const override = (cleanEmail && bonuses[cleanEmail]) || (cleanPhone && bonuses[`tel_${cleanPhone}`]);
-        if (override?.forceTier) {
-          const forced = activeTiers.find((t) => t.id === override.forceTier);
-          if (forced) return forced;
-        }
-      }
-    } catch {
-      // ignore
-    }
-
-    return calculateLoyaltyTierBySpent(accountSpent, activeTiers);
-  }, [accountSpent, cleanEmail, cleanPhone, currentUser, activeLoyalty]);
+    // A signed-out guest recognized by a repeat phone/email gets the tier their
+    // spend alone qualifies for; a manual admin override only applies once they
+    // are actually signed in, since overrides are keyed by the real account id.
+    return calculateLoyaltyTierBySpent(accountSpent, loyaltyTiers && loyaltyTiers.length > 0 ? loyaltyTiers : LOYALTY_TIERS);
+  }, [accountSpent, currentUser, activeLoyalty, loyaltyTiers]);
 
   if (!isOpen) return null;
 

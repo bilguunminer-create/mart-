@@ -1,13 +1,15 @@
 import React, { useMemo } from 'react';
 import { X, Award, ShoppingBag, TrendingUp, LogOut } from 'lucide-react';
 import { LoyaltyTier, OrderDetails, UserProfile } from '../types';
-import { formatMNT, getStoredLoyaltyTiers, calculateLoyaltyTierBySpent } from '../data/storeData';
+import { formatMNT, LOYALTY_TIERS } from '../data/storeData';
 
 interface LoyaltyModalProps {
   isOpen: boolean;
   onClose: () => void;
   orders: OrderDetails[];
   currentUser: UserProfile | null;
+  activeLoyalty?: LoyaltyTier | null;
+  loyaltyTiers?: LoyaltyTier[];
   onOpenProfile?: () => void;
   onLoginUser?: (user: UserProfile) => void;
   onLogoutUser?: () => void;
@@ -18,6 +20,8 @@ export const LoyaltyModal: React.FC<LoyaltyModalProps> = ({
   onClose,
   orders,
   currentUser,
+  activeLoyalty,
+  loyaltyTiers,
   onOpenProfile,
   onLogoutUser,
 }) => {
@@ -44,12 +48,13 @@ export const LoyaltyModal: React.FC<LoyaltyModalProps> = ({
   );
 
   const tiers = useMemo(
-    () => [...getStoredLoyaltyTiers()].sort((a, b) => a.threshold - b.threshold),
-    [],
+    () => [...(loyaltyTiers && loyaltyTiers.length > 0 ? loyaltyTiers : LOYALTY_TIERS)].sort((a, b) => a.threshold - b.threshold),
+    [loyaltyTiers],
   );
-  const currentTier: LoyaltyTier | null = currentUser
-    ? calculateLoyaltyTierBySpent(totalSpent, tiers)
-    : null;
+  // Uses the same tier already resolved centrally (including any manual admin
+  // override) instead of recomputing it here, so this always agrees with
+  // checkout, the profile card, and the admin members list.
+  const currentTier: LoyaltyTier | null = currentUser ? (activeLoyalty ?? null) : null;
   const nextTier = tiers.find((tier) => tier.threshold > totalSpent) || null;
   const remaining = nextTier ? Math.max(0, nextTier.threshold - totalSpent) : 0;
 

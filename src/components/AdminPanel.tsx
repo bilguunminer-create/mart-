@@ -46,10 +46,7 @@ import {
   CATEGORIES,
   LOYALTY_TIERS,
   formatMNT,
-  formatOrderNumber,
-  getStoredLoyaltyTiers,
-  getStoredCashbackPct,
-  calculateLoyaltyTierBySpent
+  formatOrderNumber
 } from '../data/storeData';
 import { DEFAULT_CATEGORY_IMAGES } from '../data/categoryImageDefaults';
 import { ProductFormModal } from './ProductFormModal';
@@ -68,6 +65,11 @@ interface AdminPanelProps {
   onSaveCategoryImages?: (categoryId: string, files: File[]) => Promise<void>;
   loyaltyWallets?: Array<{ user_id: string; available_points: number; lifetime_earned: number }>;
   onGrantBonusPoints?: (userId: string, amount: number) => Promise<void>;
+  loyaltyTiersConfig?: LoyaltyTier[];
+  loyaltyCashbackPct?: number;
+  onSaveLoyaltyRules?: (tiers: LoyaltyTier[], cashbackPct: number) => Promise<void>;
+  loyaltyTierOverrides?: Record<string, string>;
+  onSaveTierOverride?: (userId: string, tierId: string | null) => Promise<void>;
   onSaveProduct: (product: Product) => void;
   onDeleteProduct: (productId: string) => void;
   onToggleStock: (productId: string) => void;
@@ -126,6 +128,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   onSaveCategoryImages,
   loyaltyWallets = [],
   onGrantBonusPoints,
+  loyaltyTiersConfig = LOYALTY_TIERS,
+  loyaltyCashbackPct = 1,
+  onSaveLoyaltyRules,
+  loyaltyTierOverrides = {},
+  onSaveTierOverride,
   onSaveProduct,
   onDeleteProduct,
   onToggleStock,
@@ -257,30 +264,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [loyaltySearch, setLoyaltySearch] = useState('');
   const [loyaltyFilter, setLoyaltyFilter] = useState<'all' | 'gold' | 'silver' | 'bronze' | 'standard'>('all');
   
-  // Dynamic loyalty rules and cashback config
-  const [loyaltyTiersConfig, setLoyaltyTiersConfig] = useState<LoyaltyTier[]>(() => getStoredLoyaltyTiers());
-  const [cashbackPctConfig, setCashbackPctConfig] = useState<number>(() => getStoredCashbackPct());
   const [isRulesModalOpen, setIsRulesModalOpen] = useState(false);
-
-  // Sync when event dispatched
-  useEffect(() => {
-    const handleConfigUpdated = () => {
-      setLoyaltyTiersConfig(getStoredLoyaltyTiers());
-      setCashbackPctConfig(getStoredCashbackPct());
-    };
-    window.addEventListener('usk_loyalty_config_updated', handleConfigUpdated);
-    return () => window.removeEventListener('usk_loyalty_config_updated', handleConfigUpdated);
-  }, []);
-
-  // Custom loyalty bonuses and manual overrides persisted in localStorage
-  const [customLoyaltyData, setCustomLoyaltyData] = useState<Record<string, { bonusPoints?: number; forceTier?: string }>>(() => {
-    try {
-      const saved = localStorage.getItem('usk_loyalty_bonuses');
-      return saved ? JSON.parse(saved) : {};
-    } catch {
-      return {};
-    }
-  });
+  const [isSavingLoyaltyRules, setIsSavingLoyaltyRules] = useState(false);
 
   // Modal for rewarding bonus points
   const [bonusTarget, setBonusTarget] = useState<{ userId: string; email: string; name: string; currentPoints: number } | null>(null);
@@ -290,7 +275,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [isGrantingBonus, setIsGrantingBonus] = useState(false);
 
   // Modal for changing manual tier override
-  const [tierOverrideTarget, setTierOverrideTarget] = useState<{ email: string; name: string; currentTierId: string } | null>(null);
+  const [tierOverrideTarget, setTierOverrideTarget] = useState<{ userId: string; email: string; name: string; currentTierId: string } | null>(null);
+  const [isSavingTierOverride, setIsSavingTierOverride] = useState(false);
+  const [tierOverrideErrorMsg, setTierOverrideErrorMsg] = useState<string | null>(null);
 
   // Grants points that land in the member's real Supabase wallet.
   const handleGrantBonus = async (userId: string, amount: number) => {
@@ -311,21 +298,18 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     }
   };
 
-  const handleSetTierOverride = (email: string, tierId: string) => {
-    setCustomLoyaltyData((prev) => {
-      const existing = prev[email] || {};
-      const updated = {
-        ...prev,
-        [email]: { ...existing, forceTier: tierId === 'auto' ? undefined : tierId }
-      };
-      try {
-        localStorage.setItem('usk_loyalty_bonuses', JSON.stringify(updated));
-      } catch {
-        // ignore
-      }
-      return updated;
-    });
-    setTierOverrideTarget(null);
+  const handleSetTierOverride = async (userId: string, tierId: string) => {
+    if (!onSaveTierOverride) return;
+    setTierOverrideErrorMsg(null);
+    setIsSavingTierOverride(true);
+    try {
+      await onSaveTierOverride(userId, tierId === 'auto' ? null : tierId);
+      setTierOverrideTarget(null);
+    } catch (error) {
+      setTierOverrideErrorMsg(error instanceof Error ? error.message : 'Зэрэглэл тохируулах боломжгүй байна.');
+    } finally {
+      setIsSavingTierOverride(false);
+    }
   };
 
   // Branding: logo and banner uploads go to Supabase Storage and
@@ -453,9 +437,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         }
       }
 
-      const override = customLoyaltyData[info.email || id];
-      const effectiveTier = override?.forceTier
-        ? loyaltyTiersConfig.find((tier) => tier.id === override.forceTier) || autoTier
+      const forcedTierId = loyaltyTierOverrides[id];
+      const effectiveTier = forcedTierId
+        ? loyaltyTiersConfig.find((tier) => tier.id === forcedTierId) || autoTier
         : autoTier;
       const wallet = walletByUserId[id];
       const hasRealAccount = UUID_RE.test(id);
@@ -491,7 +475,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         orders: info.orders,
       };
     }).sort((a, b) => b.totalSpent - a.totalSpent);
-  }, [orders, memberProfiles, customLoyaltyData, loyaltyTiersConfig, walletByUserId]);
+  }, [orders, memberProfiles, loyaltyTierOverrides, loyaltyTiersConfig, walletByUserId]);
 
   // Filtered loyalty members
   const filteredLoyaltyMembers = useMemo(() => {
@@ -1933,15 +1917,22 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                         </button>
 
                         <button
+                          disabled={!member.hasRealAccount || !onSaveTierOverride}
                           onClick={() => {
+                            setTierOverrideErrorMsg(null);
                             setTierOverrideTarget({
+                              userId: member.id,
                               email: member.email || member.id,
                               name: member.name,
                               currentTierId: member.tier?.id || 'auto'
                             });
                           }}
-                          className="px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 text-xs font-bold rounded-xl cursor-pointer transition-all flex items-center gap-1 shadow-2xs"
-                          title="VIP зэрэглэлийг шууд олгох эсвэл өөрчлөх"
+                          className={`px-3 py-1.5 border text-xs font-bold rounded-xl transition-all flex items-center gap-1 shadow-2xs ${
+                            !member.hasRealAccount || !onSaveTierOverride
+                              ? 'bg-stone-50 text-stone-300 border-stone-200 cursor-not-allowed'
+                              : 'bg-amber-50 hover:bg-amber-100 text-amber-800 border-amber-300 cursor-pointer'
+                          }`}
+                          title={member.hasRealAccount ? 'VIP зэрэглэлийг шууд олгох эсвэл өөрчлөх' : 'Энэ хэрэглэгч бүртгэлгүй тул зэрэглэл тохируулах боломжгүй (зочноор захиалсан)'}
                         >
                           <Award className="w-3.5 h-3.5" />
                           <span>VIP Зэрэглэл</span>
@@ -2561,7 +2552,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 text-xs">
                   <div className="bg-white p-2.5 rounded-xl border border-stone-200 shadow-2xs">
                     <span className="text-[10px] text-stone-500 font-bold block">Суурь кэшбэк</span>
-                    <span className="text-xs font-black text-rose-600">{cashbackPctConfig}%</span>
+                    <span className="text-xs font-black text-rose-600">{loyaltyCashbackPct}%</span>
                   </div>
                   {loyaltyTiersConfig.map((tier) => (
                     <div key={tier.id} className="bg-white p-2.5 rounded-xl border border-stone-200 shadow-2xs">
@@ -2697,6 +2688,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               <p className="text-stone-500 font-mono text-[11px]">{tierOverrideTarget.email}</p>
             </div>
 
+            {tierOverrideErrorMsg && (
+              <div className="p-3 bg-rose-50 border border-rose-200 text-rose-800 rounded-xl text-xs font-bold">
+                {tierOverrideErrorMsg}
+              </div>
+            )}
+
             <div className="space-y-2">
               <label className="block text-xs font-bold text-stone-700">
                 Олгох зэрэглэлийг сонгоно уу:
@@ -2711,8 +2708,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   <button
                     key={tierOpt.id}
                     type="button"
-                    onClick={() => handleSetTierOverride(tierOverrideTarget.email, tierOpt.id)}
-                    className="w-full text-left p-2.5 rounded-xl border border-stone-200 hover:border-amber-400 hover:bg-amber-50/50 transition-all flex items-center justify-between cursor-pointer"
+                    disabled={isSavingTierOverride}
+                    onClick={() => handleSetTierOverride(tierOverrideTarget.userId, tierOpt.id)}
+                    className="w-full text-left p-2.5 rounded-xl border border-stone-200 hover:border-amber-400 hover:bg-amber-50/50 transition-all flex items-center justify-between cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <div>
                       <div className="font-bold text-xs text-stone-900">{tierOpt.name}</div>
@@ -2744,10 +2742,16 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         isOpen={isRulesModalOpen}
         onClose={() => setIsRulesModalOpen(false)}
         tiers={loyaltyTiersConfig}
-        cashbackPct={cashbackPctConfig}
-        onSave={(updatedTiers, updatedCashback) => {
-          setLoyaltyTiersConfig(updatedTiers);
-          setCashbackPctConfig(updatedCashback);
+        cashbackPct={loyaltyCashbackPct}
+        isSaving={isSavingLoyaltyRules}
+        onSave={async (updatedTiers, updatedCashback) => {
+          if (!onSaveLoyaltyRules) return;
+          setIsSavingLoyaltyRules(true);
+          try {
+            await onSaveLoyaltyRules(updatedTiers, updatedCashback);
+          } finally {
+            setIsSavingLoyaltyRules(false);
+          }
         }}
       />
 

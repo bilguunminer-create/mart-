@@ -26,8 +26,6 @@ import {
   STORE_CONFIG, 
   formatMNT,
   formatOrderNumber,
-  getStoredLoyaltyTiers,
-  getStoredCashbackPct,
   calculateLoyaltyTierBySpent
 } from './data/storeData';
 import { Product, CartItem, LoyaltyTier, ComboPack, OrderDetails, UserProfile, ProductReview } from './types';
@@ -94,6 +92,11 @@ export default function App() {
       }
       setStoreLogoUrl(settings.data.store_logo_url ? String(settings.data.store_logo_url) : null);
       setStoreBannerUrl(settings.data.store_banner_url ? String(settings.data.store_banner_url) : null);
+      const savedTiers = settings.data.loyalty_tiers_config;
+      if (Array.isArray(savedTiers) && savedTiers.length > 0) setActiveLoyaltyTiers(savedTiers as LoyaltyTier[]);
+      if (settings.data.loyalty_cashback_pct !== undefined) setLoyaltyCashbackPct(Number(settings.data.loyalty_cashback_pct));
+      const savedOverrides = settings.data.loyalty_tier_overrides;
+      if (savedOverrides && typeof savedOverrides === 'object') setLoyaltyTierOverrides(savedOverrides as Record<string, string>);
       const remoteProducts = settings.data.products;
       if (!Array.isArray(remoteProducts)) return;
       setProducts(remoteProducts.map((product: any) => {
@@ -353,39 +356,26 @@ export default function App() {
     return orders.filter((o) => o.status !== 'cancelled').length;
   }, [orders]);
 
-  // Active Loyalty Tiers from settings
-  const [activeLoyaltyTiers, setActiveLoyaltyTiers] = useState<LoyaltyTier[]>(() => getStoredLoyaltyTiers());
-
-  useEffect(() => {
-    const handleConfigSync = () => {
-      setActiveLoyaltyTiers(getStoredLoyaltyTiers());
-    };
-    window.addEventListener('usk_loyalty_config_updated', handleConfigSync);
-    return () => window.removeEventListener('usk_loyalty_config_updated', handleConfigSync);
-  }, []);
+  // Loyalty tiers, cashback rate, and manual per-customer tier overrides --
+  // all admin-configurable and stored centrally in store_settings.data, not
+  // localStorage, so every visitor and every admin session sees the same rules.
+  const [activeLoyaltyTiers, setActiveLoyaltyTiers] = useState<LoyaltyTier[]>(LOYALTY_TIERS);
+  const [loyaltyCashbackPct, setLoyaltyCashbackPct] = useState<number>(1);
+  const [loyaltyTierOverrides, setLoyaltyTierOverrides] = useState<Record<string, string>>({});
 
   // Active Loyalty Tier: Strictly visible & active only after logging in with email or phone
   const activeLoyalty = useMemo<LoyaltyTier | null>(() => {
     if (!currentUser || (!userPhoneClean && !userEmailClean)) {
       return null;
     }
-    // Check if admin granted a VIP tier override for this email or phone
-    try {
-      const saved = localStorage.getItem('usk_loyalty_bonuses');
-      if (saved) {
-        const bonuses = JSON.parse(saved);
-        const override = (userEmailClean && bonuses[userEmailClean]) || (userPhoneClean && bonuses[`tel_${userPhoneClean}`]);
-        if (override?.forceTier) {
-          const forced = activeLoyaltyTiers.find((t) => t.id === override.forceTier);
-          if (forced) return forced;
-        }
-      }
-    } catch {
-      // ignore
+    const forcedTierId = loyaltyTierOverrides[currentUser.id];
+    if (forcedTierId) {
+      const forced = activeLoyaltyTiers.find((t) => t.id === forcedTierId);
+      if (forced) return forced;
     }
 
     return calculateLoyaltyTierBySpent(userTotalSpent, activeLoyaltyTiers);
-  }, [currentUser, userPhoneClean, userEmailClean, userTotalSpent, activeLoyaltyTiers]);
+  }, [currentUser, userPhoneClean, userEmailClean, userTotalSpent, activeLoyaltyTiers, loyaltyTierOverrides]);
 
   // Search & Filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -1616,6 +1606,7 @@ export default function App() {
         orders={orders}
         currentUser={currentUser}
         activeLoyalty={activeLoyalty}
+        loyaltyTiers={activeLoyaltyTiers}
         dailyDiscountTotal={dailyDiscountTotal}
         paymentSettings={checkoutSettings}
         onReportPayment={async (orderId) => {
@@ -1714,6 +1705,8 @@ export default function App() {
         onClose={() => setIsLoyaltyOpen(false)}
         orders={orders}
         currentUser={currentUser}
+        activeLoyalty={activeLoyalty}
+        loyaltyTiers={activeLoyaltyTiers}
         onOpenProfile={() => setIsProfileOpen(true)}
         onLoginUser={(newUser) => {
           setCurrentUser(newUser);
@@ -1772,6 +1765,22 @@ export default function App() {
             await saveStoreSettings(token, { category_images: next });
             setCategoryImages(next);
             showToast('Ангилалын зураг төв санд хадгалагдлаа.');
+          }}
+          loyaltyTiersConfig={activeLoyaltyTiers}
+          loyaltyCashbackPct={loyaltyCashbackPct}
+          onSaveLoyaltyRules={async (updatedTiers, updatedCashbackPct) => {
+            if (!currentUser?.accessToken) throw new Error('Админ и-мэйлээр нэвтэрнэ үү.');
+            await saveStoreSettings(currentUser.accessToken, { loyalty_tiers_config: updatedTiers, loyalty_cashback_pct: updatedCashbackPct });
+            setActiveLoyaltyTiers(updatedTiers);
+            setLoyaltyCashbackPct(updatedCashbackPct);
+          }}
+          loyaltyTierOverrides={loyaltyTierOverrides}
+          onSaveTierOverride={async (userId, tierId) => {
+            if (!currentUser?.accessToken) throw new Error('Админ и-мэйлээр нэвтэрнэ үү.');
+            const next = { ...loyaltyTierOverrides };
+            if (tierId) next[userId] = tierId; else delete next[userId];
+            await saveStoreSettings(currentUser.accessToken, { loyalty_tier_overrides: next });
+            setLoyaltyTierOverrides(next);
           }}
           loyaltyWallets={loyaltyWallets}
           onGrantBonusPoints={async (userId, amount) => {

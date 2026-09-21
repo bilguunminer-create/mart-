@@ -15,20 +15,15 @@ import {
   HelpCircle
 } from 'lucide-react';
 import { LoyaltyTier } from '../types';
-import { 
-  formatMNT, 
-  saveStoredLoyaltyTiers, 
-  saveStoredCashbackPct, 
-  resetStoredLoyaltyTiers, 
-  LOYALTY_TIERS 
-} from '../data/storeData';
+import { formatMNT, LOYALTY_TIERS } from '../data/storeData';
 
 interface LoyaltyRulesModalProps {
   isOpen: boolean;
   onClose: () => void;
   tiers: LoyaltyTier[];
   cashbackPct: number;
-  onSave: (updatedTiers: LoyaltyTier[], updatedCashbackPct: number) => void;
+  isSaving?: boolean;
+  onSave: (updatedTiers: LoyaltyTier[], updatedCashbackPct: number) => Promise<void>;
 }
 
 export const LoyaltyRulesModal: React.FC<LoyaltyRulesModalProps> = ({
@@ -36,6 +31,7 @@ export const LoyaltyRulesModal: React.FC<LoyaltyRulesModalProps> = ({
   onClose,
   tiers,
   cashbackPct,
+  isSaving = false,
   onSave
 }) => {
   const [editedTiers, setEditedTiers] = useState<LoyaltyTier[]>(() => JSON.parse(JSON.stringify(tiers)));
@@ -43,6 +39,7 @@ export const LoyaltyRulesModal: React.FC<LoyaltyRulesModalProps> = ({
   const [activeTierIndex, setActiveTierIndex] = useState<number>(0);
   const [newBenefitText, setNewBenefitText] = useState('');
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
 
   // Sync state if props change when opened
@@ -51,6 +48,7 @@ export const LoyaltyRulesModal: React.FC<LoyaltyRulesModalProps> = ({
       setEditedTiers(JSON.parse(JSON.stringify(tiers)));
       setEditedCashback(cashbackPct);
       setSaveSuccess(false);
+      setSaveError(null);
       setShowResetConfirm(false);
     }
   }, [isOpen, tiers, cashbackPct]);
@@ -114,7 +112,7 @@ export const LoyaltyRulesModal: React.FC<LoyaltyRulesModalProps> = ({
     });
   };
 
-  const handleSaveAll = () => {
+  const handleSaveAll = async () => {
     // Security bounds & validation for numbers
     const sanitizedTiers = editedTiers.map((t) => {
       const validThreshold = Math.max(0, Math.min(500000000, Math.floor(Number(t.threshold) || 0)));
@@ -130,27 +128,34 @@ export const LoyaltyRulesModal: React.FC<LoyaltyRulesModalProps> = ({
     });
     const sanitizedCashback = Math.max(0, Math.min(50, Math.round(Number(editedCashback) || 0)));
 
-    saveStoredLoyaltyTiers(sanitizedTiers);
-    saveStoredCashbackPct(sanitizedCashback);
-    onSave(sanitizedTiers, sanitizedCashback);
-    setSaveSuccess(true);
-    setTimeout(() => {
-      setSaveSuccess(false);
-      onClose();
-    }, 1200);
+    setSaveError(null);
+    try {
+      await onSave(sanitizedTiers, sanitizedCashback);
+      setSaveSuccess(true);
+      setTimeout(() => {
+        setSaveSuccess(false);
+        onClose();
+      }, 1200);
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : 'Дүрмийг хадгалах боломжгүй байна.');
+    }
   };
 
-  const handleResetToDefaults = () => {
-    const defaultTiers = resetStoredLoyaltyTiers();
-    setEditedTiers(JSON.parse(JSON.stringify(defaultTiers)));
-    setEditedCashback(1);
-    onSave(defaultTiers, 1);
-    setShowResetConfirm(false);
-    setSaveSuccess(true);
-    setTimeout(() => {
-      setSaveSuccess(false);
-      onClose();
-    }, 1200);
+  const handleResetToDefaults = async () => {
+    setSaveError(null);
+    try {
+      await onSave(LOYALTY_TIERS, 1);
+      setEditedTiers(JSON.parse(JSON.stringify(LOYALTY_TIERS)));
+      setEditedCashback(1);
+      setShowResetConfirm(false);
+      setSaveSuccess(true);
+      setTimeout(() => {
+        setSaveSuccess(false);
+        onClose();
+      }, 1200);
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : 'Сэргээх боломжгүй байна.');
+    }
   };
 
   return (
@@ -424,8 +429,9 @@ export const LoyaltyRulesModal: React.FC<LoyaltyRulesModalProps> = ({
                 <span className="text-xs font-bold text-rose-600">Үйлдвэрийн төлөвт шилжүүлэх үү?</span>
                 <button
                   type="button"
+                  disabled={isSaving}
                   onClick={handleResetToDefaults}
-                  className="px-2.5 py-1 bg-rose-600 text-white text-[11px] font-bold rounded-lg cursor-pointer hover:bg-rose-700"
+                  className="px-2.5 py-1 bg-rose-600 text-white text-[11px] font-bold rounded-lg cursor-pointer hover:bg-rose-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Тийм, сэргээ
                 </button>
@@ -441,6 +447,9 @@ export const LoyaltyRulesModal: React.FC<LoyaltyRulesModalProps> = ({
           </div>
 
           <div className="flex items-center justify-end gap-2.5">
+            {saveError && (
+              <span className="text-xs font-bold text-rose-600">{saveError}</span>
+            )}
             {saveSuccess && (
               <span className="text-xs font-bold text-emerald-600 flex items-center gap-1 animate-pulse">
                 <Check className="w-4 h-4" />
@@ -458,11 +467,12 @@ export const LoyaltyRulesModal: React.FC<LoyaltyRulesModalProps> = ({
 
             <button
               type="button"
+              disabled={isSaving}
               onClick={handleSaveAll}
-              className="px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-stone-950 text-xs font-black rounded-xl shadow-md cursor-pointer transition-all flex items-center gap-1.5"
+              className="px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-stone-950 text-xs font-black rounded-xl shadow-md cursor-pointer transition-all flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <ShieldCheck className="w-4 h-4" />
-              <span>Дүрмийн өөрчлөлтийг батлах</span>
+              <span>{isSaving ? 'Хадгалж байна...' : 'Дүрмийн өөрчлөлтийг батлах'}</span>
             </button>
           </div>
         </div>
