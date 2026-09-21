@@ -593,9 +593,18 @@ export default function App() {
       })
       .catch((error) => {
         const message = error instanceof Error ? error.message : '';
-        showToast(message.includes('permission') || message.includes('policy')
+        const friendly = message.includes('permission') || message.includes('policy') || message.includes('FORBIDDEN')
           ? 'Энэ эрхээр захиалгын төлөв шинэчлэх боломжгүй байна. Админ и-мэйлээр дахин нэвтэрнэ үү.'
-          : 'Төв санд төлөв шинэчлэх боломжгүй байна. Дахин оролдоно уу.');
+          : message.includes('FINAL_STATUS')
+          ? 'Энэ захиалга аль хэдийн Дууссан эсвэл Цуцлагдсан төлөвтэй тул цаашид өөрчлөх боломжгүй.'
+          : message.includes('INVALID_TRANSITION')
+          ? 'Захиалгыг Шинэ төлөвт буцаах боломжгүй.'
+          : message.includes('NOT_FOUND')
+          ? 'Энэ захиалга төв санд олдсонгүй.'
+          : message.includes('INVALID_STATUS')
+          ? 'Тодорхойгүй төлөв рүү шилжүүлэх гэж оролдлоо.'
+          : 'Төв санд төлөв шинэчлэх боломжгүй байна. Дахин оролдоно уу.';
+        showToast(friendly + (message ? ` (${message})` : ''));
       });
   };
 
