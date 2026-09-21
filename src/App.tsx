@@ -809,7 +809,8 @@ export default function App() {
   const filteredProducts = useMemo(() => {
     return products.filter((product) => {
       // Draft and sold-out products are only visible to the administrator.
-      if (product.published === false || product.in_stock === false || Number(product.stock_quantity ?? 0) <= 0) return false;
+      // Products with no stock_quantity recorded yet fall back to the in_stock flag, same as everywhere else in the app.
+      if (product.published === false || product.in_stock === false || Number(product.stock_quantity ?? (product.in_stock ? 1 : 0)) <= 0) return false;
       // Search filter
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase().trim();
@@ -954,7 +955,7 @@ export default function App() {
             }
             setShowDealsOnly(true);
           }}
-          products={products.filter(product => product.published !== false && product.in_stock && Number(product.stock_quantity ?? 0) > 0)}
+          products={products.filter(product => product.published !== false && product.in_stock && Number(product.stock_quantity ?? (product.in_stock ? 1 : 0)) > 0)}
           freeDeliveryThreshold={checkoutSettings.freeDeliveryThreshold}
         />
 
