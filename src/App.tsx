@@ -35,6 +35,7 @@ import { Header } from './components/Header';
 import { DailyDealBanner } from './components/DailyDealBanner';
 import { ProductCard } from './components/ProductCard';
 import { CombosSection } from './components/CombosSection';
+import { CategoryBentoGrid } from './components/CategoryBentoGrid';
 import { CartDrawer } from './components/CartDrawer';
 import { CheckoutModal } from './components/CheckoutModal';
 import { LoyaltyModal } from './components/LoyaltyModal';
@@ -86,11 +87,14 @@ export default function App() {
       if (Array.isArray(savedCombos)) setComboPacks(savedCombos as ComboPack[]);
       const remoteProducts = settings.data.products;
       if (!Array.isArray(remoteProducts)) return;
-      setProducts(remoteProducts.map((product: any) => ({
-        ...product,
-        stock_quantity: Number(product.stock ?? 0),
-        in_stock: Boolean(product.in_stock) && Number(product.stock ?? 0) > 0,
-      })) as Product[]);
+      setProducts(remoteProducts.map((product: any) => {
+        const stock = Number(product.stock_quantity ?? product.stock ?? (product.in_stock ? 15 : 0));
+        return {
+          ...product,
+          stock_quantity: stock,
+          in_stock: Boolean(product.in_stock) && stock > 0,
+        };
+      }) as Product[]);
       setFeaturedProductId(String(settings.data.featured_product_id ?? ''));
       const bank = settings.data.bank_accounts as Record<string, unknown> | undefined;
       setCheckoutSettings({
@@ -795,7 +799,7 @@ export default function App() {
         const product = remoteProducts.find((entry) => String(entry.id) === item.id);
         if (!product) return { item, available: 0 };
         const available = Boolean(product.in_stock) && Boolean(product.published ?? true)
-          ? Math.max(0, Number(product.stock ?? 0))
+          ? Math.max(0, Number(product.stock_quantity ?? product.stock ?? (product.in_stock ? 15 : 0)))
           : 0;
         return { item, available };
       }).filter(({ item, available }) => item.quantity > available);
@@ -810,11 +814,14 @@ export default function App() {
         return;
       }
 
-      setProducts(remoteProducts.map((product: any) => ({
-        ...product,
-        stock_quantity: Number(product.stock ?? 0),
-        in_stock: Boolean(product.in_stock) && Number(product.stock ?? 0) > 0,
-      })) as Product[]);
+      setProducts(remoteProducts.map((product: any) => {
+        const stock = Number(product.stock_quantity ?? product.stock ?? (product.in_stock ? 15 : 0));
+        return {
+          ...product,
+          stock_quantity: stock,
+          in_stock: Boolean(product.in_stock) && stock > 0,
+        };
+      }) as Product[]);
     } catch {
       // Checkout is still protected by the central transaction if the catalog cannot be refreshed.
     }
@@ -1072,6 +1079,16 @@ export default function App() {
           }}
           products={products.filter(product => product.published !== false && product.in_stock && Number(product.stock_quantity ?? (product.in_stock ? 1 : 0)) > 0)}
           freeDeliveryThreshold={checkoutSettings.freeDeliveryThreshold}
+        />
+
+        {/* Category Discovery Bento Grid */}
+        <CategoryBentoGrid
+          products={products}
+          onSelectCategory={(categoryId) => {
+            setSelectedCategory(categoryId);
+            const el = document.getElementById('catalog-section');
+            if (el) el.scrollIntoView({ behavior: 'smooth' });
+          }}
         />
 
         {/* Curated Combos Section */}
