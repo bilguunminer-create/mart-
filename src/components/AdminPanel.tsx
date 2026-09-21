@@ -52,6 +52,7 @@ import {
   getStoredCashbackPct,
   calculateLoyaltyTierBySpent
 } from '../data/storeData';
+import { DEFAULT_CATEGORY_IMAGES } from '../data/categoryImageDefaults';
 import { ProductFormModal } from './ProductFormModal';
 import { ComboFormModal } from './ComboFormModal';
 import { LoyaltyRulesModal } from './LoyaltyRulesModal';
@@ -60,6 +61,8 @@ interface AdminPanelProps {
   products: Product[];
   orders: OrderDetails[];
   memberProfiles?: Array<{ user_id: string; name: string; phone: string; address: string; created_at?: string }>;
+  categoryImages?: Record<string, string[]>;
+  onSaveCategoryImages?: (categoryId: string, files: File[]) => Promise<void>;
   loyaltyWallets?: Array<{ user_id: string; available_points: number; lifetime_earned: number }>;
   onGrantBonusPoints?: (userId: string, amount: number) => Promise<void>;
   onSaveProduct: (product: Product) => void;
@@ -112,6 +115,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   products,
   orders,
   memberProfiles = [],
+  categoryImages = {},
+  onSaveCategoryImages,
   loyaltyWallets = [],
   onGrantBonusPoints,
   onSaveProduct,
@@ -333,6 +338,27 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   });
   const [isUploadingBranding, setIsUploadingBranding] = useState(false);
   const [brandingStatusMsg, setBrandingStatusMsg] = useState<string | null>(null);
+
+  // Category tile images: uploaded files go straight to Supabase Storage and
+  // store_settings.data.category_images, never localStorage -- every visitor
+  // and every admin session sees the same, real images.
+  const categoryImageInputRef = useRef<HTMLInputElement>(null);
+  const [categoryImageTarget, setCategoryImageTarget] = useState<string | null>(null);
+  const [categoryImageBusyId, setCategoryImageBusyId] = useState<string | null>(null);
+  const [categoryImageError, setCategoryImageError] = useState<Record<string, string>>({});
+
+  const handleCategoryImagesSelected = async (categoryId: string, files: FileList) => {
+    if (!onSaveCategoryImages) return;
+    setCategoryImageError((prev) => ({ ...prev, [categoryId]: '' }));
+    setCategoryImageBusyId(categoryId);
+    try {
+      await onSaveCategoryImages(categoryId, Array.from(files).slice(0, 4));
+    } catch (error) {
+      setCategoryImageError((prev) => ({ ...prev, [categoryId]: error instanceof Error ? error.message : 'Зураг хадгалах боломжгүй байна.' }));
+    } finally {
+      setCategoryImageBusyId(null);
+    }
+  };
 
   const handleUploadBrandingImage = async (type: 'logo' | 'banner', file: File) => {
     if (!file.type.startsWith('image/')) {
@@ -2212,6 +2238,67 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     </p>
                   </div>
                 </div>
+              </div>
+            </div>
+
+            {/* Category tile images */}
+            <div className="bg-white p-6 rounded-2xl border border-stone-200 shadow-xs space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center font-bold">
+                  <ImageIcon className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="font-extrabold text-stone-900 text-sm">Ангилалын зургууд</h4>
+                  <p className="text-xs text-stone-500">Нүүр хуудасны "Ангиллаараа хайх" хэсгийн зургууд. Upload хийнгүүт төв санд шууд хадгалагдаж, бүх хэрэглэгчид харагдана (1-4 зураг сонгож болно).</p>
+                </div>
+              </div>
+
+              <input
+                ref={categoryImageInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                className="hidden"
+                onChange={(e) => {
+                  if (categoryImageTarget && e.target.files && e.target.files.length > 0) {
+                    void handleCategoryImagesSelected(categoryImageTarget, e.target.files);
+                  }
+                  e.target.value = '';
+                }}
+              />
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {CATEGORIES.filter((cat) => cat.id !== 'all').map((cat) => {
+                  const images = (categoryImages[cat.id] && categoryImages[cat.id].length > 0)
+                    ? categoryImages[cat.id]
+                    : (DEFAULT_CATEGORY_IMAGES[cat.id] ?? []);
+                  const isBusy = categoryImageBusyId === cat.id;
+                  return (
+                    <div key={cat.id} className="rounded-2xl border border-stone-200 p-3 space-y-2.5">
+                      <p className="text-xs font-black text-stone-900">{cat.name}</p>
+                      <div className="grid grid-cols-2 gap-1 h-20 rounded-xl overflow-hidden bg-stone-100">
+                        {images.slice(0, 4).map((src, i) => (
+                          <img key={i} src={src} alt={cat.name} referrerPolicy="no-referrer" className="w-full h-full object-cover" />
+                        ))}
+                      </div>
+                      {categoryImageError[cat.id] && (
+                        <p className="text-[10px] text-rose-600 font-bold">{categoryImageError[cat.id]}</p>
+                      )}
+                      <button
+                        type="button"
+                        disabled={isBusy || !onSaveCategoryImages}
+                        onClick={() => {
+                          setCategoryImageTarget(cat.id);
+                          window.requestAnimationFrame(() => categoryImageInputRef.current?.click());
+                        }}
+                        className="w-full px-3 py-1.5 bg-stone-900 hover:bg-stone-800 disabled:opacity-50 disabled:cursor-not-allowed text-white text-[11px] font-bold rounded-xl cursor-pointer flex items-center justify-center gap-1.5"
+                      >
+                        <Upload className="w-3.5 h-3.5" />
+                        <span>{isBusy ? 'Хадгалж байна...' : 'Зураг солих (1-4)'}</span>
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
             </div>
 

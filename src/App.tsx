@@ -52,7 +52,7 @@ import { BeeEmblemLogo } from './components/BeeEmblemLogo';
 const InventoryCameraModal = React.lazy(() =>
   import('./components/InventoryCameraModal').then((m) => ({ default: m.InventoryCameraModal }))
 );
-import { getStoreCustomerProfiles, getStoreOrders, getStoreSettings, saveStoreOrder, saveStoreProducts, saveStoreSettings, hasStoreAdminAccess, refreshSession, reportStoreOrderPayment, updateStoreOrderStatus, confirmStoreOrderPayment, verifyAdminPin, changeAdminPin, expireUnpaidOrdersAsAdmin, getAllReviewsForAdmin, moderateProductReview, deleteProductReview, getProductReviews, adminListLoyaltyWallets, adminGrantLoyaltyPoints, AdminLoyaltyWallet } from './services/supabaseAuth';
+import { getStoreCustomerProfiles, getStoreOrders, getStoreSettings, saveStoreOrder, saveStoreProducts, saveStoreSettings, hasStoreAdminAccess, refreshSession, reportStoreOrderPayment, updateStoreOrderStatus, confirmStoreOrderPayment, verifyAdminPin, changeAdminPin, expireUnpaidOrdersAsAdmin, getAllReviewsForAdmin, moderateProductReview, deleteProductReview, getProductReviews, adminListLoyaltyWallets, adminGrantLoyaltyPoints, AdminLoyaltyWallet, uploadCategoryImage } from './services/supabaseAuth';
 import { initAdminPushNotifications } from './services/pushNotifications';
 
 export default function App() {
@@ -78,6 +78,7 @@ export default function App() {
   const [products, setProducts] = useState<Product[]>(PRODUCTS);
   const [comboPacks, setComboPacks] = useState<ComboPack[]>(COMBOS);
   const [featuredProductId, setFeaturedProductId] = useState('');
+  const [categoryImages, setCategoryImages] = useState<Record<string, string[]>>({});
   const [checkoutSettings, setCheckoutSettings] = useState<{ deliveryFee: number; freeDeliveryThreshold: number; bankName: string; accountNumber: string; iban: string; accountHolder: string; storePhone: string; storeEmail: string; facebookUrl: string; messengerUrl: string; googleMapsUrl: string; storeAddress: string; unpaidCancellationMinutes: number }>({
     deliveryFee: 3000, freeDeliveryThreshold: STORE_CONFIG.free_delivery_threshold, bankName: '', accountNumber: '', iban: '', accountHolder: '', storePhone: STORE_CONFIG.phone, storeEmail: '', facebookUrl: '', messengerUrl: '', googleMapsUrl: '', storeAddress: STORE_CONFIG.location, unpaidCancellationMinutes: 60,
   });
@@ -85,6 +86,10 @@ export default function App() {
     getStoreSettings().then((settings) => {
       const savedCombos = settings.data.combo_packs;
       if (Array.isArray(savedCombos)) setComboPacks(savedCombos as ComboPack[]);
+      const savedCategoryImages = settings.data.category_images;
+      if (savedCategoryImages && typeof savedCategoryImages === 'object') {
+        setCategoryImages(savedCategoryImages as Record<string, string[]>);
+      }
       const remoteProducts = settings.data.products;
       if (!Array.isArray(remoteProducts)) return;
       setProducts(remoteProducts.map((product: any) => {
@@ -1093,6 +1098,7 @@ export default function App() {
         {/* Category Discovery Bento Grid */}
         <CategoryBentoGrid
           products={products}
+          categoryImages={categoryImages}
           onSelectCategory={(categoryId) => {
             setSelectedCategory(categoryId);
             const el = document.getElementById('catalog-section');
@@ -1741,6 +1747,16 @@ export default function App() {
           products={products}
           orders={orders}
           memberProfiles={memberProfiles}
+          categoryImages={categoryImages}
+          onSaveCategoryImages={async (categoryId, files) => {
+            if (!currentUser?.accessToken) throw new Error('Админ и-мэйлээр нэвтэрнэ үү.');
+            const token = currentUser.accessToken;
+            const urls = await Promise.all(files.map((file) => uploadCategoryImage(token, file)));
+            const next = { ...categoryImages, [categoryId]: urls };
+            await saveStoreSettings(token, { category_images: next });
+            setCategoryImages(next);
+            showToast('Ангилалын зураг төв санд хадгалагдлаа.');
+          }}
           loyaltyWallets={loyaltyWallets}
           onGrantBonusPoints={async (userId, amount) => {
             if (!currentUser?.accessToken) throw new Error('Админ и-мэйлээр нэвтэрнэ үү.');
