@@ -66,8 +66,7 @@ function getMailTransporter(): Transporter | null {
 function getOtpSecret(): string {
   const secret = process.env.OTP_SECRET;
   if (!secret) {
-    console.warn("[Email OTP] OTP_SECRET тохируулаагүй тул түр зуурын анхдагч түлхүүр ашиглаж байна. Production дээр OTP_SECRET-ийг заавал тохируулна уу.");
-    return "usk-mart-static-otp-v1";
+    throw new Error("OTP_SECRET тохируулаагүй байна. .env файлд OTP_SECRET-ийг заавал тохируулна уу.");
   }
   return secret;
 }

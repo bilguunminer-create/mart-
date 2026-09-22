@@ -50,6 +50,9 @@ import { BeeEmblemLogo } from './components/BeeEmblemLogo';
 const InventoryCameraModal = React.lazy(() =>
   import('./components/InventoryCameraModal').then((m) => ({ default: m.InventoryCameraModal }))
 );
+const InventoryOrdersModal = React.lazy(() =>
+  import('./components/InventoryOrdersModal').then((m) => ({ default: m.InventoryOrdersModal }))
+);
 import { getStoreCustomerProfiles, getStoreOrders, getStoreSettings, saveStoreOrder, saveStoreProducts, saveStoreSettings, hasStoreAdminAccess, refreshSession, reportStoreOrderPayment, updateStoreOrderStatus, confirmStoreOrderPayment, verifyAdminPin, changeAdminPin, expireUnpaidOrdersAsAdmin, getAllReviewsForAdmin, moderateProductReview, deleteProductReview, getProductReviews, adminListLoyaltyWallets, adminGrantLoyaltyPoints, AdminLoyaltyWallet, uploadCategoryImage, uploadBrandingImage } from './services/supabaseAuth';
 import { initAdminPushNotifications } from './services/pushNotifications';
 
@@ -155,6 +158,7 @@ export default function App() {
   const [directEditProduct, setDirectEditProduct] = useState<Product | null>(null);
   const [isDirectFormOpen, setIsDirectFormOpen] = useState(false);
   const [isInventoryOpen, setIsInventoryOpen] = useState(false);
+  const [isInventoryOrdersOpen, setIsInventoryOrdersOpen] = useState(false);
 
   // Cart state persisted in localStorage
   const [cart, setCart] = useState<CartItem[]>(() => {
@@ -944,16 +948,32 @@ export default function App() {
       );
     }
 
+    const pendingOrderCount = orders.filter((o) => !o.status || o.status === 'new' || o.status === 'confirmed').length;
+
     return (
       <div className="min-h-screen bg-stone-950 flex flex-col items-center justify-center gap-4 p-6 text-center">
-        {!isInventoryOpen && (
-          <button
-            type="button"
-            onClick={() => setIsInventoryOpen(true)}
-            className="bg-amber-400 hover:bg-amber-300 text-stone-950 font-bold px-6 py-3 rounded-xl cursor-pointer transition-colors"
-          >
-            Агуулах хэсэг нээх
-          </button>
+        {!isInventoryOpen && !isInventoryOrdersOpen && (
+          <div className="flex flex-col gap-3 w-full max-w-xs">
+            <button
+              type="button"
+              onClick={() => setIsInventoryOpen(true)}
+              className="bg-amber-400 hover:bg-amber-300 text-stone-950 font-bold px-6 py-4 rounded-2xl cursor-pointer transition-colors"
+            >
+              Агуулах
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsInventoryOrdersOpen(true)}
+              className="relative bg-white/10 hover:bg-white/15 text-white font-bold px-6 py-4 rounded-2xl cursor-pointer transition-colors border border-white/10"
+            >
+              Захиалгын мэдэгдэл
+              {pendingOrderCount > 0 && (
+                <span className="absolute -top-2 -right-2 flex h-6 min-w-6 items-center justify-center rounded-full bg-rose-600 px-1.5 text-xs font-black text-white">
+                  {pendingOrderCount}
+                </span>
+              )}
+            </button>
+          </div>
         )}
         {currentUser?.accessToken && (
           <React.Suspense fallback={null}>
@@ -965,6 +985,12 @@ export default function App() {
                 setIsInventoryOpen(false);
                 window.location.reload();
               }}
+            />
+            <InventoryOrdersModal
+              isOpen={isInventoryOrdersOpen}
+              onClose={() => setIsInventoryOrdersOpen(false)}
+              orders={orders}
+              onUpdateStatus={handleUpdateOrderStatus}
             />
           </React.Suspense>
         )}
