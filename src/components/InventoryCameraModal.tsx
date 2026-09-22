@@ -2,6 +2,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import { X, Camera, Barcode, PackagePlus, MinusCircle, History, CheckCircle2, RefreshCw } from 'lucide-react';
 import { BrowserMultiFormatReader } from '@zxing/browser';
 import type { IScannerControls } from '@zxing/browser';
+import { Capacitor } from '@capacitor/core';
+import { Camera as CapacitorCamera } from '@capacitor/camera';
 import { addInventoryStock, deductInventoryByBarcode, getInventoryMovements, lookupInventoryBarcode, registerInventoryProduct, uploadProductImage, InventoryMovement } from '../services/supabaseAuth';
 import { CATEGORIES } from '../data/storeData';
 
@@ -107,6 +109,21 @@ export const InventoryCameraModal: React.FC<Props> = ({ isOpen, onClose, accessT
   const startScanner=async(target:'register'|'deduct')=>{
     try {
       stopCamera();
+      // Inside the native Android app, navigator.mediaDevices.getUserMedia alone does
+      // not reliably trigger the OS camera permission dialog across WebView versions --
+      // it silently fails on some devices even though the app declares the permission.
+      // Requesting it through the Capacitor Camera plugin goes through Android's native
+      // permission API directly, which is the reliable path.
+      if (Capacitor.isNativePlatform()) {
+        const status = await CapacitorCamera.checkPermissions();
+        if (status.camera !== 'granted') {
+          const requested = await CapacitorCamera.requestPermissions({ permissions: ['camera'] });
+          if (requested.camera !== 'granted') {
+            setMessage('Камерын зөвшөөрөл өгөгдөөгүй байна. Утасныхаа Тохиргоо → Апп → US&K Агуулах → Зөвшөөрөл хэсгээс Камерыг зөвшөөрнө үү.');
+            return;
+          }
+        }
+      }
       const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}},audio:false});
       streamRef.current=stream;
       if(videoRef.current){ videoRef.current.srcObject=stream; await videoRef.current.play(); }
@@ -131,7 +148,11 @@ export const InventoryCameraModal: React.FC<Props> = ({ isOpen, onClose, accessT
 
       const reader=new BrowserMultiFormatReader();
       zxingControlsRef.current=await reader.decodeFromStream(stream, videoRef.current ?? undefined, (result)=>{ if(result) handleDetected(result.getText()); });
-    } catch { setMessage('Камер нээх зөвшөөрөл өгнө үү.'); }
+    } catch {
+      setMessage(Capacitor.isNativePlatform()
+        ? 'Камер нээгдсэнгүй. Утасныхаа Тохиргоо → Апп → US&K Агуулах → Зөвшөөрөл хэсгээс камерыг гараар зөвшөөрөөд дахин оролдоно уу.'
+        : 'Камер нээх зөвшөөрөл өгнө үү.');
+    }
   };
 
   const register=async()=>{
