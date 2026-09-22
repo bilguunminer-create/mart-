@@ -148,7 +148,7 @@ export const PRODUCTS: Product[] = [
     weight: "1.0л",
     badge: "Дээд зэрэглэлийн",
     badge_color: "bg-cyan-600",
-    image: "https://images.unsplash.com/photo-1548839140-29a749e1bc4e?auto=format&fit=crop&w=600&h=600&q=80",
+    image: "https://images.unsplash.com/photo-1616118132534-381148898bb4?auto=format&fit=crop&w=600&h=600&q=80",
     description: "Фижи арлын гүний цэнгэг байгалийн рашаан ус. Цэвэр эрдэстэй, зөөлөн амттай дэлхийн шилдэг ус.",
     in_stock: true,
     rating: 5.0,
@@ -292,7 +292,7 @@ export const PRODUCTS: Product[] = [
     weight: "200 капсул",
     badge: "Зүрх судас & Тархи",
     badge_color: "bg-sky-700",
-    image: "https://images.unsplash.com/photo-1550572017-ed200f5e6343?auto=format&fit=crop&w=600&h=600&q=80",
+    image: "https://images.unsplash.com/photo-1670850756988-a1943aa0e554?auto=format&fit=crop&w=600&h=600&q=80",
     description: "Зүрх судасны үйл ажиллагаа, тархины ой санамж, үе мөчний уян хатан байдлыг сайжруулах цэвэршүүлсэн Омега-3 загасны тос.",
     in_stock: true,
     rating: 5.0,
@@ -640,6 +640,7 @@ export const LOYALTY_TIERS: LoyaltyTier[] = [
     threshold: 500000,
     range: "Нийт 500,000 ₮ худалдан авалтаас",
     discount_pct: 2,
+    cashback_pct: 1,
     admin_gift: "Солонгос амттан, шаржигнасан чипсний бэлэг",
     birthday_reward: "5,000 ₮ бэлгийн ваучер",
     benefits: [
@@ -659,6 +660,7 @@ export const LOYALTY_TIERS: LoyaltyTier[] = [
     threshold: 1000000,
     range: "Нийт 1,000,000 ₮ худалдан авалтаас",
     discount_pct: 3,
+    cashback_pct: 2,
     admin_gift: "Maxim кофе хайрцаг эсвэл далайн байцааны багц",
     birthday_reward: "10,000 ₮ бэлгийн ваучер",
     benefits: [
@@ -678,6 +680,7 @@ export const LOYALTY_TIERS: LoyaltyTier[] = [
     threshold: 2000000,
     range: "Нийт 2,000,000 ₮ худалдан авалтаас",
     discount_pct: 5,
+    cashback_pct: 3,
     admin_gift: "Америк & Солонгос VIP импортын бэлгийн сагс + Бэлэг",
     birthday_reward: "20,000 ₮ ваучер",
     benefits: [

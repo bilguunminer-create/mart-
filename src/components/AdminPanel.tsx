@@ -2559,6 +2559,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       <span className="text-[10px] text-stone-500 font-bold block truncate">{tier.badge}</span>
                       <span className="text-xs font-black text-stone-900">{formatMNT(tier.threshold)}</span>
                       <span className="text-[10px] text-amber-600 font-bold ml-1">(-{tier.discount_pct}%)</span>
+                      <span className="text-[10px] text-emerald-600 font-bold ml-1">({tier.cashback_pct}% кэшбэк)</span>
                     </div>
                   ))}
                 </div>
