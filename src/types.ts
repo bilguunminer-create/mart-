@@ -40,6 +40,7 @@ export interface LoyaltyTier {
   threshold: number;
   range: string;
   discount_pct: number;
+  cashback_pct: number;
   admin_gift: string;
   birthday_reward: string;
   benefits: string[];

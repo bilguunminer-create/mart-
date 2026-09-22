@@ -117,10 +117,12 @@ export const LoyaltyRulesModal: React.FC<LoyaltyRulesModalProps> = ({
     const sanitizedTiers = editedTiers.map((t) => {
       const validThreshold = Math.max(0, Math.min(500000000, Math.floor(Number(t.threshold) || 0)));
       const validDiscountPct = Math.max(0, Math.min(90, Math.round(Number(t.discount_pct) || 0)));
+      const validCashbackPct = Math.max(0, Math.min(50, Number(t.cashback_pct) || 0));
       return {
         ...t,
         threshold: validThreshold,
         discount_pct: validDiscountPct,
+        cashback_pct: validCashbackPct,
         range: `Нийт ${formatMNT(validThreshold)} худалдан авалтаас`,
         admin_gift: (t.admin_gift || '').trim().slice(0, 100),
         benefits: (t.benefits || []).map((b) => b.trim().slice(0, 150)).filter(Boolean)
@@ -195,10 +197,10 @@ export const LoyaltyRulesModal: React.FC<LoyaltyRulesModalProps> = ({
             </div>
             <div>
               <div className="text-xs font-black text-stone-900 flex items-center gap-1.5">
-                <span>Бүх худалдан авалтын суурь бэлэн онооны кэшбэк хувь</span>
+                <span>Зэрэглэлд хараахан хүрээгүй харилцагчийн суурь кэшбэк хувь</span>
               </div>
               <div className="text-[11px] text-stone-600">
-                Хэрэглэгч бүр захиалга хийх бүрт дүнгийн тодорхой хувь лояалти оноо болон хуримтлагдана.
+                Хүрэл түвшинд хүрээгүй (эсвэл зэрэглэлгүй) харилцагчид ногдох онооны хувь. Зэрэглэл бүрийн өөрийн хувийг доор тухайн таб дээр тохируулна.
               </div>
             </div>
           </div>
@@ -310,6 +312,26 @@ export const LoyaltyRulesModal: React.FC<LoyaltyRulesModalProps> = ({
                     <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-stone-400">%</span>
                   </div>
                   <p className="text-[10px] text-stone-400 mt-1">Сагсанд байрлах барааны нийт үнээс шууд хасагдах хувь.</p>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-extrabold text-stone-800 mb-1.5 flex items-center justify-between">
+                    <span>Оноо цуглуулах кэшбэк хувь (%)</span>
+                    <span className="text-[11px] font-mono text-emerald-600">{currentTier.cashback_pct}%</span>
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      step="0.5"
+                      min="0"
+                      max="50"
+                      value={currentTier.cashback_pct}
+                      onChange={(e) => handleUpdateTierField('cashback_pct', Number(e.target.value))}
+                      className="w-full px-3.5 py-2.5 text-xs font-black border border-stone-300 rounded-xl focus:outline-none focus:border-amber-500 pr-12 font-mono"
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-stone-400">%</span>
+                  </div>
+                  <p className="text-[10px] text-stone-400 mt-1">Захиалга хүргэгдэхэд энэ зэрэглэлийн гишүүнд ногдох бонус онооны хувь.</p>
                 </div>
               </div>
 
