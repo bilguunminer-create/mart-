@@ -93,7 +93,16 @@ export default function App() {
       setStoreLogoUrl(settings.data.store_logo_url ? String(settings.data.store_logo_url) : null);
       setStoreBannerUrl(settings.data.store_banner_url ? String(settings.data.store_banner_url) : null);
       const savedTiers = settings.data.loyalty_tiers_config;
-      if (Array.isArray(savedTiers) && savedTiers.length > 0) setActiveLoyaltyTiers(savedTiers as LoyaltyTier[]);
+      if (Array.isArray(savedTiers) && savedTiers.length > 0) {
+        // Older saved configs predate the per-tier cashback_pct field; backfill
+        // from the matching default tier (by id) so the admin editor and the
+        // points-earning calculation never see an undefined percentage.
+        const withCashback = (savedTiers as LoyaltyTier[]).map((tier) => ({
+          ...tier,
+          cashback_pct: tier.cashback_pct ?? (LOYALTY_TIERS.find((d) => d.id === tier.id)?.cashback_pct ?? 0)
+        }));
+        setActiveLoyaltyTiers(withCashback);
+      }
       if (settings.data.loyalty_cashback_pct !== undefined) setLoyaltyCashbackPct(Number(settings.data.loyalty_cashback_pct));
       const savedOverrides = settings.data.loyalty_tier_overrides;
       if (savedOverrides && typeof savedOverrides === 'object') setLoyaltyTierOverrides(savedOverrides as Record<string, string>);

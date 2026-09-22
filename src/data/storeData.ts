@@ -640,6 +640,7 @@ export const LOYALTY_TIERS: LoyaltyTier[] = [
     threshold: 500000,
     range: "Нийт 500,000 ₮ худалдан авалтаас",
     discount_pct: 2,
+    cashback_pct: 1,
     admin_gift: "Солонгос амттан, шаржигнасан чипсний бэлэг",
     birthday_reward: "5,000 ₮ бэлгийн ваучер",
     benefits: [
@@ -659,6 +660,7 @@ export const LOYALTY_TIERS: LoyaltyTier[] = [
     threshold: 1000000,
     range: "Нийт 1,000,000 ₮ худалдан авалтаас",
     discount_pct: 3,
+    cashback_pct: 2,
     admin_gift: "Maxim кофе хайрцаг эсвэл далайн байцааны багц",
     birthday_reward: "10,000 ₮ бэлгийн ваучер",
     benefits: [
@@ -678,6 +680,7 @@ export const LOYALTY_TIERS: LoyaltyTier[] = [
     threshold: 2000000,
     range: "Нийт 2,000,000 ₮ худалдан авалтаас",
     discount_pct: 5,
+    cashback_pct: 3,
     admin_gift: "Америк & Солонгос VIP импортын бэлгийн сагс + Бэлэг",
     birthday_reward: "20,000 ₮ ваучер",
     benefits: [
