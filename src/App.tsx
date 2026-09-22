@@ -53,7 +53,7 @@ const InventoryCameraModal = React.lazy(() =>
 const InventoryOrdersModal = React.lazy(() =>
   import('./components/InventoryOrdersModal').then((m) => ({ default: m.InventoryOrdersModal }))
 );
-import { getStoreCustomerProfiles, getStoreOrders, getStoreSettings, saveStoreOrder, saveStoreProducts, saveStoreSettings, hasStoreAdminAccess, refreshSession, reportStoreOrderPayment, updateStoreOrderStatus, confirmStoreOrderPayment, verifyAdminPin, changeAdminPin, expireUnpaidOrdersAsAdmin, getAllReviewsForAdmin, moderateProductReview, deleteProductReview, getProductReviews, adminListLoyaltyWallets, adminGrantLoyaltyPoints, AdminLoyaltyWallet, uploadCategoryImage, uploadBrandingImage } from './services/supabaseAuth';
+import { getStoreCustomerProfiles, getStoreOrders, getStoreSettings, saveStoreOrder, saveStoreProducts, saveStoreSettings, hasStoreAdminAccess, refreshSession, reportStoreOrderPayment, updateStoreOrderStatus, confirmStoreOrderPayment, verifyAdminPin, changeAdminPin, expireUnpaidOrdersAsAdmin, getAllReviewsForAdmin, moderateProductReview, deleteProductReview, getProductReviews, adminListLoyaltyWallets, adminGrantLoyaltyPoints, AdminLoyaltyWallet, uploadCategoryImage, uploadBrandingImage, logSiteVisit, getSiteVisitStats, SiteVisitStats } from './services/supabaseAuth';
 import { initAdminPushNotifications } from './services/pushNotifications';
 
 export default function App() {
@@ -323,6 +323,38 @@ export default function App() {
     if (!isAdminAuthenticated) return;
     void refreshAdminReviews();
   }, [isAdminAuthenticated, refreshAdminReviews]);
+
+  // Site visit stats (admin Статистик tab only -- fetched on demand, not polled).
+  const [siteVisitStats, setSiteVisitStats] = useState<SiteVisitStats | null>(null);
+  const refreshSiteVisitStats = useCallback(async () => {
+    if (!currentUser?.accessToken) return;
+    try {
+      setSiteVisitStats(await getSiteVisitStats(currentUser.accessToken));
+    } catch {
+      // The stats card simply stays empty; the admin can retry by reopening the tab.
+    }
+  }, [currentUser?.accessToken]);
+
+  // Logs one anonymous pageview for the public storefront only -- never for the
+  // admin dashboard or the warehouse app, so "хэдэн хүн үзсэн" reflects real
+  // customer traffic, not staff logging in to manage the site.
+  useEffect(() => {
+    if (isAdminApp) return;
+    try {
+      let visitorId = localStorage.getItem('usk_visitor_id');
+      if (!visitorId) {
+        visitorId = crypto.randomUUID();
+        localStorage.setItem('usk_visitor_id', visitorId);
+      }
+      logSiteVisit(visitorId, window.location.pathname).catch(() => {
+        // Pageview logging is best-effort; never surface this to the visitor.
+      });
+    } catch {
+      // Pageview logging is best-effort; never block the storefront on it.
+    }
+    // Runs once per page load by design -- not tied to route changes within the SPA.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Log out a customer after 30 minutes without activity.
   useEffect(() => {
@@ -1882,6 +1914,8 @@ export default function App() {
           onSaveFeaturedProduct={async (productId) => { if (!currentUser?.accessToken) throw new Error('Админ и-мэйлээр нэвтэрнэ үү.'); await saveStoreSettings(currentUser.accessToken, { featured_product_id: productId }); setFeaturedProductId(productId); showToast('Өнөөдрийн онцлох бараа төв санд хадгалагдлаа.'); }}
           reviews={adminReviews}
           onRefreshReviews={refreshAdminReviews}
+          siteVisitStats={siteVisitStats}
+          onRefreshSiteVisitStats={refreshSiteVisitStats}
           onModerateReview={async (reviewId, approve) => {
             if (!currentUser?.accessToken) throw new Error('Админ и-мэйлээр нэвтэрнэ үү.');
             await moderateProductReview(currentUser.accessToken, reviewId, approve);
