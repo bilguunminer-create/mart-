@@ -2086,10 +2086,11 @@ export default function App() {
         <button
           type="button"
           onClick={() => setIsSupportChatOpen(true)}
-          className="fixed bottom-6 left-6 z-50 w-12 h-12 rounded-full bg-stone-900 hover:bg-stone-800 text-amber-400 shadow-xl flex items-center justify-center cursor-pointer transition-colors border border-stone-700"
-          title="Дэлгүүртэй холбогдох"
+          className="fixed bottom-6 left-6 z-50 flex items-center gap-2 bg-stone-900 hover:bg-stone-800 text-amber-400 shadow-xl pl-3.5 pr-4 py-3 rounded-full cursor-pointer transition-colors border border-stone-700"
+          title="Дэлгүүрийн админтай холбогдох"
         >
-          <MessageCircle className="w-5 h-5" />
+          <MessageCircle className="w-5 h-5 shrink-0" />
+          <span className="text-xs font-bold text-stone-200 whitespace-nowrap">Дэлгүүрийн админтай холбогдох</span>
         </button>
       )}
       {currentUser?.accessToken && (
