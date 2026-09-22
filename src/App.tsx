@@ -15,7 +15,8 @@ import {
   HeartHandshake,
   LogOut,
   Star,
-  Mail
+  Mail,
+  MessageCircle
 } from 'lucide-react';
 import { 
   PRODUCTS, 
@@ -53,7 +54,10 @@ const InventoryCameraModal = React.lazy(() =>
 const InventoryOrdersModal = React.lazy(() =>
   import('./components/InventoryOrdersModal').then((m) => ({ default: m.InventoryOrdersModal }))
 );
-import { getStoreCustomerProfiles, getStoreOrders, getStoreSettings, saveStoreOrder, saveStoreProducts, saveStoreSettings, hasStoreAdminAccess, refreshSession, reportStoreOrderPayment, updateStoreOrderStatus, confirmStoreOrderPayment, verifyAdminPin, changeAdminPin, expireUnpaidOrdersAsAdmin, getAllReviewsForAdmin, moderateProductReview, deleteProductReview, getProductReviews, adminListLoyaltyWallets, adminGrantLoyaltyPoints, AdminLoyaltyWallet, uploadCategoryImage, uploadBrandingImage, logSiteVisit, getSiteVisitStats, SiteVisitStats } from './services/supabaseAuth';
+const SupportChatModal = React.lazy(() =>
+  import('./components/SupportChatModal').then((m) => ({ default: m.SupportChatModal }))
+);
+import { getStoreCustomerProfiles, getStoreOrders, getStoreSettings, saveStoreOrder, saveStoreProducts, saveStoreSettings, hasStoreAdminAccess, refreshSession, reportStoreOrderPayment, updateStoreOrderStatus, confirmStoreOrderPayment, verifyAdminPin, changeAdminPin, expireUnpaidOrdersAsAdmin, getAllReviewsForAdmin, moderateProductReview, deleteProductReview, getProductReviews, adminListLoyaltyWallets, adminGrantLoyaltyPoints, AdminLoyaltyWallet, uploadCategoryImage, uploadBrandingImage, logSiteVisit, getSiteVisitStats, SiteVisitStats, adminListSupportThreads, adminGetSupportThread, adminSendSupportMessage, SupportThreadSummary } from './services/supabaseAuth';
 import { initAdminPushNotifications } from './services/pushNotifications';
 // C-01 fix: App.tsx-аас хуваан гаргасан custom hook-ууд
 import { useCart } from './hooks/useCart';
@@ -163,6 +167,7 @@ export default function App() {
   const [isDirectFormOpen, setIsDirectFormOpen] = useState(false);
   const [isInventoryOpen, setIsInventoryOpen] = useState(false);
   const [isInventoryOrdersOpen, setIsInventoryOrdersOpen] = useState(false);
+  const [isSupportChatOpen, setIsSupportChatOpen] = useState(false);
 
   // Cart state persisted in localStorage
   // C-02 fix: 'usk_cart' нэгдмэл нэрхэвч болгосон.
@@ -347,6 +352,26 @@ export default function App() {
     } catch {
       // The stats card simply stays empty; the admin can retry by reopening the tab.
     }
+  }, [currentUser?.accessToken]);
+
+  // Support chat inbox (admin Чат tab only -- fetched on demand, not polled;
+  // AdminSupportChat itself polls the open thread while it's open).
+  const [supportThreads, setSupportThreads] = useState<SupportThreadSummary[]>([]);
+  const refreshSupportThreads = useCallback(async () => {
+    if (!currentUser?.accessToken) return;
+    try {
+      setSupportThreads(await adminListSupportThreads(currentUser.accessToken));
+    } catch {
+      // The inbox simply stays empty; the admin can retry by reopening the tab.
+    }
+  }, [currentUser?.accessToken]);
+  const handleOpenSupportThread = useCallback(async (customerId: string) => {
+    if (!currentUser?.accessToken) return [];
+    return adminGetSupportThread(currentUser.accessToken, customerId);
+  }, [currentUser?.accessToken]);
+  const handleSendSupportReply = useCallback(async (customerId: string, message: string) => {
+    if (!currentUser?.accessToken) throw new Error('Админ и-мэйлээр нэвтэрнэ үү.');
+    await adminSendSupportMessage(currentUser.accessToken, customerId, message);
   }, [currentUser?.accessToken]);
 
   // Logs one anonymous pageview for the public storefront only -- never for the
@@ -1927,6 +1952,10 @@ export default function App() {
           onRefreshReviews={refreshAdminReviews}
           siteVisitStats={siteVisitStats}
           onRefreshSiteVisitStats={refreshSiteVisitStats}
+          supportThreads={supportThreads}
+          onRefreshSupportThreads={refreshSupportThreads}
+          onOpenSupportThread={handleOpenSupportThread}
+          onSendSupportReply={handleSendSupportReply}
           onModerateReview={async (reviewId, approve) => {
             if (!currentUser?.accessToken) throw new Error('Админ и-мэйлээр нэвтэрнэ үү.');
             await moderateProductReview(currentUser.accessToken, reviewId, approve);
@@ -2062,6 +2091,26 @@ export default function App() {
             <span className="font-black text-sm text-amber-400">{formatMNT(cartCurrentPriceTotal)}</span>
           </button>
         </div>
+      )}
+
+      {currentUser?.accessToken && !isAdminOpen && (
+        <button
+          type="button"
+          onClick={() => setIsSupportChatOpen(true)}
+          className="fixed bottom-6 left-6 z-50 w-12 h-12 rounded-full bg-stone-900 hover:bg-stone-800 text-amber-400 shadow-xl flex items-center justify-center cursor-pointer transition-colors border border-stone-700"
+          title="Дэлгүүртэй холбогдох"
+        >
+          <MessageCircle className="w-5 h-5" />
+        </button>
+      )}
+      {currentUser?.accessToken && (
+        <React.Suspense fallback={null}>
+          <SupportChatModal
+            isOpen={isSupportChatOpen}
+            onClose={() => setIsSupportChatOpen(false)}
+            accessToken={currentUser.accessToken}
+          />
+        </React.Suspense>
       )}
 
       {/* Toast Notification */}
