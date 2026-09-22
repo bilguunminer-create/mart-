@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import nodemailer from 'nodemailer';
-import { checkRateLimit, clientIp } from './_rateLimit';
+import { checkRateLimit, clientIp } from './_rateLimit.js';
 
 // Global cache for serverless environment
 const globalOtpStore = (global as any).__otpStore || new Map<string, { code: string; expiresAt: number; name?: string }>();
