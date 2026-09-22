@@ -48,10 +48,12 @@ $env:ANDROID_HOME = "$env:LOCALAPPDATA\Android\Sdk"
 .\gradlew.bat assembleDebug
 ```
 
-Камер ашиглахын тулд Android-ийн `AndroidManifest.xml` дээр дараах permission байгаа эсэхийг шалгана:
+**Чухал**: `npx cap add android` хийх бүрд шинэ `AndroidManifest.xml` үүсдэг бөгөөд `@capacitor/camera` plugin өөрөө CAMERA зөвшөөрлийг **автоматаар нэмдэггүй** (зөвхөн систем камер апп руу шилжих `<queries>` intent-ийг л нэмдэг, шууд `getUserMedia`-аар видео урсгал авахад хэрэглэгддэг `android.permission.CAMERA`-г нэмдэггүй) — үүнийг `npx cap add android` хийсэн болгонд **гараар нэмэх ёстой**, эс тэгвээс камер зөвшөөрлийн диалог огт гарахгүй, "Камер нээх зөвшөөрөл өгнө үү" гэсэн алдаа мөнхөд давтагдана. `android-inventory/app/src/main/AndroidManifest.xml`-ийн `<!-- Permissions -->` хэсэгт дараах мөрүүдийг нэмнэ:
 
 ```xml
 <uses-permission android:name="android.permission.CAMERA" />
+<uses-feature android:name="android.hardware.camera" android:required="false" />
+<uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
 ```
 
 Native shell нь `https://www.uskmart.com/?admin=inventory`-оос ажлын дэлгэцээ нээдэг. Тиймээс сайт шинэчлэгдэхэд агуулах аппын логик, бараа, дүрэм серверээс шууд шинэчлэгдэнэ.
