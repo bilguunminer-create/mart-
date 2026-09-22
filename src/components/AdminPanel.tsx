@@ -88,6 +88,17 @@ interface AdminPanelProps {
   onSaveFeaturedProduct?: (productId: string) => Promise<void> | void;
   reviews?: ProductReview[];
   onRefreshReviews?: () => void;
+  siteVisitStats?: {
+    total_pageviews: number;
+    total_unique_visitors: number;
+    today_pageviews: number;
+    today_unique_visitors: number;
+    last7days_pageviews: number;
+    last7days_unique_visitors: number;
+    last30days_pageviews: number;
+    last30days_unique_visitors: number;
+  } | null;
+  onRefreshSiteVisitStats?: () => void;
   onModerateReview?: (reviewId: string, approve: boolean) => Promise<void> | void;
   onDeleteReview?: (reviewId: string) => Promise<void> | void;
   checkoutSettings?: { deliveryFee: number; freeDeliveryThreshold: number; bankName: string; accountNumber: string; iban: string; accountHolder: string; storePhone: string; storeEmail: string; facebookUrl: string; messengerUrl: string; googleMapsUrl: string; storeAddress: string; unpaidCancellationMinutes: number };
@@ -151,6 +162,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   onDeleteCombo,
   reviews = [],
   onRefreshReviews,
+  siteVisitStats = null,
+  onRefreshSiteVisitStats,
   onModerateReview,
   onDeleteReview,
   checkoutSettings = { deliveryFee: 3000, freeDeliveryThreshold: 100000, bankName: '', accountNumber: '', iban: '', accountHolder: '', storePhone: '', storeEmail: '', facebookUrl: '', messengerUrl: '', googleMapsUrl: '', storeAddress: '', unpaidCancellationMinutes: 60 },
@@ -721,7 +734,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
             <button
               id="admin-tab-stats"
-              onClick={() => setActiveTab('stats')}
+              onClick={() => { setActiveTab('stats'); onRefreshSiteVisitStats?.(); }}
               className={`py-3 px-4 text-xs font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
                 activeTab === 'stats'
                   ? 'border-rose-500 text-rose-400'
@@ -1491,6 +1504,50 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   })}
                 </div>
               </div>
+            </div>
+
+            {/* Site Visit Stats */}
+            <div className="bg-white p-5 rounded-2xl border border-stone-200 shadow-xs space-y-3">
+              <div className="flex items-center gap-2.5 pb-3 border-b border-stone-100">
+                <div className="w-8 h-8 rounded-xl bg-sky-500/10 text-sky-600 flex items-center justify-center font-bold">
+                  <Users className="w-4 h-4" />
+                </div>
+                <div>
+                  <h4 className="font-bold text-stone-900 text-sm">Сайтын зочид</h4>
+                  <p className="text-[11px] text-stone-500">Дэлгүүрийн нүүр хуудсыг үзсэн тоо (админ, агуулах цонх тооцогдохгүй)</p>
+                </div>
+              </div>
+
+              {siteVisitStats ? (
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+                  <div className="bg-stone-50 p-3 rounded-xl border border-stone-200/80">
+                    <span className="text-[10px] text-stone-500 font-bold block">Өнөөдөр</span>
+                    <span className="text-lg font-black text-stone-900">{siteVisitStats.today_unique_visitors}</span>
+                    <span className="text-[10px] text-stone-400 ml-1">хүн</span>
+                    <p className="text-[10px] text-stone-400 mt-0.5">{siteVisitStats.today_pageviews} үзэлт</p>
+                  </div>
+                  <div className="bg-stone-50 p-3 rounded-xl border border-stone-200/80">
+                    <span className="text-[10px] text-stone-500 font-bold block">Сүүлийн 7 хоног</span>
+                    <span className="text-lg font-black text-stone-900">{siteVisitStats.last7days_unique_visitors}</span>
+                    <span className="text-[10px] text-stone-400 ml-1">хүн</span>
+                    <p className="text-[10px] text-stone-400 mt-0.5">{siteVisitStats.last7days_pageviews} үзэлт</p>
+                  </div>
+                  <div className="bg-stone-50 p-3 rounded-xl border border-stone-200/80">
+                    <span className="text-[10px] text-stone-500 font-bold block">Сүүлийн 30 хоног</span>
+                    <span className="text-lg font-black text-stone-900">{siteVisitStats.last30days_unique_visitors}</span>
+                    <span className="text-[10px] text-stone-400 ml-1">хүн</span>
+                    <p className="text-[10px] text-stone-400 mt-0.5">{siteVisitStats.last30days_pageviews} үзэлт</p>
+                  </div>
+                  <div className="bg-sky-50 p-3 rounded-xl border border-sky-200/80">
+                    <span className="text-[10px] text-sky-700 font-bold block">Нийт (эхнээс хойш)</span>
+                    <span className="text-lg font-black text-sky-900">{siteVisitStats.total_unique_visitors}</span>
+                    <span className="text-[10px] text-sky-600 ml-1">хүн</span>
+                    <p className="text-[10px] text-sky-600 mt-0.5">{siteVisitStats.total_pageviews} үзэлт</p>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-xs text-stone-400 py-2">Ачааллаж байна...</p>
+              )}
             </div>
 
             {/* Loyalty Automatic Tier System Overview with quick switch */}

@@ -350,6 +350,29 @@ export async function unregisterAdminPushToken(token: string, deviceToken: strin
   }, token);
 }
 
+/** Logs one storefront pageview. Anonymous -- no token, no PII, just a random per-browser id. */
+export async function logSiteVisit(visitorId: string, path: string) {
+  return request('/rest/v1/rpc/log_site_visit', {
+    method: 'POST',
+    body: JSON.stringify({ p_visitor_id: visitorId, p_path: path }),
+  });
+}
+
+export type SiteVisitStats = {
+  total_pageviews: number;
+  total_unique_visitors: number;
+  today_pageviews: number;
+  today_unique_visitors: number;
+  last7days_pageviews: number;
+  last7days_unique_visitors: number;
+  last30days_pageviews: number;
+  last30days_unique_visitors: number;
+};
+
+export async function getSiteVisitStats(token: string): Promise<SiteVisitStats> {
+  return request('/rest/v1/rpc/get_site_visit_stats', { method: 'POST', body: JSON.stringify({}) }, token);
+}
+
 export async function uploadProfileImage(token: string, file: File) {
   if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) throw new Error('Зөвхөн JPG, PNG эсвэл WEBP зураг оруулна.');
   if (file.size > 3 * 1024 * 1024) throw new Error('Зургийн хэмжээ 3MB-аас бага байх ёстой.');
