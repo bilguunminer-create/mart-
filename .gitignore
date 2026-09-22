@@ -1,0 +1,19 @@
+node_modules/
+build/
+dist/
+coverage/
+.DS_Store
+*.log
+bun.lock
+bun.lockb
+.env*
+!.env.example
+
+# Generated native projects (regenerate with npx cap add android / cap sync) and
+# the Firebase credentials that get dropped into them — never commit these.
+android/
+android-inventory/
+ios/
+google-services.json
+GoogleService-Info.plist
+*firebase-adminsdk*.json

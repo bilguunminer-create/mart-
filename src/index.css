@@ -1,0 +1,82 @@
+@import "tailwindcss";
+
+@theme {
+  --font-serif: "Fraunces", ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
+}
+
+:root {
+  color-scheme: light;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+html {
+  width: 100%;
+  min-width: 320px;
+  min-height: 100%;
+  overflow-x: clip;
+  overflow-y: auto;
+  touch-action: pan-y pinch-zoom;
+}
+
+body, #root {
+  width: 100%;
+  min-width: 320px;
+  min-height: 100%;
+  max-width: 100%;
+}
+
+body {
+  margin: 0;
+  overflow-x: clip;
+  overflow-y: auto;
+  overscroll-behavior-y: auto;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y pinch-zoom;
+}
+
+img, video, canvas {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+button, input, select, textarea {
+  max-width: 100%;
+  font: inherit;
+}
+
+/* Footer testimonial ticker: a continuous right-to-left scroll of approved reviews. */
+@keyframes usk-testimonial-marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+.usk-testimonial-track {
+  animation: usk-testimonial-marquee 40s linear infinite;
+}
+
+.usk-testimonial-track:hover {
+  animation-play-state: paused;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .usk-testimonial-track {
+    animation: none;
+  }
+}
+
+@media (max-width: 640px) {
+  html, body, #root {
+    min-width: 0;
+  }
+
+  input, select, textarea {
+    font-size: 16px;
+  }
+
+  .fixed.inset-0 {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+  }
+}

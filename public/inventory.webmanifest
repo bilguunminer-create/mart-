@@ -1,0 +1,18 @@
+{
+  "name": "US&K Агуулах",
+  "short_name": "US&K Агуулах",
+  "description": "US&K Family Mart бараа бүртгэл, barcode болон үлдэгдлийн удирдлага",
+  "start_url": "/?admin=inventory",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#1c1917",
+  "theme_color": "#1c1917",
+  "icons": [
+    {
+      "src": "/inventory-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
