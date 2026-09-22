@@ -12,7 +12,7 @@ let started = false;
 // This is a PUBLIC key, safe to ship in the client bundle -- it identifies
 // which project can address this browser, it is not a secret credential.
 // Web push silently no-ops until this is filled in.
-const VAPID_PUBLIC_KEY = '';
+const VAPID_PUBLIC_KEY = 'BL-7oA4DL1eN9yLtn6E_6MaXry56qasXVkziF36wtkMOdu267KwhT2gQOQlxReWCXAJC3atJtkADzRVmaEbTR6o';
 
 /**
  * Native app path (Capacitor Android/iOS build installed on the device):
