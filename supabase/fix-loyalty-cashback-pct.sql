@@ -19,6 +19,9 @@
 --
 -- Run this once in the Supabase SQL Editor.
 
+-- Drop first so Postgres allows the parameter rename (p_order_id → order_id).
+drop function if exists public.store_order_status(uuid, text);
+
 create or replace function public.store_order_status(order_id uuid, next_status text)
  returns void
  language plpgsql
