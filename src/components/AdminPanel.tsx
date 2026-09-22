@@ -39,7 +39,8 @@ import {
   Minus,
   AlertTriangle,
   Upload,
-  MessageSquareText
+  MessageSquareText,
+  MessageCircle
 } from 'lucide-react';
 import { Product, OrderDetails, LoyaltyTier, ComboPack, ProductReview } from '../types';
 import {
@@ -52,6 +53,8 @@ import { DEFAULT_CATEGORY_IMAGES } from '../data/categoryImageDefaults';
 import { ProductFormModal } from './ProductFormModal';
 import { ComboFormModal } from './ComboFormModal';
 import { LoyaltyRulesModal } from './LoyaltyRulesModal';
+import { AdminSupportChat } from './AdminSupportChat';
+import { SupportMessage, SupportThreadSummary } from '../services/supabaseAuth';
 
 interface AdminPanelProps {
   products: Product[];
@@ -99,6 +102,10 @@ interface AdminPanelProps {
     last30days_unique_visitors: number;
   } | null;
   onRefreshSiteVisitStats?: () => void;
+  supportThreads?: SupportThreadSummary[];
+  onRefreshSupportThreads?: () => void;
+  onOpenSupportThread?: (customerId: string) => Promise<SupportMessage[]>;
+  onSendSupportReply?: (customerId: string, message: string) => Promise<void>;
   onModerateReview?: (reviewId: string, approve: boolean) => Promise<void> | void;
   onDeleteReview?: (reviewId: string) => Promise<void> | void;
   checkoutSettings?: { deliveryFee: number; freeDeliveryThreshold: number; bankName: string; accountNumber: string; iban: string; accountHolder: string; storePhone: string; storeEmail: string; facebookUrl: string; messengerUrl: string; googleMapsUrl: string; storeAddress: string; unpaidCancellationMinutes: number };
@@ -164,12 +171,16 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   onRefreshReviews,
   siteVisitStats = null,
   onRefreshSiteVisitStats,
+  supportThreads = [],
+  onRefreshSupportThreads,
+  onOpenSupportThread,
+  onSendSupportReply,
   onModerateReview,
   onDeleteReview,
   checkoutSettings = { deliveryFee: 3000, freeDeliveryThreshold: 100000, bankName: '', accountNumber: '', iban: '', accountHolder: '', storePhone: '', storeEmail: '', facebookUrl: '', messengerUrl: '', googleMapsUrl: '', storeAddress: '', unpaidCancellationMinutes: 60 },
   onSaveCheckoutSettings
 }) => {
-  const [activeTab, setActiveTab] = useState<'products' | 'orders' | 'loyalty' | 'stats' | 'settings' | 'reviews'>('products');
+  const [activeTab, setActiveTab] = useState<'products' | 'orders' | 'loyalty' | 'stats' | 'settings' | 'reviews' | 'chat'>('products');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedOrigin, setSelectedOrigin] = useState<'ALL' | 'KR' | 'US'>('ALL');
@@ -759,6 +770,24 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               {pendingReviewsCount > 0 && (
                 <span className="px-1.5 py-0.2 rounded-full bg-indigo-600 text-[10px] text-white font-bold animate-pulse">
                   {pendingReviewsCount} шинэ
+                </span>
+              )}
+            </button>
+
+            <button
+              id="admin-tab-chat"
+              onClick={() => { setActiveTab('chat'); onRefreshSupportThreads?.(); }}
+              className={`py-3 px-4 text-xs font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+                activeTab === 'chat'
+                  ? 'border-emerald-500 text-emerald-400'
+                  : 'border-transparent text-stone-400 hover:text-stone-200'
+              }`}
+            >
+              <MessageCircle className="w-4 h-4 text-emerald-400" />
+              <span>Чат</span>
+              {supportThreads.reduce((sum, t) => sum + t.unread_count, 0) > 0 && (
+                <span className="px-1.5 py-0.2 rounded-full bg-emerald-600 text-[10px] text-white font-bold animate-pulse">
+                  {supportThreads.reduce((sum, t) => sum + t.unread_count, 0)} шинэ
                 </span>
               )}
             </button>
@@ -2109,6 +2138,16 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               </div>
             )}
           </div>
+        )}
+
+        {/* ================= SUPPORT CHAT TAB ================= */}
+        {activeTab === 'chat' && (
+          <AdminSupportChat
+            threads={supportThreads}
+            onRefreshThreads={() => onRefreshSupportThreads?.()}
+            onOpenThread={(customerId) => onOpenSupportThread?.(customerId) ?? Promise.resolve([])}
+            onSendReply={(customerId, message) => onSendSupportReply?.(customerId, message) ?? Promise.resolve()}
+          />
         )}
 
         {/* ================= SETTINGS & SECURITY TAB ================= */}
