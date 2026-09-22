@@ -16,7 +16,8 @@ import {
   LogOut,
   Star,
   Mail,
-  MessageCircle
+  MessageCircle,
+  X
 } from 'lucide-react';
 import { 
   PRODUCTS, 
@@ -57,6 +58,10 @@ const InventoryOrdersModal = React.lazy(() =>
 const SupportChatModal = React.lazy(() =>
   import('./components/SupportChatModal').then((m) => ({ default: m.SupportChatModal }))
 );
+// Not lazy: AdminPanel already imports this statically, so it is already part
+// of the main bundle -- a dynamic import here would not save anything and
+// Vite warns about exactly that.
+import { AdminSupportChat } from './components/AdminSupportChat';
 import { getStoreCustomerProfiles, getStoreOrders, getStoreSettings, saveStoreOrder, saveStoreProducts, saveStoreSettings, hasStoreAdminAccess, refreshSession, reportStoreOrderPayment, updateStoreOrderStatus, confirmStoreOrderPayment, verifyAdminPin, changeAdminPin, expireUnpaidOrdersAsAdmin, getAllReviewsForAdmin, moderateProductReview, deleteProductReview, getProductReviews, adminListLoyaltyWallets, adminGrantLoyaltyPoints, AdminLoyaltyWallet, uploadCategoryImage, uploadBrandingImage, logSiteVisit, getSiteVisitStats, SiteVisitStats, adminListSupportThreads, adminGetSupportThread, adminSendSupportMessage, SupportThreadSummary } from './services/supabaseAuth';
 import { initAdminPushNotifications } from './services/pushNotifications';
 // C-01 fix: App.tsx-аас хуваан гаргасан custom hook-ууд
@@ -168,6 +173,7 @@ export default function App() {
   const [isInventoryOpen, setIsInventoryOpen] = useState(false);
   const [isInventoryOrdersOpen, setIsInventoryOrdersOpen] = useState(false);
   const [isSupportChatOpen, setIsSupportChatOpen] = useState(false);
+  const [isInventoryChatOpen, setIsInventoryChatOpen] = useState(false);
 
   // Cart state persisted in localStorage
   // C-02 fix: 'usk_cart' нэгдмэл нэрхэвч болгосон.
@@ -373,6 +379,10 @@ export default function App() {
     if (!currentUser?.accessToken) throw new Error('Админ и-мэйлээр нэвтэрнэ үү.');
     await adminSendSupportMessage(currentUser.accessToken, customerId, message);
   }, [currentUser?.accessToken]);
+  useEffect(() => {
+    if (!isAdminAuthenticated) return;
+    void refreshSupportThreads();
+  }, [isAdminAuthenticated, refreshSupportThreads]);
 
   // Logs one anonymous pageview for the public storefront only -- never for the
   // admin dashboard or the warehouse app, so "хэдэн хүн үзсэн" reflects real
@@ -602,12 +612,13 @@ export default function App() {
     void handleOpenAdmin();
   }, [isAdminApp, currentUser?.accessToken, isAdminAuthenticated]);
 
-  // The separate warehouse app never lands in the public admin dashboard.
-  // After central admin authentication it opens the camera inventory workflow directly.
+  // The separate warehouse app never lands in the public admin dashboard, and its
+  // own home screen (Агуулах / Захиалгын мэдэгдэл / Чат menu) is what a signed-in
+  // staff member should land on -- it used to auto-jump straight into the camera
+  // tool here, skipping the menu entirely every time someone logged in.
   useEffect(() => {
     if (!isInventoryApp || !isAdminAuthenticated || !currentUser?.accessToken) return;
     setIsAdminOpen(false);
-    setIsInventoryOpen(true);
   }, [isInventoryApp, isAdminAuthenticated, currentUser?.accessToken]);
 
   // Registers this device for new-order push notifications once signed in as admin.
@@ -1015,30 +1026,77 @@ export default function App() {
     }
 
     const pendingOrderCount = orders.filter((o) => !o.status || o.status === 'new' || o.status === 'confirmed').length;
+    const supportUnreadCount = supportThreads.reduce((sum, t) => sum + t.unread_count, 0);
+    const isInventoryHomeVisible = !isInventoryOpen && !isInventoryOrdersOpen && !isInventoryChatOpen;
 
     return (
-      <div className="min-h-screen bg-stone-950 flex flex-col items-center justify-center gap-4 p-6 text-center">
-        {!isInventoryOpen && !isInventoryOrdersOpen && (
-          <div className="flex flex-col gap-3 w-full max-w-xs">
-            <button
-              type="button"
-              onClick={() => setIsInventoryOpen(true)}
-              className="bg-amber-400 hover:bg-amber-300 text-stone-950 font-bold px-6 py-4 rounded-2xl cursor-pointer transition-colors"
-            >
-              Агуулах
-            </button>
-            <button
-              type="button"
-              onClick={() => setIsInventoryOrdersOpen(true)}
-              className="relative bg-white/10 hover:bg-white/15 text-white font-bold px-6 py-4 rounded-2xl cursor-pointer transition-colors border border-white/10"
-            >
-              Захиалгын мэдэгдэл
-              {pendingOrderCount > 0 && (
-                <span className="absolute -top-2 -right-2 flex h-6 min-w-6 items-center justify-center rounded-full bg-rose-600 px-1.5 text-xs font-black text-white">
-                  {pendingOrderCount}
-                </span>
-              )}
-            </button>
+      <div className="min-h-screen bg-stone-950 flex flex-col">
+        {isInventoryHomeVisible && (
+          <div className="flex-1 flex flex-col items-center justify-center gap-8 p-6">
+            <div className="flex flex-col items-center gap-3">
+              <BeeEmblemLogo size={72} className="w-18 h-18" logoUrl={storeLogoUrl} />
+              <div className="text-center">
+                <h1 className="text-lg font-black text-white">US&K Агуулах</h1>
+                <p className="text-xs text-stone-400 mt-0.5">Тавтай морилно уу</p>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-3 w-full max-w-xs">
+              <button
+                type="button"
+                onClick={() => setIsInventoryOpen(true)}
+                className="group flex items-center gap-3.5 bg-amber-400 hover:bg-amber-300 text-stone-950 rounded-2xl px-5 py-4 cursor-pointer transition-colors shadow-lg shadow-amber-400/10 text-left"
+              >
+                <div className="w-10 h-10 rounded-xl bg-stone-950/10 flex items-center justify-center shrink-0">
+                  <Package className="w-5 h-5" />
+                </div>
+                <div className="flex-1">
+                  <p className="font-black text-sm">Агуулах</p>
+                  <p className="text-[11px] text-stone-950/70">Barcode унших, бараа бүртгэх, үлдэгдэл</p>
+                </div>
+                <ChevronRight className="w-4 h-4 opacity-50 group-hover:translate-x-0.5 transition-transform shrink-0" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsInventoryOrdersOpen(true)}
+                className="group relative flex items-center gap-3.5 bg-white/5 hover:bg-white/10 text-white rounded-2xl px-5 py-4 cursor-pointer transition-colors border border-white/10 text-left"
+              >
+                <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center shrink-0">
+                  <Truck className="w-5 h-5 text-amber-400" />
+                </div>
+                <div className="flex-1">
+                  <p className="font-black text-sm">Захиалгын мэдэгдэл</p>
+                  <p className="text-[11px] text-stone-400">Шинэ, бэлтгэж буй захиалгууд</p>
+                </div>
+                <ChevronRight className="w-4 h-4 opacity-50 group-hover:translate-x-0.5 transition-transform shrink-0" />
+                {pendingOrderCount > 0 && (
+                  <span className="absolute -top-2 -right-2 flex h-6 min-w-6 items-center justify-center rounded-full bg-rose-600 px-1.5 text-xs font-black text-white">
+                    {pendingOrderCount}
+                  </span>
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsInventoryChatOpen(true)}
+                className="group relative flex items-center gap-3.5 bg-white/5 hover:bg-white/10 text-white rounded-2xl px-5 py-4 cursor-pointer transition-colors border border-white/10 text-left"
+              >
+                <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center shrink-0">
+                  <MessageCircle className="w-5 h-5 text-emerald-400" />
+                </div>
+                <div className="flex-1">
+                  <p className="font-black text-sm">Чат</p>
+                  <p className="text-[11px] text-stone-400">Харилцагчидтай чатлах</p>
+                </div>
+                <ChevronRight className="w-4 h-4 opacity-50 group-hover:translate-x-0.5 transition-transform shrink-0" />
+                {supportUnreadCount > 0 && (
+                  <span className="absolute -top-2 -right-2 flex h-6 min-w-6 items-center justify-center rounded-full bg-rose-600 px-1.5 text-xs font-black text-white">
+                    {supportUnreadCount}
+                  </span>
+                )}
+              </button>
+            </div>
           </div>
         )}
         {currentUser?.accessToken && (
@@ -1058,6 +1116,31 @@ export default function App() {
               orders={orders}
               onUpdateStatus={handleUpdateOrderStatus}
             />
+            {isInventoryChatOpen && (
+              <div className="fixed inset-0 z-[70] flex flex-col bg-stone-950">
+                <header className="flex items-center justify-between p-4 bg-stone-900 border-b border-stone-800 shrink-0">
+                  <h2 className="text-sm font-black text-white flex items-center gap-2">
+                    <MessageCircle className="w-4 h-4 text-emerald-400" /> Чат
+                  </h2>
+                  <button
+                    type="button"
+                    onClick={() => setIsInventoryChatOpen(false)}
+                    className="p-2 rounded-xl text-stone-400 hover:text-white hover:bg-stone-800 cursor-pointer"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </header>
+                <div className="flex-1 overflow-hidden p-3">
+                  <AdminSupportChat
+                    threads={supportThreads}
+                    onRefreshThreads={() => void refreshSupportThreads()}
+                    onOpenThread={handleOpenSupportThread}
+                    onSendReply={handleSendSupportReply}
+                    heightClassName="h-full"
+                  />
+                </div>
+              </div>
+            )}
           </React.Suspense>
         )}
         {toastMessage && (
@@ -2097,10 +2180,11 @@ export default function App() {
         <button
           type="button"
           onClick={() => setIsSupportChatOpen(true)}
-          className="fixed bottom-6 left-6 z-50 w-12 h-12 rounded-full bg-stone-900 hover:bg-stone-800 text-amber-400 shadow-xl flex items-center justify-center cursor-pointer transition-colors border border-stone-700"
-          title="Дэлгүүртэй холбогдох"
+          className="fixed bottom-6 left-6 z-50 flex items-center gap-2 bg-stone-900 hover:bg-stone-800 text-amber-400 shadow-xl pl-3.5 pr-4 py-3 rounded-full cursor-pointer transition-colors border border-stone-700"
+          title="Дэлгүүрийн админтай холбогдох"
         >
-          <MessageCircle className="w-5 h-5" />
+          <MessageCircle className="w-5 h-5 shrink-0" />
+          <span className="text-xs font-bold text-stone-200 whitespace-nowrap">Дэлгүүрийн админтай холбогдох</span>
         </button>
       )}
       {currentUser?.accessToken && (

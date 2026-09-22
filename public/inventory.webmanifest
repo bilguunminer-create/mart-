@@ -9,10 +9,16 @@
   "theme_color": "#1c1917",
   "icons": [
     {
+      "src": "/brand-logo.webp",
+      "sizes": "1254x1254",
+      "type": "image/webp",
+      "purpose": "any"
+    },
+    {
       "src": "/inventory-icon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
-      "purpose": "any maskable"
+      "purpose": "maskable"
     }
   ]
 }
