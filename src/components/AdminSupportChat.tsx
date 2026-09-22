@@ -7,9 +7,10 @@ type Props = {
   onRefreshThreads: () => void;
   onOpenThread: (customerId: string) => Promise<SupportMessage[]>;
   onSendReply: (customerId: string, message: string) => Promise<void>;
+  heightClassName?: string;
 };
 
-export const AdminSupportChat: React.FC<Props> = ({ threads, onRefreshThreads, onOpenThread, onSendReply }) => {
+export const AdminSupportChat: React.FC<Props> = ({ threads, onRefreshThreads, onOpenThread, onSendReply, heightClassName = 'h-[560px]' }) => {
   const [selected, setSelected] = useState<SupportThreadSummary | null>(null);
   const [messages, setMessages] = useState<SupportMessage[]>([]);
   const [draft, setDraft] = useState('');
@@ -62,7 +63,7 @@ export const AdminSupportChat: React.FC<Props> = ({ threads, onRefreshThreads, o
   const totalUnread = threads.reduce((sum, t) => sum + t.unread_count, 0);
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-[280px_1fr] gap-4 h-[560px]">
+    <div className={`grid grid-cols-1 md:grid-cols-[280px_1fr] gap-4 ${heightClassName}`}>
       {/* Thread list */}
       <div className={`bg-white rounded-2xl border border-stone-200 shadow-xs overflow-hidden flex-col ${selected ? 'hidden md:flex' : 'flex'}`}>
         <div className="p-3 border-b border-stone-100 flex items-center justify-between">
