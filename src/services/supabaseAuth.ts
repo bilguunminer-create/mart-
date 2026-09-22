@@ -370,6 +370,59 @@ export async function getSiteVisitStats(token: string): Promise<SiteVisitStats> 
   return request('/rest/v1/rpc/get_site_visit_stats', { method: 'POST', body: JSON.stringify({}) }, token);
 }
 
+export type SupportMessage = {
+  id: number;
+  customer_id: string;
+  sender: 'customer' | 'admin';
+  message: string;
+  created_at: string;
+};
+
+/** Customer: send a message to the store. */
+export async function sendSupportMessage(token: string, message: string) {
+  return request('/rest/v1/rpc/send_support_message', {
+    method: 'POST',
+    body: JSON.stringify({ p_message: message }),
+  }, token);
+}
+
+/** Customer: read (and mark read) their own thread. */
+export async function getMySupportMessages(token: string): Promise<SupportMessage[]> {
+  return request('/rest/v1/rpc/get_my_support_messages', { method: 'POST', body: JSON.stringify({}) }, token);
+}
+
+/** Admin: reply to a specific customer's thread. */
+export async function adminSendSupportMessage(token: string, customerId: string, message: string) {
+  return request('/rest/v1/rpc/admin_send_support_message', {
+    method: 'POST',
+    body: JSON.stringify({ p_customer_id: customerId, p_message: message }),
+  }, token);
+}
+
+/** Admin: read (and mark read) one customer's full thread. */
+export async function adminGetSupportThread(token: string, customerId: string): Promise<SupportMessage[]> {
+  return request('/rest/v1/rpc/admin_get_support_thread', {
+    method: 'POST',
+    body: JSON.stringify({ p_customer_id: customerId }),
+  }, token);
+}
+
+export type SupportThreadSummary = {
+  customer_id: string;
+  customer_name: string;
+  customer_phone: string;
+  customer_email: string;
+  last_message: string;
+  last_sender: 'customer' | 'admin';
+  last_at: string;
+  unread_count: number;
+};
+
+/** Admin: inbox list of every customer thread, newest activity first. */
+export async function adminListSupportThreads(token: string): Promise<SupportThreadSummary[]> {
+  return request('/rest/v1/rpc/admin_list_support_threads', { method: 'POST', body: JSON.stringify({}) }, token);
+}
+
 export async function uploadProfileImage(token: string, file: File) {
   if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) throw new Error('Зөвхөн JPG, PNG эсвэл WEBP зураг оруулна.');
   if (file.size > 3 * 1024 * 1024) throw new Error('Зургийн хэмжээ 3MB-аас бага байх ёстой.');
