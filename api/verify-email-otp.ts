@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { checkRateLimit, clientIp } from './_rateLimit';
+import { checkRateLimit, clientIp } from './_rateLimit.js';
 
 const globalOtpStore = (global as any).__otpStore || new Map<string, { code: string; expiresAt: number; name?: string }>();
 (global as any).__otpStore = globalOtpStore;
