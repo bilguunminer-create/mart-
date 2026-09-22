@@ -1,5 +1,37 @@
 const CACHE_NAME = 'usk-inventory-shell-v1';
 
+// New-order push notifications (Firebase Cloud Messaging Web Push). FCM
+// delivers as a standard Push API event, so this app shows it directly
+// instead of pulling in the Firebase Messaging SDK inside the service worker.
+self.addEventListener('push', (event) => {
+  if (!event.data) return;
+  let payload;
+  try { payload = event.data.json(); } catch { return; }
+  const title = payload.notification?.title || 'US&K Агуулах';
+  const body = payload.notification?.body || '';
+  event.waitUntil(
+    self.registration.showNotification(title, {
+      body,
+      icon: '/inventory-icon.svg',
+      badge: '/inventory-icon.svg',
+      data: payload.data || {},
+      tag: payload.data?.orderId || undefined,
+    })
+  );
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
+      for (const client of clients) {
+        if (client.url.includes('admin=inventory') && 'focus' in client) return client.focus();
+      }
+      return self.clients.openWindow('/?admin=inventory');
+    })
+  );
+});
+
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE_NAME));
   self.skipWaiting();

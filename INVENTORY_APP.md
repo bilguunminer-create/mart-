@@ -8,7 +8,9 @@
 2. **Install app** эсвэл **Home Screen-д нэмэх**-ийг сонгоно.
 3. Нэр нь **US&K Агуулах** болж тусдаа icon-оор гарна.
 4. Админ и-мэйлээр нэвтэрч, төв PIN оруулна.
-5. Камераар barcode/QR уншуулах, бараа шинээр бүртгэх, борлуулалтын хасалт болон түүхийг ашиглана.
+5. Нэвтэрсний дараа 2 товчтой цэс гарна:
+   - **Агуулах** — камераар barcode/QR уншуулах, бараа шинээр бүртгэх, борлуулалтын хасалт болон түүхийг ашиглана.
+   - **Захиалгын мэдэгдэл** — "Шинэ"/"Баталгаажсан" төлөвтэй, анхаарал шаардлагатай захиалгуудыг жагсаана. Захиалгыг баталгаажуулах, хүргэлтэд гаргах, шаардлагатай бол цуцлах боломжтой. Дэлгүүрийн үндсэн админ панелийн бүх бусад цэс (бараа удирдах, лояалти, тохиргоо гэх мэт) энэ аппад **байхгүй** — зөвхөн агуулах ажилтанд хэрэгтэй 2 функц л харагдана.
 
 ## Play Store APK бэлтгэх
 
@@ -56,36 +58,51 @@ Native shell нь `https://www.uskmart.com/?admin=inventory`-оос ажлын �
 
 Төв серверийн шинэчлэлтэй хамт агуулахын аппын өгөгдөл шууд шинэчлэгдэнэ.
 
-## Захиалга ирэхэд шууд push мэдэгдэл (шинэ)
+## Захиалга ирэхэд шууд push мэдэгдэл (аппаас гарсан ч утсанд ирнэ)
 
 Хэрэглэгч захиалга хийх бүрд, энэ апп суулгасан бүх админ утсанд шууд push мэдэгдэл очно
-(`Firebase Cloud Messaging`, `@capacitor/push-notifications` ашиглана). Апп аль хэдийн
-энэ функцийг дуудахаар бэлэн болсон (`src/services/pushNotifications.ts`,
-`api/notify-new-order.ts`), гэхдээ ажиллуулахын тулд 3 алхам үлдсэн:
+(`Firebase Cloud Messaging`). Апп зэрэг ажиллах 2 хэрэгжилттэй:
+
+- **Web Push** (`src/services/pushNotifications.ts`-ийн `initWebPush`) — энгийн
+  "Chrome-оос Home Screen-д нэмэх" аргаар суулгасан апп дээр ажиллана. Android Studio,
+  APK build **ХЭРЭГГҮЙ**. Android Chrome дээр бүрэн найдвартай; iPhone дээр iOS 16.4+
+  бөгөөд Home Screen-д нэмсэн байх шаардлагатай (энгийн Safari tab дээр биш).
+- **Native push** (`@capacitor/push-notifications`) — доор тайлбарласан жинхэнэ APK
+  build хийсэн тохиолдолд идэвхжинэ.
+
+Аль ч тохиолдолд төхөөрөмж `admin_push_tokens` хүснэгтэд бүртгэгдэж,
+`api/notify-new-order.ts` FCM-ээр push илгээнэ. Ажиллуулахын тулд алхамууд:
 
 **1. Supabase дээр хүснэгт/функц үүсгэх**
 
-`supabase/admin-push-notifications.sql`-ийг Supabase SQL Editor дээр нэг удаа ажиллуулна
-(`product-reviews.sql`-ийг өмнө нь яг адилхан ажиллуулсантай адил алхам).
+`supabase/admin-push-notifications.sql`-ийг Supabase SQL Editor дээр нэг удаа ажиллуулна.
 
-**2. Firebase-д Android апп бүртгэх**
+**2. Web Push түлхүүр авах (Android Studio хэрэггүй, хамгийн хурдан арга)**
 
-Төслийн Firebase project (`firebase-applet-config.json` дотор байгаа
-`gen-lang-client-0815856082`) руу орж:
+1. [Firebase Console](https://console.firebase.google.com/project/gen-lang-client-0815856082/settings/cloudmessaging)
+   → Project settings → **Cloud Messaging** таб руу орно.
+2. **Web Push certificates** хэсэгт **Generate key pair** дарна (эсвэл байгаа бол
+   хуулна). Гарч ирэх урт key string-г хуулж авна.
+3. `src/services/pushNotifications.ts`-ийн `VAPID_PUBLIC_KEY = ''` мөрөнд энэ key-г
+   бичнэ (нийтийн түлхүүр тул нууц биш, коммит хийж болно).
 
-1. Project settings → **Add app → Android**. Package name: `mn.uskmart.inventory`
-   (`capacitor.inventory.config.ts`-ийн `appId`-тай яг адил байх ёстой).
-2. Татаж авсан `google-services.json`-г `npx cap add android`-аас үүссэн
-   `android/app/google-services.json` замд байрлуулна.
-3. Project settings → **Service accounts** → **Generate new private key**. Татаж авсан
-   JSON файлын БҮХ агуулгыг нэг мөрөнд хуулж, Vercel дээр орчны хувьсагч болгон
-   `FIREBASE_SERVICE_ACCOUNT_JSON` нэрээр хадгална (`.env.example`-д тайлбар бий).
+Энэ 1 алхмаар л Web Push бэлэн болно — Android Studio, google-services.json,
+APK build огт шаардлагагүй.
 
-**3. Vercel дээр орчны хувьсагч нэмэх**
+**3. Vercel дээр орчны хувьсагч нэмэх** (Web Push болон Native push хоёуланд хэрэгтэй)
 
-- `FIREBASE_SERVICE_ACCOUNT_JSON` — дээрх алхамаас.
 - `SUPABASE_SERVICE_ROLE_KEY` — Supabase dashboard → Project Settings → API →
   `service_role` түлхүүр (нууц, зөвхөн серверт ашиглагдана).
+- `FIREBASE_SERVICE_ACCOUNT_JSON` — Firebase console → Project settings →
+  **Service accounts** → **Generate new private key**. Татаж авсан JSON файлын БҮХ
+  агуулгыг нэг мөрөнд хуулж хадгална.
 
-Эдгээр 3 алхам дуусмагц, админ и-мэйлээрээ энэ аппаар нэвтрэх бүрд төхөөрөмж нь
-автоматаар бүртгэгдэж, шинэ захиалга ирэх бүрд push мэдэгдэл очно.
+Эдгээр алхам дуусмагц, админ и-мэйлээрээ энэ аппаар нэвтэрч мэдэгдэл зөвшөөрөх бүрд
+(браузер "Notification зөвшөөрөх үү?" гэж асуана) төхөөрөмж нь автоматаар бүртгэгдэж,
+шинэ захиалга ирэх бүрд push мэдэгдэл очно — апп хаалттай байсан ч.
+
+**Native push-ийг Android APK-аар нэмэлтээр хэрэгтэй бол** (Play Store-д тавих гэх мэт),
+доорх "Play Store APK бэлтгэх" хэсгийг дагаад, Firebase-д
+**Add app → Android** (package name `mn.uskmart.inventory`) бүртгэж
+`google-services.json`-г `android/app/`-д байрлуулна. Web Push болон Native push хоёулаа
+зэрэг ажиллаж болно (нэг төхөөрөмж platform-аасаа хамааран аль нэгээр бүртгэгдэнэ).
