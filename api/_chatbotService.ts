@@ -226,6 +226,71 @@ function buildStoreContext(data: Record<string, unknown>, question: string) {
   return JSON.stringify(context, null, 2);
 }
 
+function formatMnt(value: number) {
+  return `${new Intl.NumberFormat('mn-MN').format(value)} ₮`;
+}
+
+function getConfiguredAnswer(data: Record<string, unknown>, message: string): string | null {
+  const normalized = message.toLocaleLowerCase('mn-MN').trim();
+  const chatbot = data.chatbot_settings && typeof data.chatbot_settings === 'object'
+    ? data.chatbot_settings as Record<string, unknown>
+    : {};
+  const bank = data.bank_accounts && typeof data.bank_accounts === 'object'
+    ? data.bank_accounts as Record<string, unknown>
+    : {};
+
+  if (/^(сайн\s*(байна\s*уу|уу)|өглөөний\s*мэнд|өдрийн\s*мэнд|оройн\s*мэнд|hello|hi|hey)[!?.\s]*$/iu.test(normalized)) {
+    return 'Сайн байна уу! US&K Family Mart-ийн AI туслах байна. Ажиллах цаг, хүргэлт, төлбөр, барааны үнэ ба үлдэгдэл, урамшуулал эсвэл захиалгын талаар асуугаарай.';
+  }
+
+  if (/(ажиллах\s*цаг|цагийн\s*хуваарь|хэдээс\s*хэд|хэдэн\s*цагт)/iu.test(normalized)) {
+    return `Манай дэлгүүрийн ажиллах цаг: ${asText(chatbot.workHours, asText(data.work_hours, '09:00 - 20:00 (Өдөр бүр)'))}`;
+  }
+
+  if (/(хүргэлтийн\s*бүс|хүргэлтийн\s*үнэ|хүргэлтийн\s*хугацаа|хүргэлт)/iu.test(normalized)) {
+    const parts = [
+      asText(chatbot.deliveryZones) && `Хүргэлтийн бүс: ${asText(chatbot.deliveryZones)}`,
+      `Үндсэн хүргэлтийн үнэ: ${formatMnt(asNumber(data.delivery_fee, 3000))}`,
+      `Үнэгүй хүргэлтийн босго: ${formatMnt(asNumber(data.free_delivery_threshold, 100000))}`,
+      asText(chatbot.deliveryDuration) && `Хугацаа: ${asText(chatbot.deliveryDuration)}`,
+      asText(chatbot.deliveryNotes),
+    ].filter(Boolean);
+    return parts.join('\n');
+  }
+
+  if (/(төлбөрийн\s*нөхцөл|яаж\s*төл|төлбөр\s*хий|дансны\s*мэдээлэл|qpay|кью\s*пэй)/iu.test(normalized)) {
+    const account = [
+      asText(bank.bankName ?? bank.bank_name),
+      asText(bank.accountNumber ?? bank.account_number),
+      asText(bank.iban),
+      asText(bank.accountHolder ?? bank.account_holder),
+    ].filter(Boolean).join(' · ');
+    return [
+      asText(chatbot.paymentTerms, 'Захиалгын төлбөрийг заасан дансаар шилжүүлнэ.'),
+      account && `Төлбөрийн данс: ${account}`,
+      `Төлөгдөөгүй захиалга ${asNumber(data.unpaid_cancellation_minutes, 60)} минутын дараа автоматаар цуцлагдана.`,
+    ].filter(Boolean).join('\n');
+  }
+
+  if (/(барааны\s*үнэ.*үлдэгдэл|үнэ\s*болон\s*үлдэгдэл|үнэ.*нөөц)/iu.test(normalized)) {
+    return `${asText(chatbot.productNotes, 'Барааны үнэ болон үлдэгдлийг систем дэх хамгийн сүүлийн мэдээллээр хариулна.')} Сонирхож буй барааныхаа нэрийг бичээрэй.`;
+  }
+
+  if (/(урамшуулал|loyalty|лояалти|оноо|cashback|кэшбэк)/iu.test(normalized)) {
+    return [
+      `Суурь loyalty cashback: ${asNumber(data.loyalty_cashback_pct, 1)}%.`,
+      asText(chatbot.promotions) || 'Одоогоор chatbot-д тусгай урамшуулал бүртгэгдээгүй байна.',
+      asText(chatbot.loyaltyNotes),
+    ].filter(Boolean).join('\n');
+  }
+
+  if (/(захиалга.*(заавар|яаж|хийх)|хэрхэн\s*захиалах)/iu.test(normalized)) {
+    return asText(chatbot.orderInstructions, 'Бараагаа сагсанд нэмээд хүргэлтийн мэдээллээ бөглөж, захиалгаа баталгаажуулна. Дараа нь заасан дансанд төлбөр шилжүүлнэ.');
+  }
+
+  return null;
+}
+
 function asksForHuman(message: string) {
   return /(админ|оператор|хүнтэй\s*(яр|холб)|гомдол|мөнгө\s*буца|төлбөр\s*буца|залилан|маргаан)/iu.test(message);
 }
@@ -285,15 +350,23 @@ export async function processChatbotRequest(input: {
   if (asksForHuman(message)) {
     return handOffToHuman(config.supabaseUrl, config.serviceRoleKey, user.id, state);
   }
-  if (!config.geminiApiKey) {
-    return handOffToHuman(config.supabaseUrl, config.serviceRoleKey, user.id, state);
-  }
 
   try {
-    const [recentMessages, settings] = await Promise.all([
-      getRecentMessages(config.supabaseUrl, config.serviceRoleKey, user.id),
-      getStoreSettings(config.supabaseUrl, config.serviceRoleKey),
-    ]);
+    const settings = await getStoreSettings(config.supabaseUrl, config.serviceRoleKey);
+    const configuredAnswer = getConfiguredAnswer(settings, message);
+    if (configuredAnswer) {
+      const answer = configuredAnswer.slice(0, 2000);
+      await insertBotMessage(config.supabaseUrl, config.serviceRoleKey, user.id, answer);
+      return { reply: answer, needsHuman: false, botEnabled: true };
+    }
+
+    if (!config.geminiApiKey) {
+      const answer = 'AI туслахын өргөтгөсөн хариулт түр идэвхгүй байна. Дээрх 6 түгээмэл асуултаас сонгох эсвэл “Админтай холбох” товчийг дарна уу.';
+      await insertBotMessage(config.supabaseUrl, config.serviceRoleKey, user.id, answer);
+      return { reply: answer, needsHuman: false, botEnabled: true };
+    }
+
+    const recentMessages = await getRecentMessages(config.supabaseUrl, config.serviceRoleKey, user.id);
     const transcript = recentMessages
       .map((item) => `${item.sender === 'customer' ? 'Хэрэглэгч' : item.sender === 'admin' ? 'Админ' : 'AI туслах'}: ${item.message}`)
       .join('\n');
@@ -317,14 +390,17 @@ export async function processChatbotRequest(input: {
       },
     });
     const parsed = parseModelResponse(response.text || '');
-    if (parsed.needsHuman || !parsed.answer) {
+    if (parsed.needsHuman) {
       return handOffToHuman(config.supabaseUrl, config.serviceRoleKey, user.id, state);
     }
+    if (!parsed.answer) throw new Error('Gemini empty response');
     const answer = parsed.answer.slice(0, 2000);
     await insertBotMessage(config.supabaseUrl, config.serviceRoleKey, user.id, answer);
     return { reply: answer, needsHuman: false, botEnabled: true };
   } catch (error) {
     console.error('[Chatbot Error]:', error);
-    return handOffToHuman(config.supabaseUrl, config.serviceRoleKey, user.id, state);
+    const answer = 'Уучлаарай, AI туслах түр хариулж чадсангүй. Дээрх 6 түгээмэл асуултаас сонгох эсвэл “Админтай холбох” товчийг дарна уу.';
+    await insertBotMessage(config.supabaseUrl, config.serviceRoleKey, user.id, answer);
+    return { reply: answer, needsHuman: false, botEnabled: true };
   }
 }

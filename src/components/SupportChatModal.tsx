@@ -17,6 +17,15 @@ type Props = {
 
 const DEFAULT_STATUS: SupportStatus = { bot_enabled: true, needs_human: false };
 
+const QUICK_QUESTIONS = [
+  'Дэлгүүрийн ажиллах цаг',
+  'Хүргэлтийн бүс, үнэ, хугацаа',
+  'Төлбөрийн нөхцөл',
+  'Барааны үнэ болон үлдэгдэл',
+  'Урамшуулал, loyalty оноо',
+  'Захиалга хийх заавар',
+] as const;
+
 export const SupportChatModal: React.FC<Props> = ({ isOpen, onClose, accessToken }) => {
   const [messages, setMessages] = useState<SupportMessage[]>([]);
   const [status, setStatus] = useState<SupportStatus>(DEFAULT_STATUS);
@@ -56,8 +65,8 @@ export const SupportChatModal: React.FC<Props> = ({ isOpen, onClose, accessToken
 
   if (!isOpen) return null;
 
-  const handleSend = async () => {
-    const text = draft.trim();
+  const handleSend = async (quickQuestion?: string) => {
+    const text = (quickQuestion ?? draft).trim();
     if (!text || sending) return;
     setSending(true);
     setError(null);
@@ -110,6 +119,24 @@ export const SupportChatModal: React.FC<Props> = ({ isOpen, onClose, accessToken
             <X className="w-5 h-5" />
           </button>
         </header>
+
+        <div className="shrink-0 border-b border-stone-200 bg-white px-3 py-3">
+          <p className="mb-2 text-[10px] font-black uppercase text-stone-500">Түгээмэл асуулт</p>
+          <div className="grid grid-cols-2 gap-1.5">
+            {QUICK_QUESTIONS.map((question, index) => (
+              <button
+                key={question}
+                type="button"
+                onClick={() => void handleSend(question)}
+                disabled={!loaded || sending || !status.bot_enabled || status.needs_human}
+                className="flex min-h-10 items-center gap-2 rounded-lg border border-stone-200 bg-stone-50 px-2.5 py-2 text-left text-[10px] font-bold leading-tight text-stone-700 transition-colors hover:border-amber-300 hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-amber-100 text-[9px] font-black text-amber-800">{index + 1}</span>
+                <span className="break-words">{question}</span>
+              </button>
+            ))}
+          </div>
+        </div>
 
         <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-stone-50">
           {!loaded && <p className="text-center text-xs text-stone-400 py-8">Ачааллаж байна...</p>}
