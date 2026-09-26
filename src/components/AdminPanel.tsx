@@ -40,9 +40,10 @@ import {
   AlertTriangle,
   Upload,
   MessageSquareText,
-  MessageCircle
+  MessageCircle,
+  Bot
 } from 'lucide-react';
-import { Product, OrderDetails, LoyaltyTier, ComboPack, ProductReview } from '../types';
+import { Product, OrderDetails, LoyaltyTier, ComboPack, ProductReview, ChatbotSettings } from '../types';
 import {
   CATEGORIES,
   LOYALTY_TIERS,
@@ -54,7 +55,9 @@ import { ProductFormModal } from './ProductFormModal';
 import { ComboFormModal } from './ComboFormModal';
 import { LoyaltyRulesModal } from './LoyaltyRulesModal';
 import { AdminSupportChat } from './AdminSupportChat';
+import { ChatbotSettingsPanel } from './ChatbotSettingsPanel';
 import { SupportMessage, SupportThreadSummary } from '../services/supabaseAuth';
+import { DEFAULT_CHATBOT_SETTINGS } from '../data/chatbotSettings';
 
 interface AdminPanelProps {
   products: Product[];
@@ -107,6 +110,8 @@ interface AdminPanelProps {
   onOpenSupportThread?: (customerId: string) => Promise<SupportMessage[]>;
   onSendSupportReply?: (customerId: string, message: string) => Promise<void>;
   onSetSupportBotEnabled?: (customerId: string, enabled: boolean) => Promise<void>;
+  chatbotSettings?: ChatbotSettings;
+  onSaveChatbotSettings?: (settings: ChatbotSettings, linkedSettings: { deliveryFee: number; freeDeliveryThreshold: number; loyaltyCashbackPct: number }) => Promise<void> | void;
   onModerateReview?: (reviewId: string, approve: boolean) => Promise<void> | void;
   onDeleteReview?: (reviewId: string) => Promise<void> | void;
   checkoutSettings?: { deliveryFee: number; freeDeliveryThreshold: number; bankName: string; accountNumber: string; iban: string; accountHolder: string; storePhone: string; storeEmail: string; facebookUrl: string; messengerUrl: string; googleMapsUrl: string; storeAddress: string; unpaidCancellationMinutes: number };
@@ -177,12 +182,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   onOpenSupportThread,
   onSendSupportReply,
   onSetSupportBotEnabled,
+  chatbotSettings = DEFAULT_CHATBOT_SETTINGS,
+  onSaveChatbotSettings,
   onModerateReview,
   onDeleteReview,
   checkoutSettings = { deliveryFee: 3000, freeDeliveryThreshold: 100000, bankName: '', accountNumber: '', iban: '', accountHolder: '', storePhone: '', storeEmail: '', facebookUrl: '', messengerUrl: '', googleMapsUrl: '', storeAddress: '', unpaidCancellationMinutes: 60 },
   onSaveCheckoutSettings
 }) => {
-  const [activeTab, setActiveTab] = useState<'products' | 'orders' | 'loyalty' | 'stats' | 'settings' | 'reviews' | 'chat'>('products');
+  const [activeTab, setActiveTab] = useState<'products' | 'orders' | 'loyalty' | 'stats' | 'settings' | 'reviews' | 'chat' | 'chatbot'>('products');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedOrigin, setSelectedOrigin] = useState<'ALL' | 'KR' | 'US'>('ALL');
@@ -792,6 +799,20 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   {supportThreads.reduce((sum, t) => sum + t.unread_count, 0)} шинэ
                 </span>
               )}
+            </button>
+
+            <button
+              id="admin-tab-chatbot"
+              type="button"
+              onClick={() => setActiveTab('chatbot')}
+              className={`py-3 px-4 text-xs font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+                activeTab === 'chatbot'
+                  ? 'border-amber-500 text-amber-400'
+                  : 'border-transparent text-stone-400 hover:text-stone-200'
+              }`}
+            >
+              <Bot className="w-4 h-4 text-amber-400" />
+              <span>Chatbot тохиргоо</span>
             </button>
 
             <button
@@ -2150,6 +2171,20 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             onOpenThread={(customerId) => onOpenSupportThread?.(customerId) ?? Promise.resolve([])}
             onSendReply={(customerId, message) => onSendSupportReply?.(customerId, message) ?? Promise.resolve()}
             onSetBotEnabled={(customerId, enabled) => onSetSupportBotEnabled?.(customerId, enabled) ?? Promise.resolve()}
+          />
+        )}
+
+        {/* ================= CHATBOT SETTINGS TAB ================= */}
+        {activeTab === 'chatbot' && (
+          <ChatbotSettingsPanel
+            settings={chatbotSettings}
+            productCount={products.length}
+            linkedSettings={{
+              deliveryFee: checkoutSettings.deliveryFee,
+              freeDeliveryThreshold: checkoutSettings.freeDeliveryThreshold,
+              loyaltyCashbackPct,
+            }}
+            onSave={(settings, linkedSettings) => onSaveChatbotSettings?.(settings, linkedSettings) ?? Promise.resolve()}
           />
         )}
 

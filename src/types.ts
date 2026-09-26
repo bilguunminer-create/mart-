@@ -126,3 +126,15 @@ export interface ProductReview {
   created_at: string;
   reviewed_at?: string | null;
 }
+
+export interface ChatbotSettings {
+  workHours: string;
+  deliveryZones: string;
+  deliveryDuration: string;
+  deliveryNotes: string;
+  paymentTerms: string;
+  productNotes: string;
+  promotions: string;
+  loyaltyNotes: string;
+  orderInstructions: string;
+}

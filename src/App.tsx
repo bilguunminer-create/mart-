@@ -30,7 +30,8 @@ import {
   formatOrderNumber,
   calculateLoyaltyTierBySpent
 } from './data/storeData';
-import { Product, CartItem, LoyaltyTier, ComboPack, OrderDetails, UserProfile, ProductReview } from './types';
+import { Product, CartItem, LoyaltyTier, ComboPack, OrderDetails, UserProfile, ProductReview, ChatbotSettings } from './types';
+import { DEFAULT_CHATBOT_SETTINGS, normalizeChatbotSettings } from './data/chatbotSettings';
 import { Header } from './components/Header';
 import { DailyDealBanner } from './components/DailyDealBanner';
 import { ProductCard } from './components/ProductCard';
@@ -98,6 +99,7 @@ export default function App() {
   const [checkoutSettings, setCheckoutSettings] = useState<{ deliveryFee: number; freeDeliveryThreshold: number; bankName: string; accountNumber: string; iban: string; accountHolder: string; storePhone: string; storeEmail: string; facebookUrl: string; messengerUrl: string; googleMapsUrl: string; storeAddress: string; unpaidCancellationMinutes: number }>({
     deliveryFee: 3000, freeDeliveryThreshold: STORE_CONFIG.free_delivery_threshold, bankName: '', accountNumber: '', iban: '', accountHolder: '', storePhone: STORE_CONFIG.phone, storeEmail: '', facebookUrl: '', messengerUrl: '', googleMapsUrl: '', storeAddress: STORE_CONFIG.location, unpaidCancellationMinutes: 60,
   });
+  const [chatbotSettings, setChatbotSettings] = useState<ChatbotSettings>(DEFAULT_CHATBOT_SETTINGS);
   useEffect(() => {
     getStoreSettings().then((settings) => {
       const savedCombos = settings.data.combo_packs;
@@ -122,6 +124,11 @@ export default function App() {
       if (settings.data.loyalty_cashback_pct !== undefined) setLoyaltyCashbackPct(Number(settings.data.loyalty_cashback_pct));
       const savedOverrides = settings.data.loyalty_tier_overrides;
       if (savedOverrides && typeof savedOverrides === 'object') setLoyaltyTierOverrides(savedOverrides as Record<string, string>);
+      const loadedChatbotSettings = normalizeChatbotSettings(settings.data.chatbot_settings);
+      if (!settings.data.chatbot_settings && typeof settings.data.work_hours === 'string') {
+        loadedChatbotSettings.workHours = settings.data.work_hours;
+      }
+      setChatbotSettings(loadedChatbotSettings);
       const remoteProducts = settings.data.products;
       if (!Array.isArray(remoteProducts)) return;
       setProducts(remoteProducts.map((product: any) => {
@@ -2046,6 +2053,25 @@ export default function App() {
           onOpenSupportThread={handleOpenSupportThread}
           onSendSupportReply={handleSendSupportReply}
           onSetSupportBotEnabled={handleSetSupportBotEnabled}
+          chatbotSettings={chatbotSettings}
+          onSaveChatbotSettings={async (settings, linkedSettings) => {
+            if (!currentUser?.accessToken) throw new Error('Админ и-мэйлээр нэвтэрнэ үү.');
+            const data = await saveStoreSettings(currentUser.accessToken, {
+              chatbot_settings: settings,
+              work_hours: settings.workHours,
+              delivery_fee: linkedSettings.deliveryFee,
+              free_delivery_threshold: linkedSettings.freeDeliveryThreshold,
+              loyalty_cashback_pct: linkedSettings.loyaltyCashbackPct,
+            });
+            setChatbotSettings(normalizeChatbotSettings(data.chatbot_settings));
+            setCheckoutSettings((current) => ({
+              ...current,
+              deliveryFee: Number(data.delivery_fee ?? linkedSettings.deliveryFee),
+              freeDeliveryThreshold: Number(data.free_delivery_threshold ?? linkedSettings.freeDeliveryThreshold),
+            }));
+            setLoyaltyCashbackPct(Number(data.loyalty_cashback_pct ?? linkedSettings.loyaltyCashbackPct));
+            showToast('Chatbot тохиргоо төв санд хадгалагдлаа.');
+          }}
           onModerateReview={async (reviewId, approve) => {
             if (!currentUser?.accessToken) throw new Error('Админ и-мэйлээр нэвтэрнэ үү.');
             await moderateProductReview(currentUser.accessToken, reviewId, approve);

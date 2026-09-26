@@ -176,23 +176,52 @@ function buildStoreContext(data: Record<string, unknown>, question: string) {
   const bank = data.bank_accounts && typeof data.bank_accounts === 'object'
     ? data.bank_accounts as Record<string, unknown>
     : {};
+  const chatbot = data.chatbot_settings && typeof data.chatbot_settings === 'object'
+    ? data.chatbot_settings as Record<string, unknown>
+    : {};
+  const loyaltyTiers = Array.isArray(data.loyalty_tiers_config)
+    ? (data.loyalty_tiers_config as Array<Record<string, unknown>>).map((tier) => ({
+        name: asText(tier.name),
+        threshold: asNumber(tier.threshold, 0),
+        discountPercent: asNumber(tier.discount_pct, 0),
+        cashbackPercent: asNumber(tier.cashback_pct, 0),
+        benefits: Array.isArray(tier.benefits) ? tier.benefits.filter((item) => typeof item === 'string').slice(0, 8) : [],
+      }))
+    : [];
   const context = {
     store: 'US&K Family Mart',
     phone: asText(data.store_phone, '7700-1122'),
     email: asText(data.store_email),
     address: asText(data.store_address, 'Даланзадгад хот, Өмнөговь аймаг'),
-    workHours: asText(data.work_hours, '09:00 - 20:00 (Өдөр бүр)'),
-    deliveryFee: asNumber(data.delivery_fee, 3000),
-    freeDeliveryThreshold: asNumber(data.free_delivery_threshold, 100000),
-    unpaidCancellationMinutes: asNumber(data.unpaid_cancellation_minutes, 60),
-    bank: {
-      name: asText(bank.bankName ?? bank.bank_name),
-      accountNumber: asText(bank.accountNumber ?? bank.account_number),
-      iban: asText(bank.iban),
-      accountHolder: asText(bank.accountHolder ?? bank.account_holder),
+    workHours: asText(chatbot.workHours, asText(data.work_hours, '09:00 - 20:00 (Өдөр бүр)')),
+    delivery: {
+      zones: asText(chatbot.deliveryZones),
+      duration: asText(chatbot.deliveryDuration),
+      fee: asNumber(data.delivery_fee, 3000),
+      freeDeliveryThreshold: asNumber(data.free_delivery_threshold, 100000),
+      notes: asText(chatbot.deliveryNotes),
     },
-    loyaltyCashbackPercent: asNumber(data.loyalty_cashback_pct, 1),
-    relevantProducts: relevantProducts(data, question),
+    payment: {
+      terms: asText(chatbot.paymentTerms),
+      unpaidCancellationMinutes: asNumber(data.unpaid_cancellation_minutes, 60),
+      bank: {
+        name: asText(bank.bankName ?? bank.bank_name),
+        accountNumber: asText(bank.accountNumber ?? bank.account_number),
+        iban: asText(bank.iban),
+        accountHolder: asText(bank.accountHolder ?? bank.account_holder),
+      },
+    },
+    products: {
+      notes: asText(chatbot.productNotes),
+      relevantItems: relevantProducts(data, question),
+    },
+    loyalty: {
+      baseCashbackPercent: asNumber(data.loyalty_cashback_pct, 1),
+      notes: asText(chatbot.loyaltyNotes),
+      tiers: loyaltyTiers,
+    },
+    promotions: asText(chatbot.promotions),
+    orderInstructions: asText(chatbot.orderInstructions),
   };
   return JSON.stringify(context, null, 2);
 }
