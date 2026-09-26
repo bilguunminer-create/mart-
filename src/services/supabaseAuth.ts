@@ -376,9 +376,20 @@ export async function getSiteVisitStats(token: string): Promise<SiteVisitStats> 
 export type SupportMessage = {
   id: number;
   customer_id: string;
-  sender: 'customer' | 'admin';
+  sender: 'customer' | 'admin' | 'bot';
   message: string;
   created_at: string;
+};
+
+export type SupportStatus = {
+  bot_enabled: boolean;
+  needs_human: boolean;
+};
+
+export type ChatbotReply = {
+  reply: string | null;
+  needsHuman: boolean;
+  botEnabled: boolean;
 };
 
 /** Customer: send a message to the store. */
@@ -392,6 +403,32 @@ export async function sendSupportMessage(token: string, message: string) {
 /** Customer: read (and mark read) their own thread. */
 export async function getMySupportMessages(token: string): Promise<SupportMessage[]> {
   return request('/rest/v1/rpc/get_my_support_messages', { method: 'POST', body: JSON.stringify({}) }, token);
+}
+
+/** Customer: current AI/human ownership state for their support thread. */
+export async function getMySupportStatus(token: string): Promise<SupportStatus> {
+  return request('/rest/v1/rpc/get_my_support_status', { method: 'POST', body: JSON.stringify({}) }, token);
+}
+
+async function chatbotRequest(token: string, body: Record<string, unknown>): Promise<ChatbotReply> {
+  const response = await fetch('/api/chatbot', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.error || 'Chatbot хариу өгөхөд алдаа гарлаа.');
+  return data as ChatbotReply;
+}
+
+/** Customer: saves the message and asks the AI assistant for a reply. */
+export async function sendChatbotMessage(token: string, message: string) {
+  return chatbotRequest(token, { message });
+}
+
+/** Customer: pauses AI replies and hands the conversation to a store admin. */
+export async function requestSupportHuman(token: string) {
+  return chatbotRequest(token, { requestHuman: true });
 }
 
 /** Admin: reply to a specific customer's thread. */
@@ -416,14 +453,24 @@ export type SupportThreadSummary = {
   customer_phone: string;
   customer_email: string;
   last_message: string;
-  last_sender: 'customer' | 'admin';
+  last_sender: 'customer' | 'admin' | 'bot';
   last_at: string;
   unread_count: number;
+  bot_enabled: boolean;
+  needs_human: boolean;
 };
 
 /** Admin: inbox list of every customer thread, newest activity first. */
 export async function adminListSupportThreads(token: string): Promise<SupportThreadSummary[]> {
   return request('/rest/v1/rpc/admin_list_support_threads', { method: 'POST', body: JSON.stringify({}) }, token);
+}
+
+/** Admin: enable AI again or keep the thread under human ownership. */
+export async function adminSetSupportBotState(token: string, customerId: string, botEnabled: boolean) {
+  return request('/rest/v1/rpc/admin_set_support_bot_state', {
+    method: 'POST',
+    body: JSON.stringify({ p_customer_id: customerId, p_bot_enabled: botEnabled }),
+  }, token);
 }
 
 export async function uploadProfileImage(token: string, file: File) {

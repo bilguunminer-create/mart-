@@ -6,6 +6,7 @@ import nodemailer, { type Transporter } from "nodemailer";
 import { initializeApp, getApps, cert, type App } from "firebase-admin/app";
 import { getMessaging } from "firebase-admin/messaging";
 import { checkRateLimit, clientIp } from "./api/_rateLimit";
+import { ChatbotServiceError, processChatbotRequest } from "./api/_chatbotService";
 
 const SUPABASE_URL = "https://rebtikccivjcsxieeyxe.supabase.co";
 
@@ -131,7 +132,8 @@ async function startServer() {
   // Health check
   app.get("/api/health", (req, res) => {
     const smtpConfigured = Boolean(process.env.SMTP_USER && process.env.SMTP_PASS);
-    res.json({ status: "ok", smtpConfigured });
+    const chatbotConfigured = Boolean(process.env.GEMINI_API_KEY && process.env.SUPABASE_SERVICE_ROLE_KEY);
+    res.json({ status: "ok", smtpConfigured, chatbotConfigured });
   });
 
   // Send Email OTP endpoint
@@ -367,6 +369,33 @@ async function startServer() {
     } catch (err: any) {
       console.error("[Notify New Order Error]:", err);
       return res.status(500).json({ error: err.message || "Мэдэгдэл илгээхэд алдаа гарлаа." });
+    }
+  });
+
+  // Local/self-hosted counterpart of api/chatbot.ts. The shared service keeps
+  // authentication, rate limits, handoff behavior and AI prompting identical.
+  app.post("/api/chatbot", async (req, res) => {
+    const authorization = req.headers.authorization;
+    const token = typeof authorization === "string" && authorization.startsWith("Bearer ")
+      ? authorization.slice(7).trim()
+      : "";
+    if (!token) return res.status(401).json({ error: "Нэвтрэлт шаардлагатай." });
+
+    try {
+      const result = await processChatbotRequest({
+        token,
+        message: req.body?.message,
+        requestHuman: req.body?.requestHuman,
+        ip: clientIp(req),
+      });
+      res.setHeader("Cache-Control", "no-store");
+      return res.json(result);
+    } catch (error) {
+      if (error instanceof ChatbotServiceError) {
+        return res.status(error.status).json({ error: error.message });
+      }
+      console.error("[Chatbot Handler Error]:", error);
+      return res.status(500).json({ error: "Chatbot хариу өгөхөд алдаа гарлаа." });
     }
   });
 

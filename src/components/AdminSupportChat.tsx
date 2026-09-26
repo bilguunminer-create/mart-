@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { MessageCircle, Send, ArrowLeft, Phone } from 'lucide-react';
+import { ArrowLeft, Bot, Headphones, Pause, Phone, Play, Send } from 'lucide-react';
 import { SupportMessage, SupportThreadSummary } from '../services/supabaseAuth';
 
 type Props = {
@@ -7,14 +7,16 @@ type Props = {
   onRefreshThreads: () => void;
   onOpenThread: (customerId: string) => Promise<SupportMessage[]>;
   onSendReply: (customerId: string, message: string) => Promise<void>;
+  onSetBotEnabled: (customerId: string, enabled: boolean) => Promise<void>;
   heightClassName?: string;
 };
 
-export const AdminSupportChat: React.FC<Props> = ({ threads, onRefreshThreads, onOpenThread, onSendReply, heightClassName = 'h-[560px]' }) => {
+export const AdminSupportChat: React.FC<Props> = ({ threads, onRefreshThreads, onOpenThread, onSendReply, onSetBotEnabled, heightClassName = 'h-[560px]' }) => {
   const [selected, setSelected] = useState<SupportThreadSummary | null>(null);
   const [messages, setMessages] = useState<SupportMessage[]>([]);
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
+  const [changingBotState, setChangingBotState] = useState(false);
   const [loadingThread, setLoadingThread] = useState(false);
   const bottomRef = useRef<HTMLDivElement | null>(null);
 
@@ -61,6 +63,22 @@ export const AdminSupportChat: React.FC<Props> = ({ threads, onRefreshThreads, o
   };
 
   const totalUnread = threads.reduce((sum, t) => sum + t.unread_count, 0);
+  const activeThread = selected ? threads.find((thread) => thread.customer_id === selected.customer_id) || selected : null;
+  const botEnabled = activeThread?.bot_enabled ?? true;
+
+  const handleBotState = async () => {
+    if (!activeThread || changingBotState) return;
+    setChangingBotState(true);
+    try {
+      await onSetBotEnabled(activeThread.customer_id, !botEnabled);
+      setSelected((current) => current ? { ...current, bot_enabled: !botEnabled, needs_human: false } : current);
+      onRefreshThreads();
+    } catch {
+      // Keep the current state; the admin can retry without losing the thread.
+    } finally {
+      setChangingBotState(false);
+    }
+  };
 
   return (
     <div className={`grid grid-cols-1 md:grid-cols-[280px_1fr] gap-4 ${heightClassName}`}>
@@ -68,7 +86,7 @@ export const AdminSupportChat: React.FC<Props> = ({ threads, onRefreshThreads, o
       <div className={`bg-white rounded-2xl border border-stone-200 shadow-xs overflow-hidden flex-col ${selected ? 'hidden md:flex' : 'flex'}`}>
         <div className="p-3 border-b border-stone-100 flex items-center justify-between">
           <h4 className="font-bold text-stone-900 text-sm flex items-center gap-1.5">
-            <MessageCircle className="w-4 h-4 text-amber-500" />
+            <Headphones className="w-4 h-4 text-amber-500" />
             Харилцагчид
           </h4>
           {totalUnread > 0 && (
@@ -88,12 +106,15 @@ export const AdminSupportChat: React.FC<Props> = ({ threads, onRefreshThreads, o
             >
               <div className="flex items-center justify-between gap-2">
                 <span className="text-xs font-bold text-stone-900 truncate">{t.customer_name || t.customer_email || t.customer_phone || 'Харилцагч'}</span>
-                {t.unread_count > 0 && (
-                  <span className="shrink-0 text-[9px] font-black bg-rose-600 text-white px-1.5 py-0.5 rounded-full">{t.unread_count}</span>
-                )}
+                <div className="flex items-center gap-1 shrink-0">
+                  {t.needs_human && <Headphones className="w-3 h-3 text-rose-600" aria-label="Админ шаардлагатай" />}
+                  {t.unread_count > 0 && (
+                    <span className="text-[9px] font-black bg-rose-600 text-white px-1.5 py-0.5 rounded-full">{t.unread_count}</span>
+                  )}
+                </div>
               </div>
               <p className="text-[11px] text-stone-500 truncate mt-0.5">
-                {t.last_sender === 'admin' ? 'Та: ' : ''}{t.last_message}
+                {t.last_sender === 'admin' ? 'Та: ' : t.last_sender === 'bot' ? 'AI: ' : ''}{t.last_message}
               </p>
             </button>
           ))}
@@ -113,31 +134,54 @@ export const AdminSupportChat: React.FC<Props> = ({ threads, onRefreshThreads, o
                 <ArrowLeft className="w-4 h-4 text-stone-500" />
               </button>
               <div className="min-w-0 flex-1">
-                <p className="text-xs font-bold text-stone-900 truncate">{selected.customer_name || selected.customer_email || 'Харилцагч'}</p>
-                {selected.customer_phone && (
-                  <a href={`tel:${selected.customer_phone}`} className="text-[11px] text-rose-600 font-semibold flex items-center gap-1 hover:underline">
-                    <Phone className="w-3 h-3" /> {selected.customer_phone}
+                <p className="text-xs font-bold text-stone-900 truncate">{activeThread?.customer_name || activeThread?.customer_email || 'Харилцагч'}</p>
+                {activeThread?.customer_phone && (
+                  <a href={`tel:${activeThread.customer_phone}`} className="text-[11px] text-rose-600 font-semibold flex items-center gap-1 hover:underline">
+                    <Phone className="w-3 h-3" /> {activeThread.customer_phone}
                   </a>
                 )}
               </div>
+              <button
+                type="button"
+                onClick={() => void handleBotState()}
+                disabled={changingBotState}
+                className={`shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[10px] font-bold cursor-pointer disabled:opacity-50 ${botEnabled ? 'bg-amber-100 text-amber-800 hover:bg-amber-200' : 'bg-stone-900 text-white hover:bg-stone-800'}`}
+                title={botEnabled ? 'AI автомат хариултыг зогсоох' : 'AI автомат хариултыг үргэлжлүүлэх'}
+              >
+                {botEnabled ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />}
+                {botEnabled ? 'AI зогсоох' : 'AI асаах'}
+              </button>
             </div>
+
+            {activeThread?.needs_human && (
+              <div className="px-3 py-2 bg-rose-50 border-b border-rose-100 text-[10px] font-bold text-rose-700 flex items-center gap-1.5">
+                <Headphones className="w-3.5 h-3.5" /> Энэ харилцагч админы тусламж хүссэн байна.
+              </div>
+            )}
 
             <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-stone-50">
               {loadingThread && <p className="text-center text-xs text-stone-400 py-8">Ачааллаж байна...</p>}
-              {!loadingThread && messages.map((m) => (
-                <div key={m.id} className={`flex ${m.sender === 'admin' ? 'justify-end' : 'justify-start'}`}>
-                  <div
-                    className={`max-w-[75%] px-3.5 py-2.5 rounded-2xl text-xs leading-relaxed ${
-                      m.sender === 'admin'
-                        ? 'bg-stone-900 text-white rounded-br-sm'
-                        : 'bg-white border border-stone-200 text-stone-800 rounded-bl-sm'
-                    }`}
-                  >
-                    <p className="whitespace-pre-wrap break-words">{m.message}</p>
-                    <p className="text-[9px] mt-1 text-stone-400">{new Date(m.created_at).toLocaleString('mn-MN')}</p>
+              {!loadingThread && messages.map((message) => {
+                const isAdmin = message.sender === 'admin';
+                const isBot = message.sender === 'bot';
+                return (
+                  <div key={message.id} className={`flex ${isAdmin ? 'justify-end' : 'justify-start'}`}>
+                    <div
+                      className={`max-w-[75%] px-3.5 py-2.5 rounded-2xl text-xs leading-relaxed ${
+                        isAdmin
+                          ? 'bg-stone-900 text-white rounded-br-sm'
+                          : isBot
+                            ? 'bg-amber-50 border border-amber-200 text-stone-800 rounded-bl-sm'
+                            : 'bg-white border border-stone-200 text-stone-800 rounded-bl-sm'
+                      }`}
+                    >
+                      {isBot && <p className="text-[9px] font-black text-amber-700 mb-1 flex items-center gap-1"><Bot className="w-3 h-3" /> AI туслах</p>}
+                      <p className="whitespace-pre-wrap break-words">{message.message}</p>
+                      <p className="text-[9px] mt-1 text-stone-400">{new Date(message.created_at).toLocaleString('mn-MN')}</p>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
               <div ref={bottomRef} />
             </div>
 

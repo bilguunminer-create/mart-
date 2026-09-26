@@ -106,6 +106,7 @@ interface AdminPanelProps {
   onRefreshSupportThreads?: () => void;
   onOpenSupportThread?: (customerId: string) => Promise<SupportMessage[]>;
   onSendSupportReply?: (customerId: string, message: string) => Promise<void>;
+  onSetSupportBotEnabled?: (customerId: string, enabled: boolean) => Promise<void>;
   onModerateReview?: (reviewId: string, approve: boolean) => Promise<void> | void;
   onDeleteReview?: (reviewId: string) => Promise<void> | void;
   checkoutSettings?: { deliveryFee: number; freeDeliveryThreshold: number; bankName: string; accountNumber: string; iban: string; accountHolder: string; storePhone: string; storeEmail: string; facebookUrl: string; messengerUrl: string; googleMapsUrl: string; storeAddress: string; unpaidCancellationMinutes: number };
@@ -175,6 +176,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   onRefreshSupportThreads,
   onOpenSupportThread,
   onSendSupportReply,
+  onSetSupportBotEnabled,
   onModerateReview,
   onDeleteReview,
   checkoutSettings = { deliveryFee: 3000, freeDeliveryThreshold: 100000, bankName: '', accountNumber: '', iban: '', accountHolder: '', storePhone: '', storeEmail: '', facebookUrl: '', messengerUrl: '', googleMapsUrl: '', storeAddress: '', unpaidCancellationMinutes: 60 },
@@ -2147,6 +2149,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             onRefreshThreads={() => onRefreshSupportThreads?.()}
             onOpenThread={(customerId) => onOpenSupportThread?.(customerId) ?? Promise.resolve([])}
             onSendReply={(customerId, message) => onSendSupportReply?.(customerId, message) ?? Promise.resolve()}
+            onSetBotEnabled={(customerId, enabled) => onSetSupportBotEnabled?.(customerId, enabled) ?? Promise.resolve()}
           />
         )}
 

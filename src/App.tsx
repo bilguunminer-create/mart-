@@ -62,7 +62,7 @@ const SupportChatModal = React.lazy(() =>
 // of the main bundle -- a dynamic import here would not save anything and
 // Vite warns about exactly that.
 import { AdminSupportChat } from './components/AdminSupportChat';
-import { getStoreCustomerProfiles, getStoreOrders, getStoreSettings, saveStoreOrder, saveStoreProducts, saveStoreSettings, hasStoreAdminAccess, refreshSession, reportStoreOrderPayment, updateStoreOrderStatus, confirmStoreOrderPayment, verifyAdminPin, changeAdminPin, expireUnpaidOrdersAsAdmin, getAllReviewsForAdmin, moderateProductReview, deleteProductReview, getProductReviews, adminListLoyaltyWallets, adminGrantLoyaltyPoints, AdminLoyaltyWallet, uploadCategoryImage, uploadBrandingImage, logSiteVisit, getSiteVisitStats, SiteVisitStats, adminListSupportThreads, adminGetSupportThread, adminSendSupportMessage, SupportThreadSummary } from './services/supabaseAuth';
+import { getStoreCustomerProfiles, getStoreOrders, getStoreSettings, saveStoreOrder, saveStoreProducts, saveStoreSettings, hasStoreAdminAccess, refreshSession, reportStoreOrderPayment, updateStoreOrderStatus, confirmStoreOrderPayment, verifyAdminPin, changeAdminPin, expireUnpaidOrdersAsAdmin, getAllReviewsForAdmin, moderateProductReview, deleteProductReview, getProductReviews, adminListLoyaltyWallets, adminGrantLoyaltyPoints, AdminLoyaltyWallet, uploadCategoryImage, uploadBrandingImage, logSiteVisit, getSiteVisitStats, SiteVisitStats, adminListSupportThreads, adminGetSupportThread, adminSendSupportMessage, adminSetSupportBotState, SupportThreadSummary } from './services/supabaseAuth';
 import { initAdminPushNotifications } from './services/pushNotifications';
 // C-01 fix: App.tsx-аас хуваан гаргасан custom hook-ууд
 import { useCart } from './hooks/useCart';
@@ -379,6 +379,11 @@ export default function App() {
     if (!currentUser?.accessToken) throw new Error('Админ и-мэйлээр нэвтэрнэ үү.');
     await adminSendSupportMessage(currentUser.accessToken, customerId, message);
   }, [currentUser?.accessToken]);
+  const handleSetSupportBotEnabled = useCallback(async (customerId: string, enabled: boolean) => {
+    if (!currentUser?.accessToken) throw new Error('Админ и-мэйлээр нэвтэрнэ үү.');
+    await adminSetSupportBotState(currentUser.accessToken, customerId, enabled);
+    await refreshSupportThreads();
+  }, [currentUser?.accessToken, refreshSupportThreads]);
   useEffect(() => {
     if (!isAdminAuthenticated) return;
     void refreshSupportThreads();
@@ -1136,6 +1141,7 @@ export default function App() {
                     onRefreshThreads={() => void refreshSupportThreads()}
                     onOpenThread={handleOpenSupportThread}
                     onSendReply={handleSendSupportReply}
+                    onSetBotEnabled={handleSetSupportBotEnabled}
                     heightClassName="h-full"
                   />
                 </div>
@@ -2039,6 +2045,7 @@ export default function App() {
           onRefreshSupportThreads={refreshSupportThreads}
           onOpenSupportThread={handleOpenSupportThread}
           onSendSupportReply={handleSendSupportReply}
+          onSetSupportBotEnabled={handleSetSupportBotEnabled}
           onModerateReview={async (reviewId, approve) => {
             if (!currentUser?.accessToken) throw new Error('Админ и-мэйлээр нэвтэрнэ үү.');
             await moderateProductReview(currentUser.accessToken, reviewId, approve);
