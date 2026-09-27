@@ -27,21 +27,45 @@ export function getConfiguredAnswer(data: Record<string, unknown>, message: stri
   }
 
   if (/(ажиллах\s*цаг|цагийн\s*хуваарь|хэдээс\s*хэд|хэдэн\s*цагт)/iu.test(normalized)) {
-    return `Манай дэлгүүрийн ажиллах цаг: ${asText(chatbot.workHours, asText(data.work_hours, '09:00 - 20:00 (Өдөр бүр)'))}`;
+    return `Манай дэлгүүрийн ажиллах цаг: ${asText(data.work_hours, asText(chatbot.workHours, 'Сайтад одоогоор бүртгээгүй байна.'))}`;
+  }
+
+  if (/(хаяг|байршил|хаана|утас|холбоо\s*барих)/iu.test(normalized)) {
+    return [
+      asText(data.store_address) && `Хаяг: ${asText(data.store_address)}`,
+      asText(data.store_phone) && `Утас: ${asText(data.store_phone)}`,
+      asText(data.store_email) && `И-мэйл: ${asText(data.store_email)}`,
+      asText(data.google_maps_url),
+    ].filter(Boolean).join('\n') || 'Холбоо барих мэдээлэл сайтад одоогоор бүртгээгүй байна.';
+  }
+
+  const products = Array.isArray(data.products) ? data.products as Record<string, unknown>[] : [];
+  const matches = products.filter(product => {
+    const name = asText(product.name).normalize('NFKC').toLocaleLowerCase('mn-MN');
+    return product.published !== false && name.length >= 2 && normalized.includes(name);
+  }).slice(0, 5);
+  if (matches.length) {
+    return matches.map(product => {
+      const stock = asNumber(product.stock ?? product.stock_quantity, 0);
+      const available = product.in_stock !== false && stock > 0;
+      return `${asText(product.name)}: ${formatMnt(asNumber(product.price, 0))}. ${available ? `Үлдэгдэл ${stock} ш.` : 'Одоогоор дууссан.'}`;
+    }).join('\n');
   }
 
   if (/(хүргэлтийн\s*бүс|хүргэлтийн\s*үнэ|хүргэлтийн\s*хугацаа|хүргэлт)/iu.test(normalized)) {
     const parts = [
       asText(chatbot.deliveryZones) && `Хүргэлтийн бүс: ${asText(chatbot.deliveryZones)}`,
       `Үндсэн хүргэлтийн үнэ: ${formatMnt(asNumber(data.delivery_fee, 3000))}`,
-      `Үнэгүй хүргэлтийн босго: ${formatMnt(asNumber(data.free_delivery_threshold, 100000))}`,
+      (data.rules as Record<string, unknown> | undefined)?.free_delivery_enabled === false
+        ? 'Үнэгүй хүргэлт одоогоор идэвхгүй.'
+        : `Үнэгүй хүргэлтийн босго: ${formatMnt(asNumber(data.free_delivery_threshold, 100000))}`,
       asText(chatbot.deliveryDuration) && `Хугацаа: ${asText(chatbot.deliveryDuration)}`,
       asText(chatbot.deliveryNotes),
     ].filter(Boolean);
     return parts.join('\n');
   }
 
-  if (/(төлбөрийн\s*нөхцөл|яаж\s*төл|төлбөр\s*хий|дансны\s*мэдээлэл|qpay|кью\s*пэй)/iu.test(normalized)) {
+  if (/(төлбөр|яаж\s*төл|данс|qpay|кью\s*пэй)/iu.test(normalized)) {
     const account = [
       asText(bank.bankName ?? bank.bank_name),
       asText(bank.accountNumber ?? bank.account_number),

@@ -3,6 +3,7 @@ import { Bot, Headphones, MessageCircle, Send, X } from 'lucide-react';
 import { getConfiguredAnswer } from '../data/chatbotAnswers';
 import {
   getMySupportMessages,
+  getStoreSettings,
   getMySupportStatus,
   requestSupportHuman,
   sendChatbotMessage,
@@ -82,10 +83,18 @@ export const SupportChatModal: React.FC<Props> = ({ isOpen, onClose, accessToken
   const handleSend = async (quickQuestion?: string) => {
     const text = (quickQuestion ?? draft).trim();
     if (!text || sending) return;
+    setSending(true);
+    setError(null);
+    let currentData = storeData;
+    try {
+      currentData = (await getStoreSettings()).data;
+    } catch {
+      setError('Шинэ мэдээлэл татаж чадсангүй. Сүүлд ачаалсан мэдээллийг ашиглаж байна.');
+    }
     // Public FAQ answers remain available even when chat storage or AI is offline.
     // A quick question is self-service; typed messages still respect human takeover.
     const localAnswer = (quickQuestion || (status.bot_enabled && !status.needs_human))
-      ? getConfiguredAnswer(storeData, text)
+      ? getConfiguredAnswer(currentData, text)
       : null;
     if (localAnswer) {
       const created_at = new Date().toISOString();
@@ -96,6 +105,7 @@ export const SupportChatModal: React.FC<Props> = ({ isOpen, onClose, accessToken
         { id: botId, customer_id: '', sender: 'bot', message: localAnswer, created_at },
       ]);
       if (!quickQuestion) setDraft('');
+      setSending(false);
       return;
     }
     setSending(true);

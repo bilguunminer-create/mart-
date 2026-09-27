@@ -4,6 +4,7 @@ import { UserProfile, OrderDetails, LoyaltyTier } from '../types';
 import { formatMNT, formatOrderNumber } from '../data/storeData';
 import { AuthSession, signIn, requestSignupOtp, verifySignupOtp, sendPasswordReset, updatePassword, getProfile, saveProfile, getStoreOrders, getLoyaltyWallet, cancelMyStoreOrder, expireMyUnpaidOrders, uploadProfileImage, saveProfileAvatar } from '../services/supabaseAuth';
 import { printOrderReceipt } from '../utils/printReceipt';
+import { belongsToUser } from '../utils/orderOwnership';
 
 interface Props {
   isOpen: boolean; onClose: () => void; user: UserProfile | null;
@@ -97,7 +98,7 @@ export const UserProfileModal: React.FC<Props> = ({ isOpen, onClose, user, onSav
     let active = true;
     const loadOrders = async () => {
       try {
-      await expireMyUnpaidOrders(user.accessToken);
+      await expireMyUnpaidOrders(user.accessToken).catch(() => undefined);
       // Read the wallet after expiry has committed any point refunds.
       const wallet = await getLoyaltyWallet(user.accessToken).catch(() => null);
       if (!active) return;
@@ -109,6 +110,8 @@ export const UserProfileModal: React.FC<Props> = ({ isOpen, onClose, user, onSav
       if (!active) return;
       setRemoteOrders(rows.map((order) => ({
         orderId: order.id,
+        orderNumber: order.order_number,
+        customerId: order.customer_id,
         customerName: order.customer_name,
         phone: order.phone,
         address: order.address,
@@ -126,7 +129,7 @@ export const UserProfileModal: React.FC<Props> = ({ isOpen, onClose, user, onSav
         date: new Date(order.created_at).toLocaleString('mn-MN'),
         status: order.status === 'Дууссан' ? 'delivered' : order.status === 'Цуцалсан' ? 'cancelled' : order.status === 'Хүргэлтэд' ? 'shipping' : order.status === 'Баталгаажсан' ? 'confirmed' : 'new',
       })));
-      } catch { if (active) setRemoteOrders([]); }
+      } catch { if (active) setMessage('Захиалгын түүхийг шинэчилж чадсангүй. Дахин оролдоно уу.'); }
     };
     void loadOrders();
     const poll = window.setInterval(() => void loadOrders(), 15000);
@@ -134,13 +137,8 @@ export const UserProfileModal: React.FC<Props> = ({ isOpen, onClose, user, onSav
   }, [isOpen, user?.accessToken, orderRefresh]);
 
   const ownOrders = useMemo(() => {
-    const emailMatch = user?.email?.trim().toLowerCase();
-    const phoneMatch = user?.phone?.replace(/\D/g, '').slice(-8);
     const mergedOrders = [...remoteOrders, ...orders.filter(order => !remoteOrders.some(remote => remote.orderId === order.orderId))];
-    return mergedOrders.filter((order) =>
-      (emailMatch && order.email?.trim().toLowerCase() === emailMatch) ||
-      (phoneMatch && order.phone?.replace(/\D/g, '').slice(-8) === phoneMatch)
-    );
+    return mergedOrders.filter(order => belongsToUser(order, user));
   }, [orders, remoteOrders, user]);
   if (!isOpen) return null;
 

@@ -45,6 +45,7 @@ import { AdminPanel } from './components/AdminPanel';
 import { AdminLoginModal } from './components/AdminLoginModal';
 import { ProductFormModal } from './components/ProductFormModal';
 import { UserProfileModal } from './components/UserProfileModal';
+import { belongsToUser } from './utils/orderOwnership';
 import { GoogleFormsModal } from './components/GoogleFormsModal';
 import { StoreHeroBanner } from './components/StoreHeroBanner';
 import { BeeEmblemLogo } from './components/BeeEmblemLogo';
@@ -445,15 +446,10 @@ export default function App() {
   const userPhoneClean = currentUser?.phone ? currentUser.phone.replace(/\D/g, '').slice(-8) : '';
   const userEmailClean = currentUser?.email ? currentUser.email.trim().toLowerCase() : '';
 
-  // Filter orders strictly for current logged-in user's phone number or email
+  // Account identity remains stable when delivery contact information changes.
   const userOrders = useMemo(() => {
-    if (!userPhoneClean && !userEmailClean) return [];
-    return orders.filter((o) => {
-      const matchPhone = userPhoneClean && o.phone && o.phone.replace(/\D/g, '').slice(-8) === userPhoneClean;
-      const matchEmail = userEmailClean && o.email && o.email.trim().toLowerCase() === userEmailClean;
-      return matchPhone || matchEmail;
-    });
-  }, [orders, userPhoneClean, userEmailClean]);
+    return orders.filter(order => belongsToUser(order, currentUser));
+  }, [orders, currentUser]);
 
   // Total spent accumulated strictly on this logged-in account
   const userTotalSpent = useMemo(() => {
@@ -1828,11 +1824,11 @@ export default function App() {
         paymentSettings={checkoutSettings}
         onReportPayment={async (orderId) => {
           if (!currentUser?.accessToken) throw new Error('Бүртгэлдээ нэвтэрнэ үү.');
-          await reportStoreOrderPayment(currentUser.accessToken, orderId);
+          const saved = await reportStoreOrderPayment(currentUser.accessToken, orderId);
           setOrders((prev) => prev.map((item) => item.orderId === orderId
-            ? { ...item, paymentStatus: 'Төлбөр шалгуулж байна', paymentReportedAt: new Date().toISOString() }
+            ? { ...item, paymentStatus: saved.payment_status, paymentReportedAt: saved.payment_reported_at || undefined }
             : item));
-          showToast('Төлбөрийн мэдэгдэл админд илгээгдлээ.');
+          showToast(saved.payment_status === 'Төлбөр баталгаажсан' ? 'Төлбөр аль хэдийн баталгаажсан байна.' : 'Төлбөрийн мэдэгдэл админд илгээгдлээ.');
         }}
         onOrderSuccess={async (order) => {
           if (!currentUser?.accessToken) {
@@ -2021,6 +2017,8 @@ export default function App() {
           onUpdateOrderStatus={handleUpdateOrderStatus}
           onConfirmPayment={async (orderId) => {
             if (!currentUser?.accessToken) throw new Error('Админ и-мэйлээр нэвтэрнэ үү.');
+            const existing = orders.find(order => order.orderId === orderId);
+            if (!existing || existing.paymentStatus === 'Төлбөр баталгаажсан' || existing.status === 'delivered' || existing.status === 'cancelled') return;
             await confirmStoreOrderPayment(currentUser.accessToken, orderId);
             // Confirming payment must also move a still-"new" order forward to "confirmed" so
             // the customer's order-status steps reflect it immediately, not just the payment badge.
@@ -2242,6 +2240,10 @@ export default function App() {
             onClose={() => setIsSupportChatOpen(false)}
             accessToken={currentUser.accessToken}
             storeData={{
+              products,
+              store_address: checkoutSettings.storeAddress,
+              store_phone: checkoutSettings.storePhone,
+              store_email: checkoutSettings.storeEmail,
               chatbot_settings: chatbotSettings,
               delivery_fee: checkoutSettings.deliveryFee,
               free_delivery_threshold: checkoutSettings.freeDeliveryThreshold,

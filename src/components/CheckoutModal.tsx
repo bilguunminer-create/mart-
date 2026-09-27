@@ -49,6 +49,11 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const [isReportingPayment, setIsReportingPayment] = useState(false);
   const [paymentReported, setPaymentReported] = useState(false);
 
+  useEffect(() => {
+    const latest = orders.find(order => order.orderId === completedOrder?.orderId);
+    if (latest) setCompletedOrder(latest);
+  }, [orders, completedOrder?.orderId]);
+
   const printReceipt = () => {
     if (!completedOrder) return;
     printOrderReceipt(completedOrder);
@@ -263,7 +268,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
               </p>
             </div>
 
-            {completedOrder.paymentMethod === 'bank' && onReportPayment && (
+            {completedOrder.paymentMethod === 'bank' && onReportPayment && completedOrder.paymentStatus !== 'Төлбөр баталгаажсан' && completedOrder.status !== 'delivered' && completedOrder.status !== 'cancelled' && (
               <button
                 type="button"
                 disabled={isReportingPayment || paymentReported}

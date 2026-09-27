@@ -237,6 +237,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
   // Orders status filter
   const [orderStatusFilter, setOrderStatusFilter] = useState<string>('all');
+  const [confirmingPaymentId, setConfirmingPaymentId] = useState<string | null>(null);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
 
   // Security: PIN change state with 3-step verification
   const [currentPinInput, setCurrentPinInput] = useState('');
@@ -1357,6 +1359,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                         <span className="text-xs text-stone-500 font-semibold">Төлөв солих:</span>
                         <select
                           value={currentStatus}
+                          disabled={currentStatus === 'delivered' || currentStatus === 'cancelled'}
                           onChange={(e) => onUpdateOrderStatus(order.orderId, e.target.value as any)}
                           className="text-xs font-bold border border-stone-300 rounded-xl px-2.5 py-1.5 bg-stone-50 focus:outline-none focus:border-rose-500 cursor-pointer"
                         >
@@ -1417,15 +1420,25 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                           <span className="inline-flex rounded-full bg-emerald-100 px-2 py-1 text-[10px] font-black text-emerald-800">
                             ТӨЛБӨР БАТАЛГААЖСАН
                           </span>
+                        ) : order.status === 'delivered' || order.status === 'cancelled' ? (
+                          <span className="text-xs text-stone-500">Захиалга хаагдсан</span>
                         ) : (
                           <button
                             type="button"
-                            onClick={() => { void onConfirmPayment(order.orderId); }}
+                            disabled={confirmingPaymentId !== null}
+                            onClick={async () => {
+                              setConfirmingPaymentId(order.orderId);
+                              setPaymentError(null);
+                              try { await onConfirmPayment(order.orderId); }
+                              catch { setPaymentError('Төлбөр баталгаажуулж чадсангүй. Дахин оролдоно уу.'); }
+                              finally { setConfirmingPaymentId(null); }
+                            }}
                             className="rounded-lg bg-emerald-600 px-2.5 py-1.5 text-[10px] font-black text-white hover:bg-emerald-700"
                           >
-                            Төлбөр баталгаажуулах
+                            {confirmingPaymentId === order.orderId ? 'Баталгаажуулж байна…' : 'Төлбөр баталгаажуулах'}
                           </button>
                         )}
+                        {paymentError && <p role="alert" className="text-xs text-rose-600">{paymentError}</p>}
                       </div>
                     </div>
 

@@ -176,7 +176,7 @@ export async function hasStoreAdminAccess(token: string) {
 }
 
 export async function reportStoreOrderPayment(token: string, orderId: string) {
-  return request('/rest/v1/rpc/report_store_order_payment', {
+  return request<StoreOrderRecord>('/rest/v1/rpc/report_store_order_payment', {
     method: 'POST',
     body: JSON.stringify({ order_id: orderId }),
   }, token);
