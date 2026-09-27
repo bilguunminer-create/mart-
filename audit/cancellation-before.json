@@ -1,0 +1,411 @@
+{
+  "columns": [
+    {
+      "type": "uuid",
+      "table": "loyalty_point_ledger",
+      "column": "id",
+      "default": "gen_random_uuid()",
+      "nullable": "NO"
+    },
+    {
+      "type": "uuid",
+      "table": "loyalty_point_ledger",
+      "column": "user_id",
+      "default": null,
+      "nullable": "NO"
+    },
+    {
+      "type": "uuid",
+      "table": "loyalty_point_ledger",
+      "column": "order_id",
+      "default": null,
+      "nullable": "YES"
+    },
+    {
+      "type": "text",
+      "table": "loyalty_point_ledger",
+      "column": "event_type",
+      "default": null,
+      "nullable": "NO"
+    },
+    {
+      "type": "integer",
+      "table": "loyalty_point_ledger",
+      "column": "points",
+      "default": null,
+      "nullable": "NO"
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "loyalty_point_ledger",
+      "column": "created_at",
+      "default": "now()",
+      "nullable": "NO"
+    },
+    {
+      "type": "uuid",
+      "table": "loyalty_wallets",
+      "column": "user_id",
+      "default": null,
+      "nullable": "NO"
+    },
+    {
+      "type": "integer",
+      "table": "loyalty_wallets",
+      "column": "available_points",
+      "default": "0",
+      "nullable": "NO"
+    },
+    {
+      "type": "integer",
+      "table": "loyalty_wallets",
+      "column": "lifetime_earned",
+      "default": "0",
+      "nullable": "NO"
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "loyalty_wallets",
+      "column": "updated_at",
+      "default": "now()",
+      "nullable": "NO"
+    },
+    {
+      "type": "uuid",
+      "table": "store_orders",
+      "column": "id",
+      "default": "gen_random_uuid()",
+      "nullable": "NO"
+    },
+    {
+      "type": "uuid",
+      "table": "store_orders",
+      "column": "request_id",
+      "default": null,
+      "nullable": "NO"
+    },
+    {
+      "type": "uuid",
+      "table": "store_orders",
+      "column": "customer_id",
+      "default": null,
+      "nullable": "NO"
+    },
+    {
+      "type": "text",
+      "table": "store_orders",
+      "column": "customer_name",
+      "default": null,
+      "nullable": "NO"
+    },
+    {
+      "type": "text",
+      "table": "store_orders",
+      "column": "phone",
+      "default": null,
+      "nullable": "NO"
+    },
+    {
+      "type": "text",
+      "table": "store_orders",
+      "column": "address",
+      "default": null,
+      "nullable": "NO"
+    },
+    {
+      "type": "text",
+      "table": "store_orders",
+      "column": "note",
+      "default": "''::text",
+      "nullable": "NO"
+    },
+    {
+      "type": "jsonb",
+      "table": "store_orders",
+      "column": "items",
+      "default": null,
+      "nullable": "NO"
+    },
+    {
+      "type": "integer",
+      "table": "store_orders",
+      "column": "subtotal",
+      "default": null,
+      "nullable": "NO"
+    },
+    {
+      "type": "integer",
+      "table": "store_orders",
+      "column": "daily_discount",
+      "default": null,
+      "nullable": "NO"
+    },
+    {
+      "type": "integer",
+      "table": "store_orders",
+      "column": "vip_discount",
+      "default": null,
+      "nullable": "NO"
+    },
+    {
+      "type": "integer",
+      "table": "store_orders",
+      "column": "delivery_fee",
+      "default": null,
+      "nullable": "NO"
+    },
+    {
+      "type": "integer",
+      "table": "store_orders",
+      "column": "total",
+      "default": null,
+      "nullable": "NO"
+    },
+    {
+      "type": "text",
+      "table": "store_orders",
+      "column": "tier",
+      "default": "''::text",
+      "nullable": "NO"
+    },
+    {
+      "type": "text",
+      "table": "store_orders",
+      "column": "gift",
+      "default": "''::text",
+      "nullable": "NO"
+    },
+    {
+      "type": "text",
+      "table": "store_orders",
+      "column": "status",
+      "default": "'Шинэ'::text",
+      "nullable": "NO"
+    },
+    {
+      "type": "boolean",
+      "table": "store_orders",
+      "column": "is_demo",
+      "default": null,
+      "nullable": "NO"
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "store_orders",
+      "column": "created_at",
+      "default": "now()",
+      "nullable": "NO"
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "store_orders",
+      "column": "updated_at",
+      "default": "now()",
+      "nullable": "NO"
+    },
+    {
+      "type": "integer",
+      "table": "store_orders",
+      "column": "points_discount",
+      "default": "0",
+      "nullable": "NO"
+    },
+    {
+      "type": "text",
+      "table": "store_orders",
+      "column": "payment_status",
+      "default": "'Төлөөгүй'::text",
+      "nullable": "NO"
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "store_orders",
+      "column": "payment_reported_at",
+      "default": null,
+      "nullable": "YES"
+    },
+    {
+      "type": "bigint",
+      "table": "store_orders",
+      "column": "order_number",
+      "default": "nextval('store_order_number_seq'::regclass)",
+      "nullable": "NO"
+    },
+    {
+      "type": "text",
+      "table": "store_orders",
+      "column": "email",
+      "default": null,
+      "nullable": "YES"
+    },
+    {
+      "type": "boolean",
+      "table": "store_settings",
+      "column": "id",
+      "default": "true",
+      "nullable": "NO"
+    },
+    {
+      "type": "jsonb",
+      "table": "store_settings",
+      "column": "data",
+      "default": null,
+      "nullable": "NO"
+    },
+    {
+      "type": "bigint",
+      "table": "store_settings",
+      "column": "version",
+      "default": "1",
+      "nullable": "NO"
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "store_settings",
+      "column": "updated_at",
+      "default": "now()",
+      "nullable": "NO"
+    }
+  ],
+  "functions": [
+    {
+      "acl": [
+        "=X/postgres",
+        "postgres=X/postgres",
+        "anon=X/postgres",
+        "authenticated=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "name": "admin_expire_unpaid_store_orders",
+      "definition": "CREATE OR REPLACE FUNCTION public.admin_expire_unpaid_store_orders()\n RETURNS integer\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\ndeclare minutes integer:=60; affected integer;\nbegin\n if not private.is_store_admin() then raise exception 'ADMIN_ONLY'; end if;\n select greatest(5,coalesce((data->>'unpaid_cancellation_minutes')::integer,60))\n into minutes from public.store_settings where id=true;\n update public.store_orders\n set status='cancelled', updated_at=now()\n where status='new' and coalesce(payment_status,'') <> 'Төлбөр баталгаажсан'\n   and created_at < now() - make_interval(mins=>minutes);\n get diagnostics affected = row_count;\n return affected;\nend; $function$\n"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "postgres=X/postgres",
+        "anon=X/postgres",
+        "authenticated=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "name": "cancel_my_store_order",
+      "definition": "CREATE OR REPLACE FUNCTION public.cancel_my_store_order(order_id uuid)\n RETURNS jsonb\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\r\ndeclare uid uuid=auth.uid(); affected integer;\r\nbegin\r\n if uid is null then raise exception 'LOGIN_REQUIRED'; end if;\r\n update public.store_orders\r\n set status='Цуцалсан', updated_at=now()\r\n where id=order_id and customer_id=uid and status='Шинэ'\r\n   and coalesce(payment_status,'') <> 'Төлбөр баталгаажсан';\r\n get diagnostics affected = row_count;\r\n if affected=0 then raise exception 'ORDER_CANNOT_BE_CANCELLED'; end if;\r\n return (select to_jsonb(o) from public.store_orders o where o.id=order_id);\r\nend; $function$\n"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "postgres=X/postgres",
+        "anon=X/postgres",
+        "authenticated=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "name": "expire_my_unpaid_store_orders",
+      "definition": "CREATE OR REPLACE FUNCTION public.expire_my_unpaid_store_orders()\n RETURNS integer\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\ndeclare uid uuid=auth.uid(); minutes integer:=60; affected integer;\nbegin\n if uid is null then raise exception 'LOGIN_REQUIRED'; end if;\n select greatest(5,coalesce((data->>'unpaid_cancellation_minutes')::integer,60))\n into minutes from public.store_settings where id=true;\n update public.store_orders\n set status='cancelled', updated_at=now()\n where customer_id=uid and status='new'\n   and coalesce(payment_status,'') <> 'Төлбөр баталгаажсан'\n   and created_at < now() - make_interval(mins=>minutes);\n get diagnostics affected = row_count;\n return affected;\nend; $function$\n"
+    },
+    {
+      "acl": [
+        "postgres=X/postgres",
+        "service_role=X/postgres",
+        "authenticated=X/postgres"
+      ],
+      "name": "store_checkout",
+      "definition": "CREATE OR REPLACE FUNCTION public.store_checkout(payload jsonb, save_order boolean DEFAULT false)\n RETURNS jsonb\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\r\ndeclare s jsonb; cfg public.store_settings; l jsonb; p jsonb; tier_data jsonb; lines jsonb='[]'; qty integer; idx integer; sub integer=0; dd integer=0; vd integer=0; fee integer; grand integer; spent numeric; pct numeric=0; daypct numeric=0; daycat text; daynum text; uid uuid=auth.uid(); demo boolean; n text; ph text; em text; addr text; rid uuid; old public.store_orders; result jsonb;\r\nbegin\r\n if uid is null or not exists(select 1 from auth.users where id=uid and email_confirmed_at is not null and coalesce(is_anonymous,false)=false) then raise exception 'LOGIN_REQUIRED';end if;\r\n if jsonb_typeof(payload->'items') is distinct from 'array' then raise exception 'INVALID_ORDER';end if;\r\n if jsonb_array_length(payload->'items') not between 1 and 50 then raise exception 'INVALID_ORDER';end if;\r\n if (select count(distinct i->>'productId') from jsonb_array_elements(payload->'items') i)<>jsonb_array_length(payload->'items') then raise exception 'INVALID_ORDER';end if;\r\n select * into cfg from public.store_settings where id=true for update;s=cfg.data;\r\n if s is null then raise exception 'STORE_UNAVAILABLE';end if;\r\n demo=coalesce((s->'rules'->>'demo_mode')::boolean,true);\r\n em=nullif(lower(coalesce(auth.jwt()->>'email','')),'');\r\n if save_order then\r\n  rid=(payload->>'requestId')::uuid;n=btrim(payload->>'name');ph=payload->>'phone';addr=btrim(payload->>'address');\r\n  if rid is null or n is null or length(n) not between 2 and 120 or ph is null or ph !~ '^[0-9]{8}$' or addr is null or length(addr) not between 5 and 500 or length(coalesce(payload->>'note',''))>1000 then raise exception 'INVALID_ORDER';end if;\r\n  select * into old from public.store_orders where request_id=rid;\r\n  if found then\r\n   if old.customer_id<>uid then raise exception 'INVALID_ORDER';end if;\r\n   return to_jsonb(old);\r\n  end if;\r\n  if (select count(*) from public.store_orders where customer_id=uid and created_at>now()-interval '1 hour')>=10 then raise exception 'ORDER_LIMIT';end if;\r\n end if;\r\n select coalesce(sum(total-delivery_fee),0) into spent from public.store_orders where customer_id=uid and status='Дууссан' and not is_demo;\r\n if coalesce((s->'rules'->>'vip_enabled')::boolean,false) then\r\n  select v into tier_data from jsonb_array_elements(s->'loyalty_tiers') v where coalesce((v->>'enabled')::boolean,true) and (v->>'threshold')::numeric<=spent order by (v->>'threshold')::numeric desc limit 1;\r\n  pct=least(100,greatest(0,coalesce((tier_data->>'discount_pct')::numeric,0)));\r\n end if;\r\n daynum=extract(dow from now() at time zone 'Asia/Ulaanbaatar')::integer::text;\r\n if coalesce((s->'rules'->>'daily_enabled')::boolean,false) then\r\n  daypct=least(100,greatest(0,coalesce((s->'daily_deals'->daynum->>'discount_percent')::numeric,0)));\r\n  daycat=s->'daily_deals'->daynum->>'category';\r\n end if;\r\n for l in select * from jsonb_array_elements(payload->'items') loop\r\n  if coalesce(l->>'quantity','') !~ '^[0-9]{1,3}$' then raise exception 'INVALID_ORDER';end if;\r\n  qty=(l->>'quantity')::integer;if qty not between 1 and 100 then raise exception 'INVALID_ORDER';end if;\r\n  select value,ordinality::integer-1 into p,idx from jsonb_array_elements(s->'products') with ordinality where value->>'id'=l->>'productId';\r\n  if p is null then select value,ordinality::integer-1 into p,idx from jsonb_array_elements(s->'combos') with ordinality where value->>'id'=l->>'productId';end if;\r\n  if p is null or not coalesce((p->>'in_stock')::boolean,true) or not coalesce((p->>'published')::boolean,true) then raise exception 'PRODUCT_UNAVAILABLE';end if;\r\n  if (p->>'price')::integer<=0 then raise exception 'PRODUCT_UNAVAILABLE';end if;\r\n  if not demo and coalesce((p->>'stock')::integer,0)<qty then raise exception 'OUT_OF_STOCK';end if;\r\n  sub=sub+(p->>'price')::integer*qty;\r\n  if daycat='all' or daycat=p->>'category' then dd=dd+round((p->>'price')::numeric*qty*daypct/100)::integer;end if;\r\n  lines=lines||jsonb_build_array(jsonb_build_object('productId',p->>'id','title',p->>'name','quantity',qty,'price',(p->>'price')::integer));\r\n  if save_order and not demo then\r\n   if p ? 'category' then s=jsonb_set(s,array['products',idx::text,'stock'],to_jsonb((p->>'stock')::integer-qty));else s=jsonb_set(s,array['combos',idx::text,'stock'],to_jsonb((p->>'stock')::integer-qty));end if;\r\n  end if;\r\n end loop;\r\n if coalesce((s->'rules'->>'stack_discounts')::boolean,false) then vd=round((sub-dd)*pct/100)::integer;\r\n else vd=round(sub*pct/100)::integer;if dd>=vd then vd=0;else dd=0;end if;end if;\r\n fee=coalesce((s->>'delivery_fee')::integer,3000);\r\n if (coalesce((s->'rules'->>'free_delivery_enabled')::boolean,true) and sub-dd-vd>=coalesce((s->>'free_delivery_threshold')::integer,100000)) or coalesce((tier_data->>'free_delivery')::boolean,false) then fee=0;end if;\r\n grand=sub-dd-vd+fee;\r\n if save_order and (payload->>'expectedTotal')::integer is distinct from grand then raise exception 'PRICE_CHANGED';end if;\r\n result=jsonb_build_object('items',lines,'subtotal',sub,'daily_discount',dd,'vip_discount',vd,'delivery_fee',fee,'total',grand,'tier',coalesce(tier_data->>'name',''),'gift',coalesce(tier_data->>'admin_gift',''),'is_demo',demo,'lifetime_spend',spent);\r\n if save_order then\r\n  insert into public.customer_profiles(user_id,name,phone,address) values(uid,n,ph,addr) on conflict(user_id) do update set name=excluded.name,phone=excluded.phone,address=excluded.address;\r\n  insert into public.store_orders(request_id,customer_id,customer_name,phone,email,address,note,items,subtotal,daily_discount,vip_discount,delivery_fee,total,tier,gift,is_demo) values(rid,uid,n,ph,em,addr,coalesce(payload->>'note',''),lines,sub,dd,vd,fee,grand,coalesce(tier_data->>'name',''),coalesce(tier_data->>'admin_gift',''),demo) returning * into old;\r\n  if not demo then update public.store_settings set data=s,version=version+1,updated_at=now() where id=true;end if;\r\n  result=to_jsonb(old);\r\n end if;\r\n return result;\r\nend;$function$\n"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "postgres=X/postgres",
+        "anon=X/postgres",
+        "authenticated=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "name": "store_checkout_with_points",
+      "definition": "CREATE OR REPLACE FUNCTION public.store_checkout_with_points(payload jsonb, save_order boolean DEFAULT false)\n RETURNS jsonb\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\ndeclare\n  uid uuid = auth.uid();\n  requested integer = greatest(0, coalesce((payload->>'pointsToUse')::integer, 0));\n  balance integer = 0;\n  base_expected integer;\n  usable integer;\n  adjusted jsonb;\n  preview jsonb;\n  result jsonb;\n  order_uuid uuid;\n  order_total integer;\n  configured_fee integer = 3000;\n  applied_fee integer = 0;\n  is_vehicle_pickup boolean = coalesce(payload->>'deliveryMode', '') = 'vehicle';\nbegin\n  if uid is null then raise exception 'LOGIN_REQUIRED'; end if;\n  select coalesce((data->>'delivery_fee')::integer, 3000)\n    into configured_fee from public.store_settings where id=true;\n  select coalesce((select available_points from public.loyalty_wallets where user_id=uid for update), 0) into balance;\n\n  base_expected = coalesce((payload->>'expectedTotal')::integer, 0) + requested\n    + case when is_vehicle_pickup then configured_fee else 0 end;\n  adjusted = (payload - 'pointsToUse') || jsonb_build_object('expectedTotal', base_expected);\n\n  -- Price, promotion and delivery calculations always come from the central catalog.\n  -- The preview makes the final write use that exact authoritative amount.\n  if save_order then\n    preview = public.store_checkout(adjusted, false);\n    adjusted = jsonb_set(adjusted, '{expectedTotal}', to_jsonb(coalesce((preview->>'total')::integer, 0)));\n  end if;\n\n  result = public.store_checkout(adjusted, save_order);\n  if not save_order then return result; end if;\n\n  order_uuid = (result->>'id')::uuid;\n  applied_fee = coalesce((result->>'delivery_fee')::integer, 0);\n  if is_vehicle_pickup and applied_fee > 0 then\n    update public.store_orders\n      set delivery_fee=0, total=total-applied_fee, updated_at=now()\n      where id=order_uuid;\n  end if;\n\n  select total into order_total from public.store_orders where id=order_uuid for update;\n  usable = least(requested, balance, greatest(0, order_total));\n  if requested <> usable then raise exception 'POINTS_CHANGED'; end if;\n\n  if usable > 0 then\n    insert into public.loyalty_point_ledger(user_id,order_id,event_type,points)\n    values(uid,order_uuid,'redeemed',-usable);\n    insert into public.loyalty_wallets(user_id,available_points,lifetime_earned)\n    values(uid,0,0)\n    on conflict(user_id) do update\n      set available_points=public.loyalty_wallets.available_points-usable,updated_at=now();\n    update public.store_orders\n    set points_discount=usable,total=total-usable,updated_at=now()\n    where id=order_uuid;\n  end if;\n  return (select to_jsonb(o) from public.store_orders o where o.id=order_uuid);\nend;\n$function$\n"
+    },
+    {
+      "acl": [
+        "postgres=X/postgres",
+        "authenticated=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "name": "store_order_status",
+      "definition": "CREATE OR REPLACE FUNCTION public.store_order_status(p_order_id uuid, p_next_status text)\n RETURNS void\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\r\ndeclare\r\n  o public.store_orders;\r\n  s jsonb;\r\n  i jsonb;\r\n  p jsonb;\r\n  idx integer;\r\n  coll text;\r\n  earned integer;\r\n  tier_cfg jsonb;\r\n  best_tier jsonb;\r\n  forced_tier_id text;\r\n  total_spent numeric;\r\n  cashback_pct numeric;\r\nbegin\r\n  if not private.is_store_admin() then raise exception 'FORBIDDEN'; end if;\r\n  if p_next_status not in ('Шинэ','Баталгаажсан','Хүргэлтэд','Дууссан','Цуцалсан') then raise exception 'INVALID_STATUS'; end if;\r\n\r\n  select data into s from public.store_settings where id=true for update;\r\n  select * into o from public.store_orders where id=p_order_id for update;\r\n  if not found then raise exception 'NOT_FOUND'; end if;\r\n  if o.status=p_next_status then return; end if;\r\n  if o.status in ('Дууссан','Цуцалсан') then raise exception 'FINAL_STATUS'; end if;\r\n  if p_next_status='Шинэ' then raise exception 'INVALID_TRANSITION'; end if;\r\n\r\n  if p_next_status='Цуцалсан' and not o.is_demo then\r\n    for i in select * from jsonb_array_elements(o.items) loop\r\n      coll='products';\r\n      select value,ordinality::integer-1 into p,idx from jsonb_array_elements(s->coll) with ordinality where value->>'id'=i->>'productId';\r\n      if p is null then\r\n        coll='combos';\r\n        select value,ordinality::integer-1 into p,idx from jsonb_array_elements(s->coll) with ordinality where value->>'id'=i->>'productId';\r\n      end if;\r\n      if p is not null then s=jsonb_set(s,array[coll,idx::text,'stock'],to_jsonb((p->>'stock')::integer+(i->>'quantity')::integer)); end if;\r\n    end loop;\r\n    update public.store_settings set data=s,version=version+1,updated_at=now() where id=true;\r\n  end if;\r\n\r\n  update public.store_orders set status=p_next_status,updated_at=now() where id=p_order_id;\r\n\r\n  if p_next_status='Дууссан' and not o.is_demo then\r\n    tier_cfg := s->'loyalty_tiers_config';\r\n    if tier_cfg is null or jsonb_typeof(tier_cfg) <> 'array' or jsonb_array_length(tier_cfg) = 0 then\r\n      tier_cfg := '[\r\n        {\"id\":\"bronze\",\"threshold\":500000,\"cashback_pct\":1},\r\n        {\"id\":\"silver\",\"threshold\":1000000,\"cashback_pct\":2},\r\n        {\"id\":\"gold\",\"threshold\":2000000,\"cashback_pct\":3}\r\n      ]'::jsonb;\r\n    end if;\r\n\r\n    cashback_pct := coalesce((s->>'loyalty_cashback_pct')::numeric, 1);\r\n\r\n    if o.customer_id is not null then\r\n      forced_tier_id := s->'loyalty_tier_overrides'->>o.customer_id::text;\r\n\r\n      if forced_tier_id is not null then\r\n        select value into best_tier from jsonb_array_elements(tier_cfg) value where value->>'id' = forced_tier_id;\r\n      end if;\r\n\r\n      if best_tier is null then\r\n        select coalesce(sum(total),0) into total_spent from public.store_orders where customer_id = o.customer_id and status = 'Дууссан';\r\n        select value into best_tier\r\n          from jsonb_array_elements(tier_cfg) value\r\n          where (value->>'threshold')::numeric <= total_spent\r\n          order by (value->>'threshold')::numeric desc\r\n          limit 1;\r\n      end if;\r\n\r\n      if best_tier is not null and (best_tier->>'cashback_pct') is not null then\r\n        cashback_pct := (best_tier->>'cashback_pct')::numeric;\r\n      end if;\r\n    end if;\r\n\r\n    earned=floor(greatest(0,o.total-o.delivery_fee)*cashback_pct/100)::integer;\r\n    if earned > 0 then\r\n      insert into public.loyalty_point_ledger(user_id,order_id,event_type,points)\r\n      values(o.customer_id,o.id,'earned',earned)\r\n      on conflict(order_id,event_type) do nothing;\r\n      if found then\r\n        insert into public.loyalty_wallets(user_id,available_points,lifetime_earned)\r\n        values(o.customer_id,earned,earned)\r\n        on conflict(user_id) do update\r\n          set available_points=public.loyalty_wallets.available_points+earned,\r\n              lifetime_earned=public.loyalty_wallets.lifetime_earned+earned,\r\n              updated_at=now();\r\n      end if;\r\n    end if;\r\n  end if;\r\nend;\r\n$function$\n"
+    }
+  ],
+  "constraints": [
+    {
+      "name": "store_orders_customer_id_fkey",
+      "table": "store_orders",
+      "definition": "FOREIGN KEY (customer_id) REFERENCES auth.users(id)"
+    },
+    {
+      "name": "store_orders_order_number_key",
+      "table": "store_orders",
+      "definition": "UNIQUE (order_number)"
+    },
+    {
+      "name": "store_orders_pkey",
+      "table": "store_orders",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "name": "store_orders_points_discount_check",
+      "table": "store_orders",
+      "definition": "CHECK ((points_discount >= 0))"
+    },
+    {
+      "name": "store_orders_request_id_key",
+      "table": "store_orders",
+      "definition": "UNIQUE (request_id)"
+    },
+    {
+      "name": "store_orders_status_check",
+      "table": "store_orders",
+      "definition": "CHECK ((status = ANY (ARRAY['Шинэ'::text, 'Баталгаажсан'::text, 'Хүргэлтэд'::text, 'Дууссан'::text, 'Цуцалсан'::text])))"
+    },
+    {
+      "name": "loyalty_wallets_available_points_check",
+      "table": "loyalty_wallets",
+      "definition": "CHECK ((available_points >= 0))"
+    },
+    {
+      "name": "loyalty_wallets_lifetime_earned_check",
+      "table": "loyalty_wallets",
+      "definition": "CHECK ((lifetime_earned >= 0))"
+    },
+    {
+      "name": "loyalty_wallets_pkey",
+      "table": "loyalty_wallets",
+      "definition": "PRIMARY KEY (user_id)"
+    },
+    {
+      "name": "loyalty_wallets_user_id_fkey",
+      "table": "loyalty_wallets",
+      "definition": "FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE"
+    },
+    {
+      "name": "loyalty_point_ledger_event_type_check",
+      "table": "loyalty_point_ledger",
+      "definition": "CHECK ((event_type = ANY (ARRAY['earned'::text, 'redeemed'::text, 'reversed'::text])))"
+    },
+    {
+      "name": "loyalty_point_ledger_order_id_event_type_key",
+      "table": "loyalty_point_ledger",
+      "definition": "UNIQUE (order_id, event_type)"
+    },
+    {
+      "name": "loyalty_point_ledger_order_id_fkey",
+      "table": "loyalty_point_ledger",
+      "definition": "FOREIGN KEY (order_id) REFERENCES store_orders(id) ON DELETE SET NULL"
+    },
+    {
+      "name": "loyalty_point_ledger_pkey",
+      "table": "loyalty_point_ledger",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "name": "loyalty_point_ledger_user_id_fkey",
+      "table": "loyalty_point_ledger",
+      "definition": "FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE"
+    }
+  ]
+}

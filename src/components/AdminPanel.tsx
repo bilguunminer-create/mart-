@@ -76,7 +76,7 @@ interface AdminPanelProps {
   onSaveLoyaltyRules?: (tiers: LoyaltyTier[], cashbackPct: number) => Promise<void>;
   loyaltyTierOverrides?: Record<string, string>;
   onSaveTierOverride?: (userId: string, tierId: string | null) => Promise<void>;
-  onSaveProduct: (product: Product) => void;
+  onSaveProduct: (product: Product, originalProduct?: Product | null) => void | Promise<boolean>;
   onDeleteProduct: (productId: string) => void;
   onToggleStock: (productId: string) => void;
   onUpdateOrderStatus: (orderId: string, status: 'new' | 'confirmed' | 'shipping' | 'delivered' | 'cancelled') => void;

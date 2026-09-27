@@ -199,6 +199,13 @@ export async function updateStoreOrderStatus(token: string, orderId: string, sta
 
 export type StoreSettings = { data: { products?: Array<Record<string, unknown>>; [key: string]: unknown }; version: number };
 
+export class StoreSettingsConflictError extends Error {
+  constructor() {
+    super('Каталогийн мэдээлэл өөрчлөгдсөн байна. Хуучин мэдээллийг хадгалахыг хориглолоо. Хуудсаа дахин ачаалаад өөрчлөлтөө оруулна уу.');
+    this.name = 'StoreSettingsConflictError';
+  }
+}
+
 export async function getStoreSettings() {
   const rows = await request<StoreSettings[]>('/rest/v1/store_settings?id=eq.true&select=data,version', { method: 'GET' });
   if (!rows[0]) throw new Error('Дэлгүүрийн тохиргоо олдсонгүй.');
@@ -206,29 +213,57 @@ export async function getStoreSettings() {
 }
 
 
-export async function saveStoreSettings(token: string, data: Record<string, unknown>) {
-  const settings = await getStoreSettings();
-  const nextData = { ...settings.data, ...data };
-  await request('/rest/v1/store_settings?id=eq.true', {
+async function updateStoreSettings(token: string, settings: StoreSettings, nextData: StoreSettings['data']) {
+  if (!Number.isSafeInteger(settings.version) || settings.version < 0) throw new StoreSettingsConflictError();
+  // The filter is evaluated by Postgres while updating the row. A purchase or
+  // another admin save between our GET and PATCH must never be overwritten.
+  const rows = await request<Array<{ version: number }>>(`/rest/v1/store_settings?id=eq.true&version=eq.${settings.version}&select=version`, {
     method: 'PATCH',
+    headers: { Prefer: 'return=representation' },
     body: JSON.stringify({ data: nextData, version: settings.version + 1, updated_at: new Date().toISOString() }),
   }, token);
+  if (!Array.isArray(rows) || rows.length !== 1) throw new StoreSettingsConflictError();
+}
+
+export async function saveStoreSettings(token: string, data: Record<string, unknown>) {
+  // Catalog replacement requires the baseline check in saveStoreProducts.
+  if (Object.prototype.hasOwnProperty.call(data, 'products')) throw new StoreSettingsConflictError();
+  const settings = await getStoreSettings();
+  const nextData = { ...settings.data, ...data };
+  await updateStoreSettings(token, settings, nextData);
   return nextData;
 }
 
-export async function saveStoreProducts(token: string, products: Array<Record<string, unknown>>) {
-  const settings = await getStoreSettings();
-  const normalized = products.map((product) => {
+function normalizeStoreProducts(products: Array<Record<string, unknown>>) {
+  return products.map((product) => {
     const stock = Number(product.stock_quantity ?? product.stock ?? (product.in_stock ? 15 : 0));
     const { stock_quantity, ...rest } = product;
     return { ...rest, stock: Math.max(0, stock), in_stock: Boolean(product.in_stock) && stock > 0, published: product.published ?? true };
   });
+}
+
+// JSON object key order differs between API and browser objects; compare values.
+function canonicalJson(value: unknown): string {
+  return JSON.stringify(value, (_key, item) => item && typeof item === 'object' && !Array.isArray(item)
+    ? Object.fromEntries(Object.keys(item).sort().map((key) => [key, item[key]]))
+    : item);
+}
+
+export async function saveStoreProducts(
+  token: string,
+  products: Array<Record<string, unknown>>,
+  expectedProducts: Array<Record<string, unknown>>,
+) {
+  // Fail closed for callers that have not loaded a baseline catalog.
+  if (!Array.isArray(expectedProducts)) throw new StoreSettingsConflictError();
+  const settings = await getStoreSettings();
+  if (!Array.isArray(settings.data.products) ||
+      canonicalJson(normalizeStoreProducts(settings.data.products)) !== canonicalJson(normalizeStoreProducts(expectedProducts))) {
+    throw new StoreSettingsConflictError();
+  }
+  const normalized = normalizeStoreProducts(products);
   const nextData = { ...settings.data, products: normalized };
-  await request('/rest/v1/store_settings?id=eq.true', {
-    method: 'PATCH',
-    headers: { Prefer: 'return=minimal' },
-    body: JSON.stringify({ data: nextData, version: settings.version + 1, updated_at: new Date().toISOString() }),
-  }, token);
+  await updateStoreSettings(token, settings, nextData);
 }
 
 

@@ -30,6 +30,7 @@ export const UserProfileModal: React.FC<Props> = ({ isOpen, onClose, user, onSav
   const [remoteOrders, setRemoteOrders] = useState<OrderDetails[]>([]);
   const [walletPoints, setWalletPoints] = useState(0);
   const [lifetimePoints, setLifetimePoints] = useState(0);
+  const [orderRefresh, setOrderRefresh] = useState(0);
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
   const [avatarBusy, setAvatarBusy] = useState(false);
 
@@ -97,6 +98,13 @@ export const UserProfileModal: React.FC<Props> = ({ isOpen, onClose, user, onSav
     const loadOrders = async () => {
       try {
       await expireMyUnpaidOrders(user.accessToken);
+      // Read the wallet after expiry has committed any point refunds.
+      const wallet = await getLoyaltyWallet(user.accessToken).catch(() => null);
+      if (!active) return;
+      if (wallet) {
+        setWalletPoints(wallet.available_points || 0);
+        setLifetimePoints(wallet.lifetime_earned || 0);
+      }
       const rows = await getStoreOrders(user.accessToken);
       if (!active) return;
       setRemoteOrders(rows.map((order) => ({
@@ -123,14 +131,7 @@ export const UserProfileModal: React.FC<Props> = ({ isOpen, onClose, user, onSav
     void loadOrders();
     const poll = window.setInterval(() => void loadOrders(), 15000);
     return () => { active = false; window.clearInterval(poll); };
-  }, [isOpen, user?.accessToken]);
-
-  useEffect(() => {
-    if (!isOpen || !user?.accessToken) return;
-    getLoyaltyWallet(user.accessToken)
-      .then((wallet) => { setWalletPoints(wallet.available_points || 0); setLifetimePoints(wallet.lifetime_earned || 0); })
-      .catch(() => { setWalletPoints(0); setLifetimePoints(0); });
-  }, [isOpen, user?.accessToken]);
+  }, [isOpen, user?.accessToken, orderRefresh]);
 
   const ownOrders = useMemo(() => {
     const emailMatch = user?.email?.trim().toLowerCase();
@@ -235,6 +236,7 @@ export const UserProfileModal: React.FC<Props> = ({ isOpen, onClose, user, onSav
     try {
       await cancelMyStoreOrder(user.accessToken, order.orderId);
       setRemoteOrders(current => current.map(item => item.orderId === order.orderId ? { ...item, status: 'cancelled' } : item));
+      setOrderRefresh(current => current + 1);
       setMessage('Захиалга цуцлагдлаа.');
     } catch (error: any) { setMessage(error?.message || 'Захиалгыг цуцлах боломжгүй байна.'); }
     finally { setBusy(false); }

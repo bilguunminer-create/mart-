@@ -70,6 +70,9 @@ import { useCart } from './hooks/useCart';
 import { useAdminAuth } from './hooks/useAdminAuth';
 import { useOrders } from './hooks/useOrders';
 
+// Temporarily paused. Set to true to restore all Google Forms entry points.
+const GOOGLE_FORMS_ENABLED = false;
+
 export default function App() {
   // The installed PWA and native Capacitor shells open only the secured admin flow.
   const appMode = typeof window !== 'undefined'
@@ -563,13 +566,31 @@ export default function App() {
   };
 
   // Admin Action Handlers
-  const persistProducts = (nextProducts: Product[]) => {
+  const catalogSavePending = useRef(false);
+  const persistProducts = async (nextProducts: Product[]): Promise<boolean> => {
     if (!currentUser?.accessToken) {
       showToast('Каталогийн өөрчлөлтийг хадгалахын тулд админ и-мэйлээрээ нэвтэрнэ үү.');
-      return;
+      return false;
     }
-    void saveStoreProducts(currentUser.accessToken, nextProducts as unknown as Record<string, unknown>[])
-      .catch(() => showToast('Supabase каталогийн өөрчлөлтийг хадгалах боломжгүй байна.'));
+    if (catalogSavePending.current) {
+      showToast('Өмнөх өөрчлөлтийг хадгалж байна. Түр хүлээнэ үү.');
+      return false;
+    }
+    catalogSavePending.current = true;
+    try {
+      await saveStoreProducts(
+        currentUser.accessToken,
+        nextProducts as unknown as Record<string, unknown>[],
+        products as unknown as Record<string, unknown>[],
+      );
+      setProducts(nextProducts);
+      return true;
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Каталогийн өөрчлөлтийг хадгалах боломжгүй байна.');
+      return false;
+    } finally {
+      catalogSavePending.current = false;
+    }
   };
 
   const handleOpenAdmin = async () => {
@@ -640,47 +661,43 @@ export default function App() {
     void initAdminPushNotifications(currentUser.accessToken);
   }, [isAdminAuthenticated, currentUser?.accessToken]);
 
-  const handleSaveProduct = (product: Product) => {
-    setProducts((prev) => {
-      const exists = prev.some((p) => p.id === product.id);
-      const next = exists ? prev.map((p) => (p.id === product.id ? product : p)) : [product, ...prev];
-      persistProducts(next);
-      return next;
-    });
-    showToast(`"${product.name}" Supabase-д хадгалагдлаа!`);
+  const handleSaveProduct = async (product: Product, originalProduct?: Product | null) => {
+    // A modal may still contain an old product after the catalog was refreshed.
+    if (originalProduct && products.find((item) => item.id === originalProduct.id) !== originalProduct) {
+      showToast('Барааны мэдээлэл шинэчлэгдсэн байна. Засах цонхоо хаагаад дахин нээнэ үү.');
+      return false;
+    }
+    const exists = products.some((p) => p.id === product.id);
+    const next = exists ? products.map((p) => (p.id === product.id ? product : p)) : [product, ...products];
+    const saved = await persistProducts(next);
+    if (saved) showToast(`"${product.name}" Supabase-д хадгалагдлаа!`);
+    return saved;
   };
 
-  const handleDeleteProduct = (productId: string) => {
-    setProducts((prev) => { const next = prev.filter((p) => p.id !== productId); persistProducts(next); return next; });
-    showToast('Бараа Supabase каталогоос хасагдлаа');
+  const handleDeleteProduct = async (productId: string) => {
+    if (await persistProducts(products.filter((p) => p.id !== productId))) {
+      showToast('Бараа Supabase каталогоос хасагдлаа');
+    }
   };
 
-  const handleToggleStock = (productId: string) => {
-    setProducts((prev) => {
-      const next = prev.map((p) => {
-        if (p.id !== productId) return p;
-        const nextStock = !p.in_stock;
-        const nextQuantity = nextStock ? (p.stock_quantity && p.stock_quantity > 0 ? p.stock_quantity : 15) : 0;
-        showToast(nextStock ? `"${p.name}" бэлэн төлөвт шилжлээ (${nextQuantity}ш)` : `"${p.name}" дууссан төлөвт шилжлээ (0ш)`);
-        return { ...p, in_stock: nextStock, stock_quantity: nextQuantity };
-      });
-      persistProducts(next);
-      return next;
+  const handleToggleStock = async (productId: string) => {
+    const next = products.map((p) => {
+      if (p.id !== productId) return p;
+      const nextStock = !p.in_stock;
+      const nextQuantity = nextStock ? (p.stock_quantity && p.stock_quantity > 0 ? p.stock_quantity : 15) : 0;
+      return { ...p, in_stock: nextStock, stock_quantity: nextQuantity };
     });
+    if (await persistProducts(next)) showToast('Барааны бэлэн төлөв төв санд хадгалагдлаа.');
   };
 
-  const handleQuickUpdateStock = (productId: string, amount: number, isAbsolute = false) => {
-    setProducts((prev) => {
-      const nextProducts = prev.map((p) => {
-        if (p.id !== productId) return p;
-        const current = p.stock_quantity !== undefined ? p.stock_quantity : (p.in_stock ? 15 : 0);
-        const nextStock = isAbsolute ? Math.max(0, amount) : Math.max(0, current + amount);
-        showToast(`"${p.name}" үлдэгдэл шинэчлэгдлээ: ${nextStock} ш`);
-        return { ...p, stock_quantity: nextStock, in_stock: nextStock > 0 };
-      });
-      persistProducts(nextProducts);
-      return nextProducts;
+  const handleQuickUpdateStock = async (productId: string, amount: number, isAbsolute = false) => {
+    const nextProducts = products.map((p) => {
+      if (p.id !== productId) return p;
+      const current = p.stock_quantity !== undefined ? p.stock_quantity : (p.in_stock ? 15 : 0);
+      const nextStock = isAbsolute ? Math.max(0, amount) : Math.max(0, current + amount);
+      return { ...p, stock_quantity: nextStock, in_stock: nextStock > 0 };
     });
+    if (await persistProducts(nextProducts)) showToast('Барааны үлдэгдэл төв санд хадгалагдлаа.');
   };
 
   const handleUpdateOrderStatus = (orderId: string, status: 'new' | 'confirmed' | 'shipping' | 'delivered' | 'cancelled') => {
@@ -1202,7 +1219,7 @@ export default function App() {
               >
                 Админ удирдлага
               </button>
-              <button
+              {GOOGLE_FORMS_ENABLED && <button
                 id="admin-open-forms-strip-btn"
                 onClick={() => setIsFormsOpen(true)}
                 className="bg-stone-800 hover:bg-stone-700 text-stone-200 px-2.5 py-1 rounded-lg font-semibold text-[11px] border border-stone-700 cursor-pointer transition-all flex items-center gap-1.5"
@@ -1214,7 +1231,7 @@ export default function App() {
                   <path d="M16 16H24M16 20H24M16 24H21" stroke="#7248B9" strokeWidth="2" strokeLinecap="round"/>
                 </svg>
                 <span>Forms</span>
-              </button>
+              </button>}
               <button
                 id="admin-logout-strip-btn"
                 onClick={handleAdminLogout}
@@ -1239,7 +1256,7 @@ export default function App() {
         onOpenLoyalty={() => setIsLoyaltyOpen(true)}
         onOpenProfile={() => setIsProfileOpen(true)}
         user={currentUser}
-        onOpenForms={() => setIsFormsOpen(true)}
+        onOpenForms={GOOGLE_FORMS_ENABLED ? () => setIsFormsOpen(true) : undefined}
         onOpenAdmin={handleOpenAdmin}
         onLogoutAdmin={handleAdminLogout}
         isAdminActive={isAdminAuthenticated}
@@ -1305,7 +1322,7 @@ export default function App() {
         />
 
         {/* Customer Services Duo: User Security & Registration / Google Forms */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className={`grid grid-cols-1 gap-4 ${GOOGLE_FORMS_ENABLED ? 'md:grid-cols-2' : ''}`}>
           {/* User Profile & Security Banner */}
           <div className="bg-gradient-to-br from-emerald-950 via-stone-900 to-slate-900 rounded-2xl p-4 sm:p-5 text-white shadow-xs border border-emerald-800/40 flex flex-col justify-between gap-4">
             <div className="flex items-start gap-3.5">
@@ -1341,7 +1358,7 @@ export default function App() {
           </div>
 
           {/* Google Forms Banner */}
-          <div className="bg-gradient-to-br from-purple-950 via-indigo-950 to-slate-900 rounded-2xl p-4 sm:p-5 text-white shadow-xs border border-purple-800/40 flex flex-col justify-between gap-4">
+          {GOOGLE_FORMS_ENABLED && <div className="bg-gradient-to-br from-purple-950 via-indigo-950 to-slate-900 rounded-2xl p-4 sm:p-5 text-white shadow-xs border border-purple-800/40 flex flex-col justify-between gap-4">
             <div className="flex items-start gap-3.5">
               <div className="w-11 h-11 rounded-xl bg-purple-500/20 border border-purple-400/30 flex items-center justify-center shrink-0 p-2.5">
                 <svg className="w-full h-full" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -1374,7 +1391,7 @@ export default function App() {
                 <span className="text-purple-600 font-black">→</span>
               </button>
             </div>
-          </div>
+          </div>}
         </div>
 
         {/* Catalog Control Section: Categories, Country Origin Tabs, Filters */}
@@ -1724,6 +1741,7 @@ export default function App() {
                 <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
                 <span>Бүртгэл & Нууцлал</span>
               </button>
+              {GOOGLE_FORMS_ENABLED && <>
               <span>•</span>
               <button
                 id="footer-google-forms-btn"
@@ -1737,6 +1755,7 @@ export default function App() {
                 </svg>
                 <span>Google Forms судалгаа</span>
               </button>
+              </>}
               {isAdminAuthenticated && (
                 <>
                   <span>•</span>
@@ -2023,7 +2042,7 @@ export default function App() {
           onClose={() => setIsAdminOpen(false)}
           onLogout={handleAdminLogout}
           onChangePin={handleChangePin}
-          onOpenForms={() => setIsFormsOpen(true)}
+          onOpenForms={GOOGLE_FORMS_ENABLED ? () => setIsFormsOpen(true) : undefined}
           onQuickUpdateStock={handleQuickUpdateStock}
           featuredProductId={featuredProductId}
           combos={comboPacks}
@@ -2160,11 +2179,11 @@ export default function App() {
       />
 
       {/* Google Forms Integration Modal */}
-      <GoogleFormsModal
+      {GOOGLE_FORMS_ENABLED && <GoogleFormsModal
         isOpen={isFormsOpen}
         onClose={() => setIsFormsOpen(false)}
         onNotify={(msg) => showToast(msg)}
-      />
+      />}
 
       {/* Admin Login Modal */}
       <AdminLoginModal
@@ -2181,11 +2200,7 @@ export default function App() {
           setDirectEditProduct(null);
         }}
         productToEdit={directEditProduct}
-        onSave={(updated) => {
-          handleSaveProduct(updated);
-          setIsDirectFormOpen(false);
-          setDirectEditProduct(null);
-        }}
+        onSave={handleSaveProduct}
       />
 
       {/* Floating Bottom Cart Bar for Mobile when items exist */}
@@ -2226,6 +2241,14 @@ export default function App() {
             isOpen={isSupportChatOpen}
             onClose={() => setIsSupportChatOpen(false)}
             accessToken={currentUser.accessToken}
+            storeData={{
+              chatbot_settings: chatbotSettings,
+              delivery_fee: checkoutSettings.deliveryFee,
+              free_delivery_threshold: checkoutSettings.freeDeliveryThreshold,
+              unpaid_cancellation_minutes: checkoutSettings.unpaidCancellationMinutes,
+              bank_accounts: checkoutSettings,
+              loyalty_cashback_pct: loyaltyCashbackPct,
+            }}
           />
         </React.Suspense>
       )}

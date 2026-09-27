@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Bot, Headphones, MessageCircle, Send, X } from 'lucide-react';
+import { getConfiguredAnswer } from '../data/chatbotAnswers';
 import {
   getMySupportMessages,
   getMySupportStatus,
@@ -13,6 +14,7 @@ type Props = {
   isOpen: boolean;
   onClose: () => void;
   accessToken: string;
+  storeData: Record<string, unknown>;
 };
 
 const DEFAULT_STATUS: SupportStatus = { bot_enabled: true, needs_human: false };
@@ -26,8 +28,9 @@ const QUICK_QUESTIONS = [
   'Захиалга хийх заавар',
 ] as const;
 
-export const SupportChatModal: React.FC<Props> = ({ isOpen, onClose, accessToken }) => {
+export const SupportChatModal: React.FC<Props> = ({ isOpen, onClose, accessToken, storeData }) => {
   const [messages, setMessages] = useState<SupportMessage[]>([]);
+  const [localMessages, setLocalMessages] = useState<SupportMessage[]>([]);
   const [status, setStatus] = useState<SupportStatus>(DEFAULT_STATUS);
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
@@ -35,6 +38,7 @@ export const SupportChatModal: React.FC<Props> = ({ isOpen, onClose, accessToken
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
+  const localId = useRef(-1);
 
   const load = async () => {
     try {
@@ -47,7 +51,9 @@ export const SupportChatModal: React.FC<Props> = ({ isOpen, onClose, accessToken
       setLoaded(true);
       setError(null);
     } catch {
-      setError('Мессеж татахад алдаа гарлаа.');
+      setError('Чатын түүхийг татаж чадсангүй. Түгээмэл асуултуудаас сонгон хариу авах боломжтой.');
+    } finally {
+      setLoaded(true);
     }
   };
 
@@ -61,13 +67,37 @@ export const SupportChatModal: React.FC<Props> = ({ isOpen, onClose, accessToken
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, sending]);
+  }, [messages, localMessages, sending]);
+
+  useEffect(() => {
+    setLocalMessages([]);
+    setMessages([]);
+    setStatus(DEFAULT_STATUS);
+    setLoaded(false);
+    setDraft('');
+  }, [accessToken]);
 
   if (!isOpen) return null;
 
   const handleSend = async (quickQuestion?: string) => {
     const text = (quickQuestion ?? draft).trim();
     if (!text || sending) return;
+    // Public FAQ answers remain available even when chat storage or AI is offline.
+    // A quick question is self-service; typed messages still respect human takeover.
+    const localAnswer = (quickQuestion || (status.bot_enabled && !status.needs_human))
+      ? getConfiguredAnswer(storeData, text)
+      : null;
+    if (localAnswer) {
+      const created_at = new Date().toISOString();
+      const customerId = localId.current--;
+      const botId = localId.current--;
+      setLocalMessages((previous) => [...previous,
+        { id: customerId, customer_id: '', sender: 'customer', message: text, created_at },
+        { id: botId, customer_id: '', sender: 'bot', message: localAnswer, created_at },
+      ]);
+      if (!quickQuestion) setDraft('');
+      return;
+    }
     setSending(true);
     setError(null);
     setDraft('');
@@ -128,7 +158,7 @@ export const SupportChatModal: React.FC<Props> = ({ isOpen, onClose, accessToken
                 key={question}
                 type="button"
                 onClick={() => void handleSend(question)}
-                disabled={!loaded || sending || !status.bot_enabled || status.needs_human}
+                disabled={sending}
                 className="flex min-h-10 items-center gap-2 rounded-lg border border-stone-200 bg-stone-50 px-2.5 py-2 text-left text-[10px] font-bold leading-tight text-stone-700 transition-colors hover:border-amber-300 hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-amber-100 text-[9px] font-black text-amber-800">{index + 1}</span>
@@ -140,13 +170,13 @@ export const SupportChatModal: React.FC<Props> = ({ isOpen, onClose, accessToken
 
         <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-stone-50">
           {!loaded && <p className="text-center text-xs text-stone-400 py-8">Ачааллаж байна...</p>}
-          {loaded && messages.length === 0 && (
+          {messages.length === 0 && localMessages.length === 0 && (
             <div className="text-center text-xs text-stone-500 py-8 px-6">
               <Bot className="w-8 h-8 mx-auto mb-2 text-amber-500" />
-              Бараа, хүргэлт, төлбөр болон дэлгүүрийн мэдээллээ асуугаарай.
+              Сайн байна уу! US&K Family Mart-ийн туслах байна. Асуултаа бичих эсвэл дээрх түгээмэл асуултуудаас сонгоорой.
             </div>
           )}
-          {messages.map((message) => {
+          {[...messages, ...localMessages].sort((a, b) => a.created_at.localeCompare(b.created_at)).map((message) => {
             const isCustomer = message.sender === 'customer';
             const isBot = message.sender === 'bot';
             return (
@@ -162,7 +192,7 @@ export const SupportChatModal: React.FC<Props> = ({ isOpen, onClose, accessToken
                 >
                   {!isCustomer && (
                     <p className={`text-[9px] font-black mb-1 ${isBot ? 'text-amber-700' : 'text-emerald-700'}`}>
-                      {isBot ? 'AI туслах' : 'Дэлгүүрийн админ'}
+                      {isBot ? (message.id < 0 ? 'Түгээмэл асуултын автомат хариулт' : 'AI туслах') : 'Дэлгүүрийн админ'}
                     </p>
                   )}
                   <p className="whitespace-pre-wrap break-words">{message.message}</p>

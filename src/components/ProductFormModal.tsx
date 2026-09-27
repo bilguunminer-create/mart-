@@ -8,7 +8,7 @@ interface ProductFormModalProps {
   isOpen: boolean;
   onClose: () => void;
   productToEdit: Product | null;
-  onSave: (product: Product) => void;
+  onSave: (product: Product, originalProduct?: Product | null) => void | Promise<boolean>;
 }
 
 export const ProductFormModal: React.FC<ProductFormModalProps> = ({
@@ -38,6 +38,8 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   const [isProcessingImage, setIsProcessingImage] = useState(false);
   const [imageError, setImageError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const savePending = useRef(false);
   const [isDragging, setIsDragging] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -121,8 +123,9 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (savePending.current) return;
     const cleanName = name.trim();
     if (!cleanName) {
       setFormError('Барааны нэрийг оруулна уу.');
@@ -169,6 +172,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
     const cleanDayDeal = dayDeal === -1 ? -1 : (Number(dayDeal) >= 0 && Number(dayDeal) <= 6 ? Number(dayDeal) : -1);
 
     const savedProduct: Product = {
+      ...productToEdit,
       id: productToEdit ? productToEdit.id : `PROD-${Date.now().toString().slice(-6)}`,
       name: cleanName,
       category,
@@ -190,8 +194,22 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       published
     };
 
-    onSave(savedProduct);
-    onClose();
+    savePending.current = true;
+    setIsSaving(true);
+    setFormError(null);
+    try {
+      const saved = await onSave(savedProduct, productToEdit);
+      if (saved === false) {
+        setFormError('Өөрчлөлт хадгалагдсангүй. Мэдээлэл хуучирсан бол хуудсаа дахин ачаалаад шинэ каталог дээр засна уу.');
+        return;
+      }
+      onClose();
+    } catch (error) {
+      setFormError(error instanceof Error ? error.message : 'Өөрчлөлт хадгалагдсангүй. Дахин оролдоно уу.');
+    } finally {
+      savePending.current = false;
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -213,6 +231,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
           <button
             id="close-product-form-btn"
             onClick={onClose}
+            disabled={isSaving}
             className="w-8 h-8 rounded-full bg-stone-800 hover:bg-stone-700 flex items-center justify-center text-stone-400 hover:text-white transition-colors cursor-pointer"
           >
             <X className="w-4 h-4" />
@@ -660,6 +679,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
             <button
               type="button"
               onClick={onClose}
+              disabled={isSaving}
               className="px-4 py-2 text-xs font-bold text-stone-600 hover:text-stone-900 cursor-pointer"
             >
               Болих
@@ -667,10 +687,11 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
             <button
               id="save-product-btn"
               type="submit"
-              className="px-5 py-2.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl shadow-md hover:shadow-lg transition-all flex items-center gap-1.5 cursor-pointer"
+              disabled={isSaving || isProcessingImage}
+              className="px-5 py-2.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl shadow-md hover:shadow-lg transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Check className="w-4 h-4" />
-              <span>{productToEdit ? 'Өөрчлөлтийг хадгалах' : 'Барааг бүртгэх'}</span>
+              <span>{isSaving ? 'Хадгалж байна...' : productToEdit ? 'Өөрчлөлтийг хадгалах' : 'Барааг бүртгэх'}</span>
             </button>
           </div>
         </form>
