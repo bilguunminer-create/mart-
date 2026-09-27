@@ -2,6 +2,8 @@ import React, { useMemo } from 'react';
 import { X, Award, ShoppingBag, TrendingUp, LogOut } from 'lucide-react';
 import { LoyaltyTier, OrderDetails, UserProfile } from '../types';
 import { formatMNT, LOYALTY_TIERS } from '../data/storeData';
+import { belongsToUser } from '../utils/orderOwnership';
+import { getLoyaltyProgress } from '../utils/loyaltyProgress';
 
 interface LoyaltyModalProps {
   isOpen: boolean;
@@ -26,15 +28,7 @@ export const LoyaltyModal: React.FC<LoyaltyModalProps> = ({
   onLogoutUser,
 }) => {
   const accountOrders = useMemo(() => {
-    const email = currentUser?.email?.trim().toLowerCase();
-    const phone = currentUser?.phone?.replace(/\D/g, '').slice(-8);
-    if (!email && !phone) return [];
-
-    return orders.filter((order) => {
-      const orderEmail = order.email?.trim().toLowerCase();
-      const orderPhone = order.phone?.replace(/\D/g, '').slice(-8);
-      return Boolean((email && orderEmail === email) || (phone && orderPhone === phone));
-    });
+    return orders.filter(order => belongsToUser(order, currentUser));
   }, [orders, currentUser]);
 
   // Tier progress counts only delivered orders, matching how it is computed
@@ -55,8 +49,7 @@ export const LoyaltyModal: React.FC<LoyaltyModalProps> = ({
   // override) instead of recomputing it here, so this always agrees with
   // checkout, the profile card, and the admin members list.
   const currentTier: LoyaltyTier | null = currentUser ? (activeLoyalty ?? null) : null;
-  const nextTier = tiers.find((tier) => tier.threshold > totalSpent) || null;
-  const remaining = nextTier ? Math.max(0, nextTier.threshold - totalSpent) : 0;
+  const { nextTier, remaining } = getLoyaltyProgress(totalSpent, tiers, currentTier);
 
   if (!isOpen) return null;
 
@@ -108,7 +101,7 @@ export const LoyaltyModal: React.FC<LoyaltyModalProps> = ({
             {nextTier ? (
               <div className="flex gap-3 rounded-2xl border border-stone-200 p-4 text-sm text-stone-700">
                 <TrendingUp className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" />
-                <p><b>{nextTier.name}</b> зэрэглэлд ороход {formatMNT(remaining)} дутуу байна.</p>
+                <p>Дараагийн зэрэглэл — <b>{nextTier.name}</b>: хүрэхэд <b>{formatMNT(remaining)}</b>-ийн худалдан авалт дутуу байна.</p>
               </div>
             ) : (
               <p className="rounded-2xl bg-emerald-50 p-4 text-sm font-semibold text-emerald-800">
@@ -117,7 +110,7 @@ export const LoyaltyModal: React.FC<LoyaltyModalProps> = ({
             )}
 
             <p className="text-xs leading-5 text-stone-500">
-              Зэрэглэлийг гараар сонгох боломжгүй. Таны бүртгэлд холбогдсон, цуцлагдаагүй захиалгын дүнгээр автоматаар шинэчлэгдэнэ.
+              Худалдан авалтын нийлбэрт таны бүртгэлд холбогдсон, хүргэгдэж дууссан захиалгууд тооцогдоно.
             </p>
 
             <div className="grid grid-cols-2 gap-3">

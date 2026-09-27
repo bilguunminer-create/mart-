@@ -400,26 +400,33 @@ export default function App() {
     void refreshSupportThreads();
   }, [isAdminAuthenticated, refreshSupportThreads]);
 
-  // Logs one anonymous pageview for the public storefront only -- never for the
+  const pageVisitKey = useRef<string | null>(null);
+  const pageVisitAccount = useRef<string | null>(null);
+  // Logs one pageview for the public storefront only -- never for the
   // admin dashboard or the warehouse app, so "хэдэн хүн үзсэн" reflects real
   // customer traffic, not staff logging in to manage the site.
   useEffect(() => {
     if (isAdminApp) return;
     try {
+      const accountId = currentUser?.supabaseUserId || currentUser?.id || null;
+      if (!pageVisitKey.current || (accountId && pageVisitAccount.current && accountId !== pageVisitAccount.current)) {
+        pageVisitKey.current = crypto.randomUUID();
+      }
+      if (accountId) pageVisitAccount.current = accountId;
       let visitorId = localStorage.getItem('usk_visitor_id');
       if (!visitorId) {
         visitorId = crypto.randomUUID();
         localStorage.setItem('usk_visitor_id', visitorId);
       }
-      logSiteVisit(visitorId, window.location.pathname).catch(() => {
+      logSiteVisit(visitorId, window.location.pathname, pageVisitKey.current, currentUser?.accessToken).catch(() => {
         // Pageview logging is best-effort; never surface this to the visitor.
       });
     } catch {
       // Pageview logging is best-effort; never block the storefront on it.
     }
-    // Runs once per page load by design -- not tied to route changes within the SPA.
+    // Reuse the event key on login/token refresh, upgrading identity without another view.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [currentUser?.accessToken, currentUser?.supabaseUserId, currentUser?.id]);
 
   // Log out a customer after 30 minutes without activity.
   useEffect(() => {

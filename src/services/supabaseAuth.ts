@@ -385,15 +385,23 @@ export async function unregisterAdminPushToken(token: string, deviceToken: strin
   }, token);
 }
 
-/** Logs one storefront pageview. Anonymous -- no token, no PII, just a random per-browser id. */
-export async function logSiteVisit(visitorId: string, path: string) {
-  return request('/rest/v1/rpc/log_site_visit', {
+/** One page load; the server derives account identity from the authenticated token. */
+export async function logSiteVisit(visitorId: string, path: string, visitKey: string, token?: string) {
+  return request('/rest/v1/rpc/log_site_visit_v2', {
     method: 'POST',
-    body: JSON.stringify({ p_visitor_id: visitorId, p_path: path }),
-  });
+    body: JSON.stringify({ p_visitor_id: visitorId, p_visit_key: visitKey, p_path: path }),
+  }, token);
 }
 
 export type SiteVisitStats = {
+  total_new_visitors: number;
+  total_repeat_visits: number;
+  today_new_visitors: number;
+  today_repeat_visits: number;
+  last7days_new_visitors: number;
+  last7days_repeat_visits: number;
+  last30days_new_visitors: number;
+  last30days_repeat_visits: number;
   total_pageviews: number;
   total_unique_visitors: number;
   today_pageviews: number;

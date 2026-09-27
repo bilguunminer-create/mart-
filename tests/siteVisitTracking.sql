@@ -1,0 +1,40 @@
+do $test$
+declare u uuid:=gen_random_uuid(); v uuid:=gen_random_uuid(); b1 uuid:=gen_random_uuid(); b2 uuid:=gen_random_uuid();
+ k1 uuid:=gen_random_uuid(); k2 uuid:=gen_random_uuid(); k3 uuid:=gen_random_uuid(); baseline jsonb; result jsonb;
+begin
+ begin
+ insert into auth.users(id,email,email_confirmed_at,is_anonymous) values(u,u::text||'@example.invalid',now(),false);
+ insert into public.allowed_accounts(email) values(u::text||'@example.invalid');
+ perform set_config('request.jwt.claim.sub',u::text,true);
+ baseline:=public.get_site_visit_stats();
+ perform set_config('request.jwt.claim.sub','',true);
+ perform public.log_site_visit_v2(b1,k1,'/');
+ perform set_config('request.jwt.claim.sub',u::text,true);
+ perform public.log_site_visit_v2(b1,k1,'/');
+ perform public.log_site_visit_v2(b1,k1,'/');
+ assert (select count(*)=1 from public.site_visits where visit_key=k1),'Login/retry doubled view';
+ assert (select user_id=u from public.site_visits where visit_key=k1),'Login identity missing';
+ perform public.log_site_visit_v2(b2,k2,'/');
+ perform set_config('request.jwt.claim.sub',v::text,true);
+ perform public.log_site_visit_v2(b2,k3,'/');
+ perform public.log_site_visit_v2(b1,k1,'/');
+ assert (select user_id=u from public.site_visits where visit_key=k1),'Identity reassigned';
+ perform set_config('request.jwt.claim.sub',u::text,true);
+ result:=public.get_site_visit_stats();
+ assert (result->>'total_pageviews')::bigint=(baseline->>'total_pageviews')::bigint+3,'Pageviews';
+ assert (result->>'total_unique_visitors')::bigint=(baseline->>'total_unique_visitors')::bigint+2,'Cross-device account deduplication';
+ assert (result->>'total_new_visitors')::bigint=(baseline->>'total_new_visitors')::bigint+2,'New visitors';
+ assert (result->>'total_repeat_visits')::bigint=(baseline->>'total_repeat_visits')::bigint+1,'Repeat visits';
+ update public.site_visits set created_at=now()-interval '2 days' where visit_key=k1;
+ result:=public.get_site_visit_stats();
+ assert (result->>'today_new_visitors')::bigint=(baseline->>'today_new_visitors')::bigint+1,'Returning visitor counted new today';
+ assert (result->>'today_repeat_visits')::bigint=(baseline->>'today_repeat_visits')::bigint+1,'Returning visit today';
+ perform set_config('request.jwt.claim.sub','',true);
+ begin perform public.get_site_visit_stats(); raise exception 'ANON_STATS_ALLOWED';
+ exception when others then assert sqlerrm='FORBIDDEN','Statistics access'; end;
+ raise exception using errcode='ZX003',message='ROLLBACK_VISIT_FIXTURES';
+ exception when sqlstate 'ZX003' then null;
+ end;
+ assert not exists(select 1 from public.site_visits where visit_key in(k1,k2,k3)),'Fixtures survived';
+end;
+$test$;

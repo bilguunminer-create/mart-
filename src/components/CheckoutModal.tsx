@@ -1,4 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { belongsToUser } from '../utils/orderOwnership';
+import { getLoyaltyProgress } from '../utils/loyaltyProgress';
 import { X, CheckCircle2, QrCode, CreditCard, Banknote, Truck, ShieldCheck, Copy, Check, Printer, Award, Phone, Mail } from 'lucide-react';
 import { CartItem, LoyaltyTier, OrderDetails, UserProfile } from '../types';
 import { STORE_CONFIG, LOYALTY_TIERS, formatMNT, formatOrderNumber, calculateLoyaltyTierBySpent } from '../data/storeData';
@@ -88,15 +90,10 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const cleanPhone = phone.replace(/\D/g, '').slice(-8);
   const cleanEmail = email.trim().toLowerCase();
 
-  // Purchase history specifically tied to this phone number or email
+  // Delivery contact edits do not change the account's purchase history.
   const accountOrders = useMemo(() => {
-    if (cleanPhone.length < 8 && (!cleanEmail || !cleanEmail.includes('@'))) return [];
-    return orders.filter((o) => {
-      const matchPhone = cleanPhone.length >= 8 && o.phone && o.phone.replace(/\D/g, '').slice(-8) === cleanPhone;
-      const matchEmail = cleanEmail.includes('@') && o.email && o.email.trim().toLowerCase() === cleanEmail;
-      return matchPhone || matchEmail;
-    });
-  }, [orders, cleanPhone, cleanEmail]);
+    return orders.filter(order => belongsToUser(order, currentUser));
+  }, [orders, currentUser]);
 
   const accountSpent = useMemo(() => {
     return accountOrders
@@ -104,19 +101,13 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
       .reduce((sum, o) => sum + (o.total || 0), 0);
   }, [accountOrders]);
 
-  // Loyalty tier for this checkout. A logged-in customer always uses the same
-  // tier already resolved for their account elsewhere in the app (activeLoyalty),
-  // instead of recomputing it here from whatever phone/email happens to be typed
-  // into this form -- that recomputation only exists so a signed-out guest who
-  // types a phone number they have ordered under before can still be recognized.
+  // Keep checkout consistent with the account tier, including admin overrides.
   const accountLoyaltyTier = useMemo<LoyaltyTier | null>(() => {
     if (currentUser) return activeLoyalty ?? null;
-    // A signed-out guest recognized by a repeat phone/email gets the tier their
-    // spend alone qualifies for; a manual admin override only applies once they
-    // are actually signed in, since overrides are keyed by the real account id.
     return calculateLoyaltyTierBySpent(accountSpent, loyaltyTiers && loyaltyTiers.length > 0 ? loyaltyTiers : LOYALTY_TIERS);
   }, [accountSpent, currentUser, activeLoyalty, loyaltyTiers]);
 
+  const tierProgress = getLoyaltyProgress(accountSpent, loyaltyTiers?.length ? loyaltyTiers : LOYALTY_TIERS, accountLoyaltyTier);
   if (!isOpen) return null;
 
   const subtotal = items.reduce((sum, item) => sum + item.originalPrice * item.quantity, 0);
@@ -425,14 +416,14 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                           </button>
                         </div>
                       </div>
-                    ) : (
+                    ) : tierProgress.nextTier ? (
                       <div className="text-[11px] text-stone-600 flex items-center justify-between bg-white/70 p-2 rounded-xl border border-stone-200">
-                        <span>500,000 ₮ хүрснээр Хүрэл (2%) хөнгөлөлтийн эрх нээгдэнэ</span>
+                        <span>Дараагийн зэрэглэл: {tierProgress.nextTier.name}</span>
                         <span className="text-amber-700 font-bold ml-2">
-                          {formatMNT(Math.max(0, 500000 - accountSpent))} дутуу
+                          {formatMNT(tierProgress.remaining)} дутуу
                         </span>
                       </div>
-                    )}
+                    ) : null}
 
                     <div className="flex items-center justify-between rounded-xl bg-white/70 p-2 border border-stone-200">
                       <span className="text-stone-700 font-medium">Боломжтой бонус оноо:</span>
