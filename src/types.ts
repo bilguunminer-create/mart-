@@ -1,3 +1,14 @@
+export interface PreorderProduct {
+  id: string;
+  name: string;
+  image: string;
+  description: string;
+  price: number | null;
+  lead_time: string;
+  origin: string;
+  published: boolean;
+}
+
 export interface Product {
   id: string;
   name: string;

@@ -45,7 +45,7 @@ import {
   MessageCircle,
   Bot
 } from 'lucide-react';
-import { Product, OrderDetails, LoyaltyTier, ComboPack, ProductReview, ChatbotSettings } from '../types';
+import { Product, PreorderProduct, OrderDetails, LoyaltyTier, ComboPack, ProductReview, ChatbotSettings } from '../types';
 import {
   CATEGORIES,
   LOYALTY_TIERS,
@@ -54,6 +54,7 @@ import {
 } from '../data/storeData';
 import { DEFAULT_CATEGORY_IMAGES } from '../data/categoryImageDefaults';
 import { ProductFormModal } from './ProductFormModal';
+import { PreorderAdmin } from './PreorderAdmin';
 import { ComboFormModal } from './ComboFormModal';
 import { LoyaltyRulesModal } from './LoyaltyRulesModal';
 import { AdminSupportChat } from './AdminSupportChat';
@@ -63,6 +64,10 @@ import { DEFAULT_CHATBOT_SETTINGS } from '../data/chatbotSettings';
 
 interface AdminPanelProps {
   products: Product[];
+  preorderProducts: PreorderProduct[];
+  preorderLoaded: boolean;
+  onSavePreorderProducts: (products: PreorderProduct[]) => Promise<void>;
+  onUploadPreorderImage: (file: File) => Promise<string>;
   orders: OrderDetails[];
   memberProfiles?: Array<{ user_id: string; name: string; phone: string; address: string; created_at?: string }>;
   storeLogoUrl?: string | null;
@@ -135,6 +140,10 @@ export interface LoyaltyMember {
 
 export const AdminPanel: React.FC<AdminPanelProps> = ({
   products,
+  preorderProducts,
+  preorderLoaded,
+  onSavePreorderProducts,
+  onUploadPreorderImage,
   orders,
   memberProfiles = [],
   storeLogoUrl = null,
@@ -182,7 +191,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   checkoutSettings = { deliveryFee: 3000, freeDeliveryThreshold: 100000, bankName: '', accountNumber: '', iban: '', accountHolder: '', storePhone: '', storeEmail: '', facebookUrl: '', messengerUrl: '', googleMapsUrl: '', storeAddress: '', unpaidCancellationMinutes: 60 },
   onSaveCheckoutSettings
 }) => {
-  const [activeTab, setActiveTab] = useState<'products' | 'orders' | 'loyalty' | 'stats' | 'settings' | 'reviews' | 'chat' | 'chatbot'>('products');
+  const [activeTab, setActiveTab] = useState<'products' | 'preorders' | 'orders' | 'loyalty' | 'stats' | 'settings' | 'reviews' | 'chat' | 'chatbot'>('products');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedOrigin, setSelectedOrigin] = useState<'ALL' | 'KR' | 'US'>('ALL');
@@ -713,6 +722,17 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             </button>
 
             <button
+              type="button"
+              id="admin-tab-preorders"
+              onClick={() => setActiveTab('preorders')}
+              className={'py-3 px-4 text-xs font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ' + (activeTab === 'preorders' ? 'border-amber-500 text-amber-400' : 'border-transparent text-stone-400 hover:text-stone-200')}
+            >
+              <Package className="h-4 w-4" />
+              <span>Захиалгаар ирэх бараа</span>
+              <span className="rounded-full bg-stone-800 px-1.5 text-[10px] text-stone-300">{preorderProducts.length}</span>
+            </button>
+
+            <button
               id="admin-tab-orders"
               onClick={() => setActiveTab('orders')}
               className={`py-3 px-4 text-xs font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
@@ -836,6 +856,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
       {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 space-y-6">
+        {activeTab === 'preorders' && (preorderLoaded
+          ? <PreorderAdmin products={preorderProducts} onSave={onSavePreorderProducts} onUploadImage={onUploadPreorderImage} />
+          : <p role="alert" className="rounded-xl bg-amber-50 p-4 text-amber-900">Барааны мэдээлэл ачаалагдаагүй байна. Хуудсаа дахин ачаална уу.</p>)}
         {/* ================= PRODUCTS TAB ================= */}
         {activeTab === 'products' && (
           <div className="space-y-4">

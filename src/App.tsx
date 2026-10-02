@@ -30,12 +30,14 @@ import {
   formatOrderNumber,
   calculateLoyaltyTierBySpent
 } from './data/storeData';
-import { Product, CartItem, LoyaltyTier, ComboPack, OrderDetails, UserProfile, ProductReview, ChatbotSettings } from './types';
+import { Product, PreorderProduct, CartItem, LoyaltyTier, ComboPack, OrderDetails, UserProfile, ProductReview, ChatbotSettings } from './types';
 import { DEFAULT_CHATBOT_SETTINGS, normalizeChatbotSettings } from './data/chatbotSettings';
 import { Header } from './components/Header';
 import { DailyDealBanner } from './components/DailyDealBanner';
 import { ProductCard } from './components/ProductCard';
 import { CombosSection } from './components/CombosSection';
+import { PreorderSection } from './components/PreorderSection';
+import { readPreorderProducts } from './utils/preorderProducts';
 import { CategoryBentoGrid } from './components/CategoryBentoGrid';
 import { CartDrawer } from './components/CartDrawer';
 import { CheckoutModal } from './components/CheckoutModal';
@@ -64,7 +66,7 @@ const SupportChatModal = React.lazy(() =>
 // of the main bundle -- a dynamic import here would not save anything and
 // Vite warns about exactly that.
 import { AdminSupportChat } from './components/AdminSupportChat';
-import { getStoreCustomerProfiles, getStoreOrders, getStoreSettings, saveStoreOrder, saveStoreProducts, saveStoreSettings, hasStoreAdminAccess, refreshSession, reportStoreOrderPayment, updateStoreOrderStatus, confirmStoreOrderPayment, verifyAdminPin, changeAdminPin, expireUnpaidOrdersAsAdmin, getAllReviewsForAdmin, moderateProductReview, deleteProductReview, getProductReviews, adminListLoyaltyWallets, adminGrantLoyaltyPoints, AdminLoyaltyWallet, uploadCategoryImage, uploadBrandingImage, logSiteVisit, getSiteVisitStats, SiteVisitStats, adminListSupportThreads, adminGetSupportThread, adminSendSupportMessage, adminSetSupportBotState, SupportThreadSummary } from './services/supabaseAuth';
+import { getStoreCustomerProfiles, getStoreOrders, getStoreSettings, saveStoreOrder, saveStoreProducts, savePreorderProducts, uploadProductImage, saveStoreSettings, hasStoreAdminAccess, refreshSession, reportStoreOrderPayment, updateStoreOrderStatus, confirmStoreOrderPayment, verifyAdminPin, changeAdminPin, expireUnpaidOrdersAsAdmin, getAllReviewsForAdmin, moderateProductReview, deleteProductReview, getProductReviews, adminListLoyaltyWallets, adminGrantLoyaltyPoints, AdminLoyaltyWallet, uploadCategoryImage, uploadBrandingImage, logSiteVisit, getSiteVisitStats, SiteVisitStats, adminListSupportThreads, adminGetSupportThread, adminSendSupportMessage, adminSetSupportBotState, SupportThreadSummary } from './services/supabaseAuth';
 import { initAdminPushNotifications } from './services/pushNotifications';
 // C-01 fix: App.tsx-аас хуваан гаргасан custom hook-ууд
 import { useCart } from './hooks/useCart';
@@ -97,6 +99,9 @@ export default function App() {
   // The public catalog is loaded from Supabase. PRODUCTS is only the first render fallback.
   const [products, setProducts] = useState<Product[]>(PRODUCTS);
   const [comboPacks, setComboPacks] = useState<ComboPack[]>(COMBOS);
+  const [preorderProducts, setPreorderProducts] = useState<PreorderProduct[]>([]);
+  const [preorderLoaded, setPreorderLoaded] = useState(false);
+  const [preorderLoading, setPreorderLoading] = useState(true);
   const [featuredProductId, setFeaturedProductId] = useState('');
   const [categoryImages, setCategoryImages] = useState<Record<string, string[]>>({});
   const [storeLogoUrl, setStoreLogoUrl] = useState<string | null>(null);
@@ -107,6 +112,8 @@ export default function App() {
   const [chatbotSettings, setChatbotSettings] = useState<ChatbotSettings>(DEFAULT_CHATBOT_SETTINGS);
   useEffect(() => {
     getStoreSettings().then((settings) => {
+      setPreorderProducts(readPreorderProducts(settings.data.preorder_products));
+      setPreorderLoaded(true);
       const savedCombos = settings.data.combo_packs;
       if (Array.isArray(savedCombos)) setComboPacks(savedCombos as ComboPack[]);
       const savedCategoryImages = settings.data.category_images;
@@ -161,7 +168,8 @@ export default function App() {
         storeAddress: String(settings.data.store_address ?? STORE_CONFIG.location),
         unpaidCancellationMinutes: Number(settings.data.unpaid_cancellation_minutes ?? 60),
       });
-    }).catch(() => { /* The built-in catalog remains visible if the network is unavailable. */ });
+    }).catch(() => { /* The built-in catalog remains visible if the network is unavailable. */ })
+      .finally(() => setPreorderLoading(false));
   }, []);
 
   // Orders are loaded from Supabase after a user signs in.
@@ -1320,6 +1328,8 @@ export default function App() {
           }}
         />
 
+        <PreorderSection products={preorderProducts} storePhone={checkoutSettings.storePhone} loading={preorderLoading} error={!preorderLoading && !preorderLoaded} />
+
         {/* Customer Services Duo: User Security & Registration / Google Forms */}
         <div className={`grid grid-cols-1 gap-4 ${GOOGLE_FORMS_ENABLED ? 'md:grid-cols-2' : ''}`}>
           {/* User Profile & Security Banner */}
@@ -1952,6 +1962,19 @@ export default function App() {
       {isAdminOpen && (
         <AdminPanel
           products={products}
+          preorderProducts={preorderProducts}
+          preorderLoaded={preorderLoaded}
+          onSavePreorderProducts={async (nextProducts) => {
+            if (!currentUser?.accessToken || !isAdminAuthenticated) throw new Error('Админ и-мэйлээр нэвтэрнэ үү.');
+            if (!preorderLoaded) throw new Error('Барааны мэдээлэл ачаалагдаагүй байна. Хуудсаа дахин ачаална уу.');
+            const saved = await savePreorderProducts(currentUser.accessToken, nextProducts, preorderProducts);
+            setPreorderProducts(saved);
+            showToast('Захиалгаар ирэх барааны мэдээлэл хадгалагдлаа.');
+          }}
+          onUploadPreorderImage={async (file) => {
+            if (!currentUser?.accessToken || !isAdminAuthenticated) throw new Error('Админ и-мэйлээр нэвтэрнэ үү.');
+            return uploadProductImage(currentUser.accessToken, file);
+          }}
           orders={orders}
           memberProfiles={memberProfiles}
           storeLogoUrl={storeLogoUrl}

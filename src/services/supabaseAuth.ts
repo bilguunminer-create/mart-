@@ -1,3 +1,6 @@
+import type { PreorderProduct } from '../types';
+import { validatePreorderProduct } from '../utils/preorderProducts';
+
 const SUPABASE_URL = 'https://rebtikccivjcsxieeyxe.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_6cFfPZrw3hfRy-RqefprLQ_c94gv3Ik';
 const APP_URL = typeof window === 'undefined' ? 'https://www.uskmart.com' : window.location.origin;
@@ -363,6 +366,20 @@ export async function saveStoreProducts(
   await updateStoreSettings(token, settings, nextData);
 }
 
+
+export async function savePreorderProducts(token: string, products: PreorderProduct[], expectedProducts: PreorderProduct[]) {
+  if (!Array.isArray(expectedProducts)) throw new StoreSettingsConflictError();
+  if (products.length > 200) throw new Error('Захиалгын хэсэгт хамгийн ихдээ 200 бараа хадгална.');
+  const validated = products.map(validatePreorderProduct);
+  if (new Set(validated.map((product) => product.id)).size !== validated.length) throw new Error('Барааны дугаар давхардсан байна.');
+  const settings = await getStoreSettings();
+  // Reject an outdated editor even if the other save completed before this GET.
+  if (canonicalJson(settings.data.preorder_products ?? []) !== canonicalJson(expectedProducts)) {
+    throw new StoreSettingsConflictError();
+  }
+  await updateStoreSettings(token, settings, { ...settings.data, preorder_products: validated });
+  return validated;
+}
 
 export async function verifyAdminPin(token: string, pin: string) {
   return request<boolean>('/rest/v1/rpc/verify_admin_pin', {
