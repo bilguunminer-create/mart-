@@ -7,6 +7,7 @@ import { initializeApp, getApps, cert, type App } from "firebase-admin/app";
 import { getMessaging } from "firebase-admin/messaging";
 import { checkRateLimit, clientIp } from "./api/_rateLimit";
 import { ChatbotServiceError, processChatbotRequest } from "./api/_chatbotService";
+import { recordSiteVisit, SiteVisitError } from "./api/_siteVisitService";
 
 const SUPABASE_URL = "https://rebtikccivjcsxieeyxe.supabase.co";
 
@@ -90,6 +91,16 @@ async function startServer() {
   app.use(express.json({ limit: "25mb" }));
   app.use(express.urlencoded({ extended: true, limit: "25mb" }));
 
+  app.post('/api/site-visit', async (req, res) => {
+    res.setHeader('Cache-Control', 'no-store');
+    try { res.json(await recordSiteVisit(req)); }
+    catch (error) {
+      res.status(error instanceof SiteVisitError ? error.status : 503).json({
+        error: error instanceof SiteVisitError ? error.message : 'Хандалтыг бүртгэж чадсангүй.',
+      });
+    }
+  });
+
   // Serve uploaded public assets if any
   const publicAssetsDir = path.join(process.cwd(), "public", "assets");
   if (!fs.existsSync(publicAssetsDir)) {
@@ -133,7 +144,8 @@ async function startServer() {
   app.get("/api/health", (req, res) => {
     const smtpConfigured = Boolean(process.env.SMTP_USER && process.env.SMTP_PASS);
     const chatbotConfigured = Boolean(process.env.GEMINI_API_KEY && process.env.SUPABASE_SERVICE_ROLE_KEY);
-    res.json({ status: "ok", smtpConfigured, chatbotConfigured });
+    res.json({ status: "ok", smtpConfigured, chatbotConfigured,
+      siteVisitTrackingConfigured: Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY) });
   });
 
   // Send Email OTP endpoint

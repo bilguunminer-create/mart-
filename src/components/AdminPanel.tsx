@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import type { SiteVisitStats } from '../services/supabaseAuth';
+import { SiteVisitAudit } from './SiteVisitAudit';
 import { 
   Package, 
   ShoppingBag, 
@@ -1571,8 +1572,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 </div>
                 <div>
                   <h4 className="font-bold text-stone-900 text-sm">Сайтын зочид</h4>
-                  <p className="text-[11px] text-stone-500">Нэг бүртгэлээр дахин орвол давтан хандалт. Нэвтрээгүй зочдыг браузераар ялгана. Админ, агуулах цонх тооцогдохгүй.</p>
+                  <p className="text-[11px] text-stone-500">Бүртгэл болон browser-аар ялгасан хандалт. Давтан үзэлтэд хуудас шинэчлэх орно; баталгаажсан нэвтрэлтийг доор тусад нь харуулна.</p>
                 </div>
+                <button type="button" onClick={onRefreshSiteVisitStats} className="ml-auto shrink-0 text-xs font-bold text-sky-700">Шинэчлэх</button>
               </div>
 
               {siteVisitStats ? (
@@ -1580,28 +1582,28 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   <div className="bg-stone-50 p-3 rounded-xl border border-stone-200/80">
                     <span className="text-[10px] text-stone-500 font-bold block">Өнөөдөр</span>
                     <span className="text-lg font-black text-stone-900">{siteVisitStats.today_unique_visitors}</span>
-                    <span className="text-[10px] text-stone-400 ml-1">хүн</span>
+                    <span className="text-[10px] text-stone-400 ml-1">зочин</span>
                     <p className="text-[10px] text-stone-400 mt-0.5">{siteVisitStats.today_pageviews} үзэлт</p>
                     <p className="mt-1 text-stone-600">{siteVisitStats.today_new_visitors} шинэ · {siteVisitStats.today_repeat_visits} давтан хандалт</p>
                   </div>
                   <div className="bg-stone-50 p-3 rounded-xl border border-stone-200/80">
                     <span className="text-[10px] text-stone-500 font-bold block">Сүүлийн 7 хоног</span>
                     <span className="text-lg font-black text-stone-900">{siteVisitStats.last7days_unique_visitors}</span>
-                    <span className="text-[10px] text-stone-400 ml-1">хүн</span>
+                    <span className="text-[10px] text-stone-400 ml-1">зочин</span>
                     <p className="text-[10px] text-stone-400 mt-0.5">{siteVisitStats.last7days_pageviews} үзэлт</p>
                     <p className="mt-1 text-stone-600">{siteVisitStats.last7days_new_visitors} шинэ · {siteVisitStats.last7days_repeat_visits} давтан хандалт</p>
                   </div>
                   <div className="bg-stone-50 p-3 rounded-xl border border-stone-200/80">
                     <span className="text-[10px] text-stone-500 font-bold block">Сүүлийн 30 хоног</span>
                     <span className="text-lg font-black text-stone-900">{siteVisitStats.last30days_unique_visitors}</span>
-                    <span className="text-[10px] text-stone-400 ml-1">хүн</span>
+                    <span className="text-[10px] text-stone-400 ml-1">зочин</span>
                     <p className="text-[10px] text-stone-400 mt-0.5">{siteVisitStats.last30days_pageviews} үзэлт</p>
                     <p className="mt-1 text-stone-600">{siteVisitStats.last30days_new_visitors} шинэ · {siteVisitStats.last30days_repeat_visits} давтан хандалт</p>
                   </div>
                   <div className="bg-sky-50 p-3 rounded-xl border border-sky-200/80">
                     <span className="text-[10px] text-sky-700 font-bold block">Нийт (эхнээс хойш)</span>
                     <span className="text-lg font-black text-sky-900">{siteVisitStats.total_unique_visitors}</span>
-                    <span className="text-[10px] text-sky-600 ml-1">хүн</span>
+                    <span className="text-[10px] text-sky-600 ml-1">зочин</span>
                     <p className="text-[10px] text-sky-600 mt-0.5">{siteVisitStats.total_pageviews} үзэлт</p>
                     <p className="mt-1 text-sky-700">{siteVisitStats.total_new_visitors} шинэ · {siteVisitStats.total_repeat_visits} давтан хандалт</p>
                   </div>
@@ -1609,6 +1611,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               ) : (
                 <p className="text-xs text-stone-400 py-2">Ачааллаж байна...</p>
               )}
+              {siteVisitStats && <SiteVisitAudit stats={siteVisitStats} />}
             </div>
 
             {/* Loyalty Automatic Tier System Overview with quick switch */}

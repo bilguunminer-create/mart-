@@ -70,6 +70,7 @@ import { initAdminPushNotifications } from './services/pushNotifications';
 import { useCart } from './hooks/useCart';
 import { useAdminAuth } from './hooks/useAdminAuth';
 import { useOrders } from './hooks/useOrders';
+import { useCustomerSession } from './hooks/useCustomerSession';
 
 // Temporarily paused. Set to true to restore all Google Forms entry points.
 const GOOGLE_FORMS_ENABLED = false;
@@ -205,44 +206,23 @@ export default function App() {
     }
   });
 
-  // Current logged in user profile (phone authentication)
-  const [currentUser, setCurrentUser] = useState<UserProfile | null>(() => {
-    try {
-      const saved = localStorage.getItem('usk_current_user');
-      if (!saved) return null;
-      const profile = JSON.parse(saved) as UserProfile;
-      // Old browser-only profiles cannot access the central database. Force them
-      // through the real email/password login once, then retain only the Supabase session.
-      return profile.accessToken && profile.supabaseUserId ? profile : null;
-    } catch {
-      return null;
-    }
-  });
-
-  // Renew an expired access token automatically. Older sessions without a refresh
-  // token will be asked to sign in again instead of showing a raw JWT error.
+  // Persisted identity is published only after Auth validates the account.
+  const { currentUser, setCurrentUser, logoutUser } = useCustomerSession();
   useEffect(() => {
-    if (!currentUser) return;
-    if (!currentUser.refreshToken) {
-      setCurrentUser(null);
-      localStorage.removeItem('usk_current_user');
-      return;
-    }
-    let active = true;
-    refreshSession(currentUser.refreshToken)
-      .then((session) => {
-        if (!active) return;
-        const next = { ...currentUser, accessToken: session.access_token, refreshToken: session.refresh_token || currentUser.refreshToken };
-        setCurrentUser(next);
-        localStorage.setItem('usk_current_user', JSON.stringify(next));
-      })
-      .catch(() => {
-        if (!active) return;
-        setCurrentUser(null);
-        localStorage.removeItem('usk_current_user');
-      });
-    return () => { active = false; };
-  }, []);
+    // Do not carry account data or an admin PIN unlock into another login.
+    setOrders([]);
+    setMemberProfiles([]);
+    setLoyaltyWallets([]);
+    setIsAdminAuthenticated(false);
+    setIsAdminOpen(false);
+    setIsInventoryOpen(false);
+    setIsInventoryOrdersOpen(false);
+    setIsSupportChatOpen(false);
+    setIsInventoryChatOpen(false);
+    setSiteVisitStats(null);
+    setSupportThreads([]);
+    try { sessionStorage.removeItem('usk_admin_auth'); } catch { /* Storage may be disabled. */ }
+  }, [currentUser?.supabaseUserId]);
 
   // Load the account's central data after every real Supabase sign-in.
   // Store administrators already listed in allowed_accounts receive the full list through RLS.
@@ -402,6 +382,8 @@ export default function App() {
 
   const pageVisitKey = useRef<string | null>(null);
   const pageVisitAccount = useRef<string | null>(null);
+  const pageVisitSession = useRef<string | null>(null);
+  const fallbackVisitorId = useRef<string | null>(null);
   // Logs one pageview for the public storefront only -- never for the
   // admin dashboard or the warehouse app, so "хэдэн хүн үзсэн" reflects real
   // customer traffic, not staff logging in to manage the site.
@@ -409,15 +391,31 @@ export default function App() {
     if (isAdminApp) return;
     try {
       const accountId = currentUser?.supabaseUserId || currentUser?.id || null;
-      if (!pageVisitKey.current || (accountId && pageVisitAccount.current && accountId !== pageVisitAccount.current)) {
+      let sessionId: string | null = null;
+      try {
+        // Used only to choose an event key. The API independently verifies identity.
+        sessionId = currentUser?.accessToken ? JSON.parse(atob(currentUser.accessToken.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))).session_id : null;
+      } catch { /* the API rejects invalid tokens */ }
+      if (!accountId && pageVisitAccount.current) {
+        pageVisitKey.current = null;
+        pageVisitAccount.current = null;
+        pageVisitSession.current = null;
+        return; // Signing out is not an extra page view.
+      }
+      if (!pageVisitKey.current || (accountId && pageVisitAccount.current &&
+        (accountId !== pageVisitAccount.current || sessionId !== pageVisitSession.current))) {
         pageVisitKey.current = crypto.randomUUID();
       }
-      if (accountId) pageVisitAccount.current = accountId;
-      let visitorId = localStorage.getItem('usk_visitor_id');
-      if (!visitorId) {
-        visitorId = crypto.randomUUID();
-        localStorage.setItem('usk_visitor_id', visitorId);
+      if (accountId) {
+        pageVisitAccount.current = accountId;
+        pageVisitSession.current = sessionId;
       }
+      let visitorId = fallbackVisitorId.current ||= crypto.randomUUID();
+      try {
+        const saved = localStorage.getItem('usk_visitor_id');
+        if (saved && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(saved)) visitorId = saved;
+        else localStorage.setItem('usk_visitor_id', visitorId);
+      } catch { /* Private browsers still get an in-memory visitor ID. */ }
       logSiteVisit(visitorId, window.location.pathname, pageVisitKey.current, currentUser?.accessToken).catch(() => {
         // Pageview logging is best-effort; never surface this to the visitor.
       });
@@ -433,8 +431,7 @@ export default function App() {
     if (!currentUser) return;
     let timer: ReturnType<typeof setTimeout>;
     const logout = () => {
-      setCurrentUser(null);
-      localStorage.removeItem('usk_current_user');
+      void logoutUser();
       showToast('30 минут идэвхгүй байсан тул таны бүртгэлээс гарлаа.');
     };
     const reset = () => {
@@ -447,7 +444,7 @@ export default function App() {
       clearTimeout(timer);
       ['mousemove', 'keydown', 'click', 'touchstart', 'scroll'].forEach((event) => window.removeEventListener(event, reset));
     };
-  }, [currentUser?.id]);
+  }, [currentUser?.id, logoutUser]);
 
   // Current user's normalized phone number and email
   const userPhoneClean = currentUser?.phone ? currentUser.phone.replace(/\D/g, '').slice(-8) : '';
@@ -533,14 +530,16 @@ export default function App() {
     return () => window.removeEventListener('popstate', onPopState);
   }, [isCartOpen, isCheckoutOpen, isLoyaltyOpen, isProfileOpen, isFormsOpen, detailProduct, isAdminOpen, isAdminLoginOpen, isDirectFormOpen, isInventoryOpen]);
 
-  // Supabase recovery links contain a short-lived session in the URL hash.
-  // Open the password form immediately so the member can finish the reset.
+  // Open the matching form for confirmation/recovery links and callback errors.
   useEffect(() => {
     const hash = new URLSearchParams(window.location.hash.slice(1));
     const query = new URLSearchParams(window.location.search);
     const type = hash.get('type') || query.get('type');
     const token = hash.get('access_token') || query.get('access_token');
-    if ((type === 'recovery' && token) || sessionStorage.getItem('usk_recovery_token')) setIsProfileOpen(true);
+    const hasError = hash.has('error') || hash.has('error_code') || query.has('error') || query.has('error_code');
+    let hasRecovery = false;
+    try { hasRecovery = Boolean(sessionStorage.getItem('usk_recovery_token')); } catch { /* Storage may be disabled. */ }
+    if ((['signup', 'email', 'recovery'].includes(type || '') && token) || hasError || hasRecovery) setIsProfileOpen(true);
   }, []);
 
   // Toast message
@@ -1029,13 +1028,10 @@ export default function App() {
             user={currentUser}
             onSaveUser={(updatedUser) => {
               setCurrentUser(updatedUser);
-              localStorage.setItem('usk_current_user', JSON.stringify(updatedUser));
               showToast('Хэрэглэгчийн мэдээлэл шинэчлэгдлээ.');
             }}
             onLogoutUser={() => {
-              setCurrentUser(null);
-              localStorage.removeItem('usk_current_user');
-              showToast('Бүртгэлээс гарлаа.');
+              void logoutUser().then((revoked) => showToast(revoked ? 'Бүртгэлээс гарлаа.' : 'Энэ төхөөрөмжөөс гарлаа. Сүлжээ тасарсан тул серверийн нэвтрэлтийг хааж чадсангүй.'));
             }}
             orders={orders}
             activeLoyalty={activeLoyalty}
@@ -1336,11 +1332,11 @@ export default function App() {
                 <div className="flex items-center gap-2 flex-wrap">
                   <h3 className="text-sm font-bold text-white">Хэрэглэгчийн Бүртгэл & Нууцлал</h3>
                   <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/30">
-                    ✉️ Үнэгүй И-мэйл OTP
+                    ✉️ И-мэйл баталгаажуулалт
                   </span>
                 </div>
                 <p className="text-xs text-emerald-200/90 mt-1 leading-relaxed">
-                  Таны худалдан авалтын түүх и-мэйл хаяг дээр автоматаар бүртгэгдэж явна. Нууц үг шаардахгүй нэг удаагийн үнэгүй кодоор хялбар нэвтэрч, өөрийн түүх болон лояалти хөнгөлөлтөө удирдан хараарай.
+                  И-мэйлээ баталгаажуулж, нууц үгээ үүсгэн бүртгүүлээрэй. Дараа нь и-мэйл, нууц үгээрээ нэвтэрч худалдан авалтын түүх болон лояалти хөнгөлөлтөө харах боломжтой.
                 </p>
               </div>
             </div>
@@ -1932,14 +1928,11 @@ export default function App() {
         onOpenProfile={() => setIsProfileOpen(true)}
         onLoginUser={(newUser) => {
           setCurrentUser(newUser);
-          localStorage.setItem('usk_current_user', JSON.stringify(newUser));
           const methodLabel = newUser.loginMethod === 'email' ? 'И-мэйлээр' : 'Утасны дугаараар';
           showToast(`${methodLabel} амжилттай нэвтэрлээ. Тавтай морил, ${newUser.name}!`);
         }}
         onLogoutUser={() => {
-          setCurrentUser(null);
-          localStorage.removeItem('usk_current_user');
-          showToast('Бүртгэлээс гарлаа.');
+          void logoutUser().then((revoked) => showToast(revoked ? 'Бүртгэлээс гарлаа.' : 'Энэ төхөөрөмжөөс гарлаа. Сүлжээ тасарсан тул серверийн нэвтрэлтийг хааж чадсангүй.'));
         }}
       />
 
@@ -2170,13 +2163,10 @@ export default function App() {
         user={currentUser}
         onSaveUser={(updatedUser) => {
           setCurrentUser(updatedUser);
-          localStorage.setItem('usk_current_user', JSON.stringify(updatedUser));
           showToast(`Хэрэглэгчийн мэдээлэл шинэчлэгдлээ.`);
         }}
         onLogoutUser={() => {
-          setCurrentUser(null);
-          localStorage.removeItem('usk_current_user');
-          showToast('Бүртгэлээс гарлаа. Хувийн мэдээлэл бүрэн цэвэрлэгдсэн.');
+          void logoutUser().then((revoked) => showToast(revoked ? 'Бүртгэлээс гарлаа.' : 'Энэ төхөөрөмжөөс гарлаа. Сүлжээ тасарсан тул серверийн нэвтрэлтийг хааж чадсангүй.'));
         }}
         orders={orders}
         activeLoyalty={activeLoyalty}

@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { X, User, Mail, MapPin, Phone, LogOut, KeyRound, ChevronDown, ReceiptText, XCircle, Camera } from 'lucide-react';
 import { UserProfile, OrderDetails, LoyaltyTier } from '../types';
 import { formatMNT, formatOrderNumber } from '../data/storeData';
-import { AuthSession, signIn, requestSignupOtp, verifySignupOtp, sendPasswordReset, updatePassword, getProfile, saveProfile, getStoreOrders, getLoyaltyWallet, cancelMyStoreOrder, expireMyUnpaidOrders, uploadProfileImage, saveProfileAvatar } from '../services/supabaseAuth';
+import { AuthSession, signIn, requestSignupOtp, resendSignupOtp, verifySignupOtp, resolveAuthCallback, getAuthUser, getAuthErrorMessage, normalizeSignupProfile, signOutSession, sendPasswordReset, updatePassword, getProfile, saveProfile, getStoreOrders, getLoyaltyWallet, cancelMyStoreOrder, expireMyUnpaidOrders, uploadProfileImage, saveProfileAvatar } from '../services/supabaseAuth';
 import { printOrderReceipt } from '../utils/printReceipt';
 import { belongsToUser } from '../utils/orderOwnership';
 
@@ -34,6 +34,13 @@ export const UserProfileModal: React.FC<Props> = ({ isOpen, onClose, user, onSav
   const [orderRefresh, setOrderRefresh] = useState(0);
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
   const [avatarBusy, setAvatarBusy] = useState(false);
+  const [resendSeconds, setResendSeconds] = useState(0);
+
+  useEffect(() => {
+    if (resendSeconds <= 0) return;
+    const timer = window.setTimeout(() => setResendSeconds(value => Math.max(0, value - 1)), 1000);
+    return () => window.clearTimeout(timer);
+  }, [resendSeconds]);
 
   async function handleAvatarChange(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -61,36 +68,56 @@ export const UserProfileModal: React.FC<Props> = ({ isOpen, onClose, user, onSav
   }, [user?.id, user?.name, user?.email, user?.phone, user?.address]);
 
   useEffect(() => {
-    const hash = new URLSearchParams(window.location.hash.slice(1));
-    const query = new URLSearchParams(window.location.search);
-    const token = hash.get('access_token') || query.get('access_token');
-    const type = hash.get('type') || query.get('type');
-    if (!token) return;
-
-    if (type === 'recovery') {
-      sessionStorage.setItem('usk_recovery_token', token);
-      setRecoveryToken(token); setMode('reset');
-      window.history.replaceState({}, document.title, window.location.pathname);
-      return;
-    }
-
-    // Supabase's default confirmation email returns a signed-in session in the URL hash.
-    // Keep it in memory and let the new member choose their permanent password.
-    if (type === 'signup' || type === 'email') {
+    let active = true;
+    const callbackHash = window.location.hash;
+    const callbackSearch = window.location.search;
+    const completeCallback = async () => {
       try {
-        const encodedPayload = token.split('.')[1];
-        const payload = JSON.parse(atob(encodedPayload.replace(/-/g, '+').replace(/_/g, '/')));
-        if (payload.sub) {
-          setSignupSession({ access_token: token, user: { id: payload.sub, email: payload.email } });
-          setEmail(payload.email || '');
+        const callback = await resolveAuthCallback(callbackHash, callbackSearch);
+        if (!active) return;
+        if (!callback) {
+          let savedRecovery: string | null = null;
+          try { savedRecovery = sessionStorage.getItem('usk_recovery_token'); } catch { /* storage may be disabled */ }
+          if (savedRecovery) {
+            await getAuthUser(savedRecovery);
+            if (active) { setRecoveryToken(savedRecovery); setMode('reset'); }
+          }
+          return;
+        }
+        const { session } = callback;
+        if (callback.type === 'recovery') {
+          try { sessionStorage.setItem('usk_recovery_token', session.access_token); } catch { /* keep the in-memory token */ }
+          setRecoveryToken(session.access_token); setMode('reset');
+        } else {
+          setSignupSession(session);
+          setEmail(session.user.email || '');
+          setName(session.user.user_metadata?.name || '');
+          setPhone(session.user.user_metadata?.phone || '');
+          setAddress(session.user.user_metadata?.address || '');
           setMode('signup'); setSignupStep('password');
           setMessage('И-мэйл баталгаажлаа. Одоо өөрийн нууц үгээ үүсгэнэ үү.');
-          window.history.replaceState({}, document.title, window.location.pathname);
         }
-      } catch {
-        setMessage('Баталгаажуулах холбоосыг дахин илгээнэ үү.');
+      } catch (error) {
+        if (active) {
+          try { sessionStorage.removeItem('usk_recovery_token'); } catch { /* storage may be disabled */ }
+          setMessage(getAuthErrorMessage(error));
+        }
+      } finally {
+        if (active) {
+          const url = new URL(window.location.href);
+          const keys = ['access_token', 'refresh_token', 'token_type', 'expires_in', 'expires_at', 'type', 'error', 'error_code', 'error_description'];
+          const hash = new URLSearchParams(url.hash.slice(1));
+          const hasCallback = keys.some(key => url.searchParams.has(key) || hash.has(key));
+          if (hasCallback) {
+            for (const key of keys) { url.searchParams.delete(key); hash.delete(key); }
+            url.hash = hash.toString();
+            window.history.replaceState({}, document.title, url.pathname + url.search + url.hash);
+          }
+        }
       }
-    }
+    };
+    void completeCallback();
+    return () => { active = false; };
   }, []);
 
   useEffect(() => {
@@ -144,15 +171,17 @@ export const UserProfileModal: React.FC<Props> = ({ isOpen, onClose, user, onSav
 
   const switchMode = (next: Mode) => {
     setMode(next); setPassword(''); setPasswordConfirm(''); setOtp(''); setMessage('');
+    setSignupSession(null);
     if (next === 'signup') setSignupStep('details');
   };
 
   const profileFromSession = async (session: AuthSession, fallback: { name: string; phone: string; address: string }) => {
     const existing = await getProfile(session.access_token, session.user.id);
+    const metadata = session.user.user_metadata;
     return {
       id: session.user.id, supabaseUserId: session.user.id, accessToken: session.access_token, refreshToken: session.refresh_token,
-      name: existing?.name || fallback.name || email.split('@')[0], email: email.trim().toLowerCase(),
-      phone: existing?.phone || fallback.phone, address: existing?.address || fallback.address,
+      name: existing?.name || fallback.name || metadata?.name || session.user.email?.split('@')[0] || 'Гишүүн', email: session.user.email || email.trim().toLowerCase(),
+      phone: existing?.phone || fallback.phone || metadata?.phone || '', address: existing?.address || fallback.address || metadata?.address || '',
       avatarUrl: existing?.avatar_url,
       district: 'Өмнөговь, Даланзадгад', createdAt: new Date().toLocaleDateString('mn-MN'),
       isVerified: true, privacyMasking: true, loginMethod: 'email' as const,
@@ -160,7 +189,7 @@ export const UserProfileModal: React.FC<Props> = ({ isOpen, onClose, user, onSav
   };
 
   async function authenticate(event: React.FormEvent) {
-    event.preventDefault(); setBusy(true); setMessage('');
+    event.preventDefault(); if (busy) return; setBusy(true); setMessage('');
     const cleanEmail = email.trim().toLowerCase();
     try {
       if (mode === 'recover') {
@@ -172,23 +201,30 @@ export const UserProfileModal: React.FC<Props> = ({ isOpen, onClose, user, onSav
         if (!recoveryToken) throw new Error('Сэргээх холбоос хүчингүй эсвэл хугацаа дууссан байна.');
         if (password.length < 8) throw new Error('Нууц үг хамгийн багадаа 8 тэмдэгттэй байна.');
         if (password !== passwordConfirm) throw new Error('Нууц үгүүд таарахгүй байна.');
-        await updatePassword(recoveryToken || sessionStorage.getItem('usk_recovery_token') || '', password);
-        sessionStorage.removeItem('usk_recovery_token');
+        await updatePassword(recoveryToken, password);
+        try { sessionStorage.removeItem('usk_recovery_token'); } catch { /* storage may be disabled */ }
+        void signOutSession(recoveryToken).catch(() => undefined);
+        setRecoveryToken('');
         setMessage('Нууц үг шинэчлэгдлээ. Шинэ нууц үгээрээ нэвтэрнэ үү.');
         setMode('login'); setPassword(''); setPasswordConfirm('');
         return;
       }
       if (mode === 'signup') {
         if (signupStep === 'details') {
-          if (!name.trim()) throw new Error('Нэрээ оруулна уу.');
-          const signup = await requestSignupOtp(cleanEmail, { name: name.trim(), phone, address });
+          const details = normalizeSignupProfile({ name, phone, address });
+          const signup = await requestSignupOtp(cleanEmail, details);
           if (signup.user?.identities && signup.user.identities.length === 0) {
             setMode('recover');
             setMessage('Энэ и-мэйл хаяг бүртгэлтэй байна. Нууц үгээ сэргээнэ үү.');
             return;
           }
-          setSignupStep('otp');
-          setMessage('И-мэйлээр баталгаажуулах код илгээгдлээ. Кодоо оруулна уу.');
+          if (signup.session) {
+            setSignupSession(signup.session); setSignupStep('password');
+            setMessage('Одоо өөрийн нууц үгээ үүсгэнэ үү.');
+          } else {
+            setSignupStep('otp'); setResendSeconds(60);
+            setMessage('И-мэйлээ шалгаж баталгаажуулах холбоосыг нээнэ үү. Код ирсэн бол доор оруулна уу. Spam хавтсаа мөн шалгаарай.');
+          }
           return;
         }
         if (signupStep === 'otp') {
@@ -201,27 +237,43 @@ export const UserProfileModal: React.FC<Props> = ({ isOpen, onClose, user, onSav
         if (!signupSession) throw new Error('Баталгаажуулалтын хугацаа дууссан байна. Кодыг дахин авна уу.');
         if (password.length < 8) throw new Error('Нууц үг хамгийн багадаа 8 тэмдэгттэй байна.');
         if (password !== passwordConfirm) throw new Error('Нууц үгүүд таарахгүй байна.');
-        await updatePassword(signupSession.access_token, password);
         const nextProfile = await profileFromSession(signupSession, { name: name.trim(), phone, address });
         await saveProfile(signupSession.access_token, signupSession.user.id, nextProfile);
+        // Save the profile first so a retry after a profile error does not attempt
+        // to set an already changed password and fail with same_password.
+        await updatePassword(signupSession.access_token, password);
+        setSignupSession(null); setPassword(''); setPasswordConfirm('');
+        setMode('login'); setSignupStep('details');
         onSaveUser(nextProfile); onClose();
         return;
       }
 
-      if (password.length < 8) throw new Error('Нууц үг хамгийн багадаа 8 тэмдэгттэй байна.');
+      if (!password) throw new Error('Нууц үгээ оруулна уу.');
       const session = await signIn(cleanEmail, password);
       const nextProfile = await profileFromSession(session, { name: '', phone: '', address: '' });
+      setPassword('');
       onSaveUser(nextProfile); onClose();
     } catch (error: any) {
-      setMessage(error?.message || 'Нэвтрэх боломжгүй байна.');
+      setMessage(getAuthErrorMessage(error));
     } finally { setBusy(false); }
+  }
+
+  async function resendConfirmation() {
+    if (busy || resendSeconds > 0) return;
+    setBusy(true); setMessage('');
+    try {
+      await resendSignupOtp(email);
+      setResendSeconds(60);
+      setMessage('Баталгаажуулах и-мэйл дахин илгээгдлээ. Ирсэн холбоосыг нээх эсвэл кодоо оруулна уу.');
+    } catch (error) { setMessage(getAuthErrorMessage(error)); }
+    finally { setBusy(false); }
   }
 
   async function updateProfile(event: React.FormEvent) {
     event.preventDefault(); if (!user?.accessToken || !user.supabaseUserId) return;
     setBusy(true); setMessage('');
     try {
-      const next = { ...user, name: name.trim(), phone, address };
+      const next = { ...user, ...normalizeSignupProfile({ name, phone, address }) };
       await saveProfile(user.accessToken, user.supabaseUserId, next);
       onSaveUser(next); setMessage('Мэдээлэл хадгалагдлаа.');
     } catch (error: any) { setMessage(error?.message || 'Хадгалах боломжгүй байна.'); }
@@ -240,18 +292,20 @@ export const UserProfileModal: React.FC<Props> = ({ isOpen, onClose, user, onSav
     finally { setBusy(false); }
   }
 
-  const unauthenticated = !user || mode === 'reset';
+  const unauthenticated = !user || mode === 'reset' || Boolean(signupSession);
 
   return <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/60 p-4"><section className="max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-[2rem] bg-white shadow-2xl">
     <header className="flex items-center justify-between bg-gradient-to-br from-stone-950 via-stone-900 to-amber-950 px-6 py-5 text-white"><div className="flex items-center gap-3"><User className="text-amber-300"/><div><h2 className="font-black">Миний бүртгэл</h2><p className="text-xs text-stone-300">Захиалга, гишүүнчлэл нэг и-мэйлд хадгалагдана</p></div></div><button onClick={onClose} aria-label="Хаах"><X/></button></header>
-    <div className="p-6">{message && <p className="mb-4 rounded-xl bg-amber-50 p-3 text-sm text-amber-900">{message}</p>}
+    <div className="p-6">{message && <p role="status" className="mb-4 rounded-xl bg-amber-50 p-3 text-sm text-amber-900">{message}</p>}
     {unauthenticated ? <form onSubmit={authenticate} className="space-y-4">
+      <fieldset disabled={busy} className="space-y-4">
       {mode === 'signup' && signupStep === 'details' && <><label className="block text-sm font-bold">Нэр<input value={name} onChange={e=>setName(e.target.value)} required className="mt-1 w-full rounded-xl border p-3"/></label><label className="block text-sm font-bold">Утас<input value={phone} onChange={e=>setPhone(e.target.value)} className="mt-1 w-full rounded-xl border p-3"/></label><label className="block text-sm font-bold">Хаяг<input value={address} onChange={e=>setAddress(e.target.value)} className="mt-1 w-full rounded-xl border p-3"/></label></>}
       {mode !== 'reset' && !(mode === 'signup' && signupStep === 'password') && <label className="block text-sm font-bold">И-мэйл<input type="email" value={email} onChange={e=>setEmail(e.target.value)} required readOnly={mode==='signup' && signupStep==='otp'} className="mt-1 w-full rounded-xl border p-3"/></label>}
-      {mode === 'signup' && signupStep === 'otp' && <label className="block text-sm font-bold">И-мэйлээр ирсэн баталгаажуулах код<input inputMode="numeric" autoComplete="one-time-code" value={otp} onChange={e=>setOtp(e.target.value.replace(/\\D/g,'').slice(0,12))} required className="mt-1 w-full rounded-xl border p-3 text-center text-xl tracking-[0.5em]"/></label>}
-      {(mode === 'login' || mode === 'reset' || (mode === 'signup' && signupStep === 'password')) && <><label className="block text-sm font-bold">{mode==='signup'?'Шинэ нууц үг':'Нууц үг'}<input type="password" value={password} onChange={e=>setPassword(e.target.value)} minLength={8} required className="mt-1 w-full rounded-xl border p-3"/></label>{(mode === 'reset' || (mode === 'signup' && signupStep === 'password')) && <label className="block text-sm font-bold">Нууц үг давтах<input type="password" value={passwordConfirm} onChange={e=>setPasswordConfirm(e.target.value)} minLength={8} required className="mt-1 w-full rounded-xl border p-3"/></label>}</>}
-      <button disabled={busy} className="w-full rounded-xl bg-stone-900 p-3 font-bold text-white">{busy?'Түр хүлээнэ үү…':mode==='login'?'Нэвтрэх':mode==='recover'?'Сэргээх холбоос илгээх':mode==='reset'?'Шинэ нууц үг хадгалах':signupStep==='details'?'Баталгаажуулах код илгээх':signupStep==='otp'?'Код баталгаажуулах':'Бүртгэл үүсгэж нэвтрэх'}</button>
+      {mode === 'signup' && signupStep === 'otp' && <><label className="block text-sm font-bold">И-мэйлээр ирсэн баталгаажуулах код<input inputMode="numeric" autoComplete="one-time-code" value={otp} onChange={e=>setOtp(e.target.value.replace(/\D/g,'').slice(0,12))} minLength={6} maxLength={12} pattern="[0-9]{6,12}" required className="mt-1 w-full rounded-xl border p-3 text-center text-xl tracking-[0.5em]"/></label><p className="text-xs text-stone-600">И-мэйлд кодын оронд холбоос ирсэн бол холбоосыг нээж үргэлжлүүлнэ үү.</p><button type="button" disabled={busy || resendSeconds > 0} onClick={() => void resendConfirmation()} className="text-sm font-bold text-amber-800 disabled:opacity-50">{resendSeconds > 0 ? `Дахин илгээх (${resendSeconds} сек)` : 'Баталгаажуулах и-мэйл дахин илгээх'}</button></>}
+      {(mode === 'login' || mode === 'reset' || (mode === 'signup' && signupStep === 'password')) && <><label className="block text-sm font-bold">{mode==='signup'?'Шинэ нууц үг':'Нууц үг'}<input type="password" autoComplete={mode === 'login' ? 'current-password' : 'new-password'} value={password} onChange={e=>setPassword(e.target.value)} minLength={mode === 'login' ? 1 : 8} required className="mt-1 w-full rounded-xl border p-3"/></label>{(mode === 'reset' || (mode === 'signup' && signupStep === 'password')) && <label className="block text-sm font-bold">Нууц үг давтах<input type="password" autoComplete="new-password" value={passwordConfirm} onChange={e=>setPasswordConfirm(e.target.value)} minLength={8} required className="mt-1 w-full rounded-xl border p-3"/></label>}</>}
+      <button disabled={busy} className="w-full rounded-xl bg-stone-900 p-3 font-bold text-white">{busy?'Түр хүлээнэ үү…':mode==='login'?'Нэвтрэх':mode==='recover'?'Сэргээх холбоос илгээх':mode==='reset'?'Шинэ нууц үг хадгалах':signupStep==='details'?'Баталгаажуулах и-мэйл илгээх':signupStep==='otp'?'Код баталгаажуулах':'Бүртгэл үүсгэж нэвтрэх'}</button>
       {mode !== 'reset' && <div className="flex justify-between text-xs font-bold text-amber-800"><button type="button" onClick={()=>switchMode('login')}>Нэвтрэх</button><button type="button" onClick={()=>switchMode('signup')}>Шинэ бүртгэл</button><button type="button" onClick={()=>switchMode('recover')}>Нууц үгээ мартсан</button></div>}
+      </fieldset>
     </form> : <><section className="mb-5 overflow-hidden rounded-3xl bg-gradient-to-br from-stone-950 to-stone-800 p-5 text-white shadow-lg"><div className="mb-4 flex items-center gap-3"><div className="relative shrink-0">{user.avatarUrl ? <img src={user.avatarUrl} alt={user.name} className="h-12 w-12 rounded-2xl object-cover" /> : <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-400 text-lg font-black text-stone-950">{user.name.slice(0, 1).toUpperCase()}</div>}<label className={`absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-white text-stone-900 ring-2 ring-stone-900 ${avatarBusy ? 'opacity-50' : 'cursor-pointer'}`} title="Профайл зураг солих"><Camera className="h-3 w-3" /><input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" disabled={avatarBusy} onChange={handleAvatarChange} /></label></div><div><p className="font-black">{user.name}</p><p className="text-xs text-stone-300">{user.email}</p></div></div><div className="rounded-2xl bg-white/10 p-3"><p className="font-black text-amber-300">{activeLoyalty ? activeLoyalty.badge+' '+activeLoyalty.name : 'Энгийн гишүүн'}</p><p className="mt-1 text-sm text-stone-200">Хүргэгдсэн захиалга: <b>{ownOrders.filter(o => o.status === 'delivered').length}</b></p><div className="mt-3 grid grid-cols-2 gap-2"><div className="rounded-xl bg-emerald-400/15 p-2"><p className="text-[10px] text-emerald-200">Боломжит урамшуулал</p><p className="font-black text-emerald-300">{formatMNT(walletPoints)}</p></div><div className="rounded-xl bg-amber-400/15 p-2"><p className="text-[10px] text-amber-100">Нийт цуглуулсан</p><p className="font-black text-amber-300">{formatMNT(lifetimePoints)}</p></div></div><p className="mt-2 text-[11px] text-stone-300">Боломжит оноогоо дараагийн захиалгад сонгож ашиглаж болно.</p></div></section>
       <form onSubmit={updateProfile} className="space-y-4"><p className="text-sm text-stone-600"><Mail className="mr-1 inline h-4 w-4"/>{user.email}</p><label className="block text-sm font-bold">Нэр<input value={name} onChange={e=>setName(e.target.value)} required className="mt-1 w-full rounded-xl border p-3"/></label><label className="block text-sm font-bold">Утас<input value={phone} onChange={e=>setPhone(e.target.value)} className="mt-1 w-full rounded-xl border p-3"/></label><label className="block text-sm font-bold">Хаяг<input value={address} onChange={e=>setAddress(e.target.value)} className="mt-1 w-full rounded-xl border p-3"/></label><button disabled={busy} className="w-full rounded-xl bg-stone-900 p-3 font-bold text-white">Мэдээлэл хадгалах</button></form>
       <section className="mt-5 border-t border-stone-100 pt-5"><div className="mb-3 flex items-center justify-between"><h3 className="font-black text-stone-900">Миний захиалгууд</h3><span className="rounded-full bg-stone-100 px-2 py-1 text-[10px] font-bold text-stone-600">{ownOrders.length} захиалга</span></div>{ownOrders.length ? <div className="space-y-2">{ownOrders.map((order) => {

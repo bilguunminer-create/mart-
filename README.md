@@ -31,12 +31,12 @@ npm run dev
 | `SMTP_PASS` | Gmail App Password (16 тэмдэгт) | Имэйл OTP илгээхэд |
 | `SMTP_FROM_NAME` | Илгээгчийн харагдах нэр | Заавал биш (анхдагч: US&K Family Mart) |
 | `OTP_SECRET` | OTP token гарын үсгийн HMAC нууц түлхүүр | **Production-д заавал** — тохируулаагүй бол урьдчилан мэдэгдсэн insecure анхдагч утга ашиглагдана |
-| `SUPABASE_SERVICE_ROLE_KEY` | Supabase-ийн server-only secret/service key | Push notification болон chatbot-д **заавал** |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase-ийн server-only secret/service key | IP/сессийн хандалт, push notification болон chatbot-д **заавал** |
 | `GEMINI_API_KEY` | Google AI Studio API key | AI chatbot-д **заавал** |
 | `GEMINI_MODEL` | Gemini model ID | Заавал биш (анхдагч: `gemini-3.8-flash`) |
 | `SUPABASE_URL` | Supabase project URL | Заавал биш, одоогийн төслийн URL анхдагчаар ашиглагдана |
 
-`SMTP_USER`/`SMTP_PASS` тохируулаагүй бол апп "Preview Mode"-д ажиллаж, имэйл илгээхгүйгээр консол дээр л кодыг харуулна — dev/тестэд тохиромжтой, **production дээр заавал бодит SMTP тохируулах хэрэгтэй**.
+Хэрэглэгчийн шинэ бүртгэл, нууц үг сэргээх урсгал **Supabase Auth**-ийн имэйл үйлчилгээг ашиглана. Supabase Authentication дахь SMTP, email provider, confirmation template болон зөвшөөрсөн redirect URL-уудыг тохируулна. Эндхийн `SMTP_*` нь хуучин `/api/send-email-otp` endpoint-д хамаатай; шинэ бүртгэлийн имэйл тохиргоог орлохгүй. Бүртгэл нь баталгаажуулах холбоос болон 6–12 оронтой кодыг дэмжинэ.
 
 Supabase-ийн URL болон publishable key нь `src/services/supabaseAuth.ts` дотор шууд бичигдсэн (энэ бол public/anon түвшний, RLS-ээр хамгаалагдсан key тул орчны хувьсагч болгох шаардлагагүй, мөн `USK-Orlogo-Zarlaga-App`/`USK-Stock-In-Out-App` зэрэг бусад туслах аппуудтай нэг сантай байхын тулд зориудаар ингэж бичигдсэн).
 
@@ -68,8 +68,21 @@ Supabase-ийн URL болон publishable key нь `src/services/supabaseAuth.t
 
 ```bash
 npm run lint    # tsc --noEmit
+npm test        # auth, session, IP tracking and existing regression tests
 npm run build   # vite build (Vercel-ийн ашигладаг production build)
 ```
+
+## IP ба баталгаажсан нэвтрэлтийн бүртгэл
+
+`supabase/add-verified-site-visits.sql` нь одоогийн хандалтын хүснэгтэд IP, сессийн нотолгоо нэмнэ. 2026-10-01-нд `rebtikccivjcsxieeyxe` төсөлд `server_verified_ip_and_login_sessions` migration-аар суулгасан. `supabase/test-verified-site-visits.sql` нь туршилтын бүх өөрчлөлтийг rollback хийдэг SQL шалгалт.
+
+Шинэ frontend болон `api/site-visit.ts`-ийг хамт deploy хийнэ. Серверт `SUPABASE_SERVICE_ROLE_KEY` заавал байна; `/api/health` дахь `siteVisitTrackingConfigured` зөвхөн энэ тохиргоо байгаа эсэхийг харуулна. Локалд шаардлагатай хувьсагчдыг process environment-д өгөх эсвэл `node --env-file=.env --import tsx server.ts` ашиглана. Түлхүүргүй үед хандалтын API 503 буцааж, худал нотолгоо үүсгэхгүй.
+
+Vercel дээр IP-г платформын `x-vercel-forwarded-for` header-аас авна. Өөр Node hosting дээр шууд холбогдсон peer IP ашиглана; reverse proxy хэрэглэвэл proxy-ийн IP бүртгэгдэнэ. Дурын `X-Forwarded-For` header-д итгэхгүй. Endpoint-ийн process доторх rate limit нь хэт олон хүсэлтийг багасгана; тархсан ботыг бүрэн илрүүлдэг хамгаалалт биш.
+
+Админ → Статистик хэсэгт IP-ийн тоо, баталгаажсан сесс, давтан нэвтрэлт, сүүлийн 50 хандалт харагдана. Ижил IP-тэй өөр бүртгэлийг нэг хүн болгож нэгтгэхгүй. Нэг сессийн reload/token refresh шинэ нэвтрэлт биш; өөр баталгаажсан сессээр дахин орсон тохиолдлыг давтан нэвтрэлт гэж тоолно. Зочин болон хуучин хандалтууд баталгаажсан нэвтрэлтэд орохгүй. IP/сесс нь хүний бодит биеийн байцаалт эсвэл бот биш гэдгийг нотлохгүй.
+
+IP түүхийг зөвхөн админы эрх шалгасан RPC-ээр уншина. Хуучин frontend-ийн logger түр хадгалагдсан бөгөөд зөвхөн баталгаагүй хандалт бичнэ. IP/сессийн түүхэд автомат устгал одоогоор тохируулаагүй; хадгалах хугацааг байгууллагын бодлоготой нийцүүлж тохируулна.
 
 ## Native апп (Android/iOS)
 

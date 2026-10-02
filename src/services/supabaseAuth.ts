@@ -2,11 +2,23 @@ const SUPABASE_URL = 'https://rebtikccivjcsxieeyxe.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_6cFfPZrw3hfRy-RqefprLQ_c94gv3Ik';
 const APP_URL = typeof window === 'undefined' ? 'https://www.uskmart.com' : window.location.origin;
 
-export type AuthSession = { access_token: string; refresh_token?: string; user: { id: string; email?: string; email_confirmed_at?: string | null; identities?: unknown[] } };
+export type AuthUser = {
+  id: string; email?: string; email_confirmed_at?: string | null; identities?: unknown[];
+  is_anonymous?: boolean; user_metadata?: { name?: string; phone?: string; address?: string };
+};
+export type AuthSession = { access_token: string; refresh_token?: string; expires_in?: number; expires_at?: number; user: AuthUser };
 type Profile = { name: string; phone?: string; address?: string };
+
+export class SupabaseRequestError extends Error {
+  constructor(message: string, public status: number, public code?: string) {
+    super(message);
+    this.name = 'SupabaseRequestError';
+  }
+}
 
 async function request<T>(path: string, init: RequestInit = {}, token?: string): Promise<T> {
   const response = await fetch(SUPABASE_URL + path, {
+    signal: AbortSignal.timeout(20_000),
     ...init,
     headers: {
       apikey: SUPABASE_KEY,
@@ -16,53 +28,137 @@ async function request<T>(path: string, init: RequestInit = {}, token?: string):
     },
   });
   const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data.msg || data.error_description || data.message || 'Хүсэлт амжилтгүй боллоо.');
+  if (!response.ok) throw new SupabaseRequestError(data.msg || data.error_description || data.message || 'Хүсэлт амжилтгүй боллоо.', response.status, data.error_code || data.code);
   return data as T;
 }
 
 function temporaryPassword() {
-  return crypto.randomUUID();
+  // Keep the temporary credential comfortably within bcrypt's 72-byte limit.
+  return `Aa1!${crypto.randomUUID()}`;
+}
+
+export function normalizeSignupProfile(profile: Profile): Profile {
+  const name = profile.name.trim();
+  let phone = (profile.phone || '').replace(/\D/g, '');
+  const address = (profile.address || '').trim();
+  if (phone.length === 11 && phone.startsWith('976')) phone = phone.slice(3);
+  if (!name) throw new Error('Нэрээ оруулна уу.');
+  if (name.length > 120) throw new Error('Нэр хамгийн ихдээ 120 тэмдэгттэй байна.');
+  if (phone && !/^\d{8}$/.test(phone)) throw new Error('Утасны дугаар 8 оронтой байна.');
+  if (address.length > 500) throw new Error('Хаяг хамгийн ихдээ 500 тэмдэгттэй байна.');
+  return { name, phone, address };
+}
+
+function requireEmail(email: string) {
+  const normalized = email.trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized)) throw new Error('Зөв и-мэйл хаяг оруулна уу.');
+  return normalized;
+}
+
+function requireAuthSession(session: AuthSession): AuthSession {
+  if (!session?.access_token || !session.user?.id || !session.user.email_confirmed_at || session.user.is_anonymous) {
+    throw new Error('И-мэйл баталгаажсан нэвтрэлт шаардлагатай. Дахин нэвтэрнэ үү.');
+  }
+  return session;
 }
 
 /** Creates a pending account. Supabase sends the confirmation OTP configured in its email template. */
 export async function requestSignupOtp(email: string, profile: Profile) {
-  return request<{ user: AuthSession['user']; session: AuthSession | null }>('/auth/v1/signup', {
+  const details = normalizeSignupProfile(profile);
+  // GoTrue REST returns a User for pending signup and a token response when
+  // confirmations are disabled. The SDK's { user, session } wrapper is not on the wire.
+  const result = await request<AuthUser | AuthSession>(`/auth/v1/signup?redirect_to=${encodeURIComponent(APP_URL)}`, {
     method: 'POST',
     body: JSON.stringify({
-      email,
+      email: requireEmail(email),
       password: temporaryPassword(),
-      data: { name: profile.name },
-      options: { emailRedirectTo: APP_URL },
+      data: details,
     }),
+  });
+  if ('access_token' in result) return { user: result.user, session: requireAuthSession(result) };
+  if (!result.id) throw new Error('Бүртгэлийн хариу дутуу байна. Дахин оролдоно уу.');
+  return { user: result, session: null };
+}
+
+export async function resendSignupOtp(email: string) {
+  return request(`/auth/v1/resend?redirect_to=${encodeURIComponent(APP_URL)}`, {
+    method: 'POST', body: JSON.stringify({ email: requireEmail(email), type: 'signup' }),
   });
 }
 
 /** Exchanges the six-digit confirmation token for an authenticated session. */
 export async function verifySignupOtp(email: string, token: string) {
-  return request<AuthSession>('/auth/v1/verify', {
+  const code = token.replace(/\s/g, '');
+  if (!/^\d{6,12}$/.test(code)) throw new Error('И-мэйлээр ирсэн 6–12 оронтой кодоо оруулна уу.');
+  return requireAuthSession(await request<AuthSession>('/auth/v1/verify', {
     method: 'POST',
-    body: JSON.stringify({ email, token, type: 'signup' }),
-  });
+    body: JSON.stringify({ email: requireEmail(email), token: code, type: 'email' }),
+  }));
 }
 
 export async function signIn(email: string, password: string) {
-  return request<AuthSession>('/auth/v1/token?grant_type=password', {
+  return requireAuthSession(await request<AuthSession>('/auth/v1/token?grant_type=password', {
     method: 'POST',
-    body: JSON.stringify({ email, password }),
-  });
+    body: JSON.stringify({ email: requireEmail(email), password }),
+  }));
 }
 
 export async function refreshSession(refreshToken: string) {
-  return request<AuthSession>('/auth/v1/token?grant_type=refresh_token', {
+  return requireAuthSession(await request<AuthSession>('/auth/v1/token?grant_type=refresh_token', {
     method: 'POST',
     body: JSON.stringify({ refresh_token: refreshToken }),
-  });
+  }));
+}
+
+export async function getAuthUser(token: string) {
+  return request<AuthUser>('/auth/v1/user', { method: 'GET' }, token);
+}
+
+export async function signOutSession(token: string) {
+  await request('/auth/v1/logout?scope=local', { method: 'POST' }, token);
+}
+
+/** Resolve callback identity through Auth; decoding a JWT does not verify it. */
+export async function resolveAuthCallback(hash: string, search = '') {
+  const fragment = new URLSearchParams(hash.replace(/^#/, ''));
+  const query = new URLSearchParams(search.replace(/^\?/, ''));
+  const value = (key: string) => fragment.get(key) || query.get(key);
+  if (value('error') || value('error_code')) throw new Error('Баталгаажуулах холбоос хүчингүй эсвэл хугацаа дууссан байна. Шинэ холбоос авна уу.');
+  const token = value('access_token');
+  const type = value('type');
+  if (!token || !['signup', 'email', 'recovery'].includes(type || '')) return null;
+  const user = await getAuthUser(token);
+  const session = requireAuthSession({ access_token: token, refresh_token: value('refresh_token') || undefined, user });
+  return { type: type as 'signup' | 'email' | 'recovery', session };
+}
+
+export function getAuthErrorMessage(error: unknown) {
+  if (error instanceof SupabaseRequestError) {
+    const messages: Record<string, string> = {
+      invalid_credentials: 'И-мэйл эсвэл нууц үг буруу байна.',
+      email_not_confirmed: 'И-мэйлээ баталгаажуулсны дараа нэвтэрнэ үү.',
+      user_already_exists: 'Энэ и-мэйл бүртгэлтэй байна. Нэвтрэх эсвэл нууц үгээ сэргээнэ үү.',
+      email_exists: 'Энэ и-мэйл бүртгэлтэй байна. Нэвтрэх эсвэл нууц үгээ сэргээнэ үү.',
+      signup_disabled: 'Шинэ бүртгэл түр хаалттай байна. Дэлгүүртэй холбогдоно уу.',
+      email_provider_disabled: 'И-мэйл бүртгэл түр боломжгүй байна. Дэлгүүртэй холбогдоно уу.',
+      otp_expired: 'Код хүчингүй эсвэл хугацаа дууссан байна. Шинэ код авна уу.',
+      over_email_send_rate_limit: 'И-мэйл илгээх хязгаарт хүрлээ. Түр хүлээгээд дахин оролдоно уу.',
+      over_request_rate_limit: 'Хэт олон хүсэлт илгээсэн байна. Түр хүлээгээд дахин оролдоно уу.',
+      email_address_invalid: 'Зөв и-мэйл хаяг оруулна уу.',
+      weak_password: 'Нууц үг хангалттай хүчтэй биш байна. Том, жижиг үсэг, тоо, тусгай тэмдэгт оруулна уу.',
+      same_password: 'Өмнөхөөсөө өөр нууц үг сонгоно уу.',
+    };
+    if (messages[error.code || '']) return messages[error.code!];
+    if (error.status === 429) return messages.over_request_rate_limit;
+  }
+  if (error instanceof TypeError) return 'Сүлжээтэй холбогдож чадсангүй. Холболтоо шалгаад дахин оролдоно уу.';
+  return error instanceof Error ? error.message : 'Нэвтрэх боломжгүй байна.';
 }
 
 export async function sendPasswordReset(email: string) {
-  return request('/auth/v1/recover', {
+  return request(`/auth/v1/recover?redirect_to=${encodeURIComponent(APP_URL)}`, {
     method: 'POST',
-    body: JSON.stringify({ email, redirect_to: APP_URL }),
+    body: JSON.stringify({ email: requireEmail(email) }),
   });
 }
 
@@ -76,10 +172,11 @@ export async function getProfile(token: string, userId: string) {
 }
 
 export async function saveProfile(token: string, userId: string, profile: Profile) {
+  const normalized = normalizeSignupProfile(profile);
   await request('/rest/v1/customer_profiles?on_conflict=user_id', {
     method: 'POST',
     headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
-    body: JSON.stringify({ user_id: userId, name: profile.name, phone: (profile.phone || '').replace(/\\D/g, '').slice(-8), address: profile.address || '' }),
+    body: JSON.stringify({ user_id: userId, ...normalized }),
   }, token);
 }
 
@@ -385,15 +482,25 @@ export async function unregisterAdminPushToken(token: string, deviceToken: strin
   }, token);
 }
 
-/** One page load; the server derives account identity from the authenticated token. */
+/** IP and account/session identity are validated by our server, never supplied by the browser. */
 export async function logSiteVisit(visitorId: string, path: string, visitKey: string, token?: string) {
-  return request('/rest/v1/rpc/log_site_visit_v2', {
+  const response = await fetch('/api/site-visit', {
     method: 'POST',
-    body: JSON.stringify({ p_visitor_id: visitorId, p_visit_key: visitKey, p_path: path }),
-  }, token);
+    headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    body: JSON.stringify({ visitorId, visitKey, path }),
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!response.ok) throw new Error('Хандалтыг бүртгэж чадсангүй.');
 }
 
-export type SiteVisitStats = {
+export type SiteVisitPeriod = 'total' | 'today' | 'last7days' | 'last30days';
+export type SiteVisitRecord = {
+  id: number; created_at: string; path: string; visitor_id: string; user_id: string | null;
+  ip_address: string | null; auth_session_id: string | null; identity_status: 'verified' | 'guest' | 'legacy';
+};
+export type SiteVisitStats = Partial<Record<`${SiteVisitPeriod}_${'unique_ips' | 'verified_login_sessions' | 'repeat_logins' | 'unverified_pageviews'}`, number>> & {
+  recent_visits?: SiteVisitRecord[];
+  recent_visits_error?: boolean;
   total_new_visitors: number;
   total_repeat_visits: number;
   today_new_visitors: number;
@@ -413,7 +520,15 @@ export type SiteVisitStats = {
 };
 
 export async function getSiteVisitStats(token: string): Promise<SiteVisitStats> {
-  return request('/rest/v1/rpc/get_site_visit_stats', { method: 'POST', body: JSON.stringify({}) }, token);
+  const stats = await request<SiteVisitStats>('/rest/v1/rpc/get_site_visit_stats', { method: 'POST', body: JSON.stringify({}) }, token);
+  if (stats.total_verified_login_sessions !== undefined) {
+    try {
+      stats.recent_visits = await request<SiteVisitRecord[]>('/rest/v1/rpc/get_recent_site_visits', {
+        method: 'POST', body: JSON.stringify({ p_limit: 50 }),
+      }, token);
+    } catch { stats.recent_visits_error = true; }
+  }
+  return stats;
 }
 
 export type SupportMessage = {
