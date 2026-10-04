@@ -35,15 +35,20 @@ body {
   touch-action: pan-y pinch-zoom;
 }
 
-img, video, canvas {
-  display: block;
-  max-width: 100%;
-  height: auto;
-}
+/* Element defaults live in the base layer: unlayered rules beat every Tailwind
+   utility, so `height: auto` and `font: inherit` were overriding h-*, text-*
+   and font-* classes on images and buttons across the site. */
+@layer base {
+  img, video, canvas {
+    display: block;
+    max-width: 100%;
+    height: auto;
+  }
 
-button, input, select, textarea {
-  max-width: 100%;
-  font: inherit;
+  button, input, select, textarea {
+    max-width: 100%;
+    font: inherit;
+  }
 }
 
 /* Footer testimonial ticker: a continuous right-to-left scroll of approved reviews. */
