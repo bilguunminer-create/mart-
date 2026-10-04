@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { recordSiteVisit, SiteVisitError, trustedVisitIp } from '../api/_siteVisitService.ts';
+import { recordSiteVisit, SiteVisitError, trustedVisitIp, trustedVisitLocation } from '../api/_siteVisitService.ts';
 
 const visitor = 'a186d42c-dd01-4d52-a823-c98888290c36';
 const visit = '5804f5f9-2a5b-48f6-a23b-a6adf0353e51';
@@ -50,6 +50,27 @@ test('invalid, revoked, mismatched and unconfirmed sessions never become anonymo
     await assert.rejects(recordSiteVisit({ ...req(), headers: { ...req().headers, authorization: `Bearer ${token()}` } }, env, fetcher), (err: SiteVisitError) => err.status === 401);
     assert.equal(calls, outcome === 'revoked' ? 2 : 1);
   }
+});
+test('location comes only from Vercel edge headers and is sanitized', () => {
+  const headers = { 'x-vercel-ip-country': 'mn', 'x-vercel-ip-country-region': '053', 'x-vercel-ip-city': 'Dalanzadgad' };
+  assert.deepEqual(trustedVisitLocation({ headers }, true), { country: 'MN', region: '053', city: 'Dalanzadgad' });
+  assert.deepEqual(trustedVisitLocation({ headers }, false), { country: null, region: null, city: null });
+  assert.deepEqual(trustedVisitLocation({ headers: { 'x-vercel-ip-country': 'Mongolia', 'x-vercel-ip-country-region': '<b>', 'x-vercel-ip-city': '%3Cscript%3EUlaanbaatar' } }, true),
+    { country: null, region: null, city: 'scriptUlaanbaatar' });
+});
+test('visit stores edge location, ignores browser-sent location, and falls back before the SQL is applied', async () => {
+  const calls: Array<{ url: string; body: any }> = [];
+  const fetcher = (async (url, options) => {
+    calls.push({ url: String(url), body: JSON.parse(String(options?.body)) });
+    return new Response(null, { status: calls.length === 1 ? 404 : 204 });
+  }) as typeof fetch;
+  const request = { ...req(), headers: { ...req().headers, 'x-vercel-ip-country': 'MN', 'x-vercel-ip-city': 'Ulaanbaatar' }, body: { ...req().body, country: 'US', city: 'Fake' } };
+  await recordSiteVisit(request, env, fetcher);
+  assert.match(calls[0].url, /log_site_visit_v4$/);
+  assert.equal(calls[0].body.p_country, 'MN');
+  assert.equal(calls[0].body.p_city, 'Ulaanbaatar');
+  assert.match(calls[1].url, /log_site_visit_v3$/);
+  assert.equal(calls[1].body.p_country, undefined);
 });
 test('malformed IDs, paths with secrets, cross-site requests and missing configuration fail before fetching', async () => {
   const fetcher = (async () => { throw new Error('Must not fetch'); }) as typeof fetch;

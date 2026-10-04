@@ -525,9 +525,15 @@ export type SiteVisitRecord = {
   id: number; created_at: string; path: string; visitor_id: string; user_id: string | null;
   ip_address: string | null; auth_session_id: string | null; identity_status: 'verified' | 'guest' | 'legacy';
 };
+/** Aggregated by Vercel IP geolocation; empty strings mean the location is unknown. */
+export type SiteVisitLocation = {
+  period: SiteVisitPeriod; country: string; region: string; city: string; pageviews: number; visitors: number;
+};
 export type SiteVisitStats = Partial<Record<`${SiteVisitPeriod}_${'unique_ips' | 'verified_login_sessions' | 'repeat_logins' | 'unverified_pageviews'}`, number>> & {
   recent_visits?: SiteVisitRecord[];
   recent_visits_error?: boolean;
+  /** Undefined until supabase/add-site-visit-locations.sql is applied (or if loading failed). */
+  locations?: SiteVisitLocation[];
   total_new_visitors: number;
   total_repeat_visits: number;
   today_new_visitors: number;
@@ -554,6 +560,9 @@ export async function getSiteVisitStats(token: string): Promise<SiteVisitStats> 
         method: 'POST', body: JSON.stringify({ p_limit: 50 }),
       }, token);
     } catch { stats.recent_visits_error = true; }
+    try {
+      stats.locations = await request<SiteVisitLocation[]>('/rest/v1/rpc/get_site_visit_locations', { method: 'POST', body: '{}' }, token);
+    } catch { /* location report not installed yet */ }
   }
   return stats;
 }

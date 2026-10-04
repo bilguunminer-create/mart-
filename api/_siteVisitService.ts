@@ -23,6 +23,25 @@ export function trustedVisitIp(req: VisitRequest, vercel = process.env.VERCEL ==
   return isIP(normalized) ? normalized : null;
 }
 
+// Vercel's edge adds the visitor's approximate location (derived from the IP).
+// Like the IP, it is never taken from the browser or outside Vercel.
+export function trustedVisitLocation(req: VisitRequest, vercel = process.env.VERCEL === '1') {
+  const header = (name: string) => {
+    const value = vercel ? req.headers[name] : undefined;
+    return typeof value === 'string' ? value.trim() : '';
+  };
+  const country = header('x-vercel-ip-country').toUpperCase();
+  const region = header('x-vercel-ip-country-region').toUpperCase();
+  let city = '';
+  try { city = decodeURIComponent(header('x-vercel-ip-city')); } catch { /* malformed encoding */ }
+  city = city.replace(/[\u0000-\u001f\u007f<>]/g, '').trim().slice(0, 80);
+  return {
+    country: /^[A-Z]{2}$/.test(country) ? country : null,
+    region: /^[A-Z0-9]{1,3}$/.test(region) ? region : null,
+    city: city || null,
+  };
+}
+
 export async function recordSiteVisit(req: VisitRequest, env: VisitEnvironment = process.env, fetcher: typeof fetch = fetch) {
   if (!env.SUPABASE_SERVICE_ROLE_KEY) throw new SiteVisitError(503, 'Хандалтын бүртгэл тохируулагдаагүй байна.');
   if (req.headers['sec-fetch-site'] === 'cross-site') throw new SiteVisitError(403, 'Хүсэлт зөвшөөрөгдөөгүй.');
@@ -62,14 +81,19 @@ export async function recordSiteVisit(req: VisitRequest, env: VisitEnvironment =
     sessionId = claims.session_id;
   }
   const agent = req.headers['user-agent'];
-  const response = await fetcher(`${url}/rest/v1/rpc/log_site_visit_v3`, {
+  const visit = { p_visitor_id: visitorId, p_visit_key: visitKey, p_path: path,
+    p_ip_address: ip, p_user_agent: typeof agent === 'string' ? agent.slice(0, 512) : '',
+    p_user_id: userId, p_auth_session_id: sessionId };
+  const location = trustedVisitLocation(req, env.VERCEL === '1');
+  const log = (rpc: string, body: Record<string, unknown>) => fetcher(`${url}/rest/v1/rpc/${rpc}`, {
     method: 'POST',
     headers: { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ p_visitor_id: visitorId, p_visit_key: visitKey, p_path: path,
-      p_ip_address: ip, p_user_agent: typeof agent === 'string' ? agent.slice(0, 512) : '',
-      p_user_id: userId, p_auth_session_id: sessionId }),
+    body: JSON.stringify(body),
     signal: AbortSignal.timeout(10_000),
   });
+  let response = await log('log_site_visit_v4', { ...visit, p_country: location.country, p_region: location.region, p_city: location.city });
+  // Until supabase/add-site-visit-locations.sql is applied, v4 does not exist (404).
+  if (response.status === 404) response = await log('log_site_visit_v3', visit);
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
     if (String(error.message).includes('INVALID_AUTH_SESSION')) throw new SiteVisitError(401, 'Нэвтрэлтийн хугацаа дууссан байна.');
