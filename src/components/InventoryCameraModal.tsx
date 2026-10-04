@@ -1,9 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { X, Camera, Barcode, PackagePlus, MinusCircle, History, CheckCircle2, RefreshCw } from 'lucide-react';
+import { X, Camera, Barcode, PackagePlus, MinusCircle, History, ImagePlus, CheckCircle2, RefreshCw } from 'lucide-react';
 import { BrowserMultiFormatReader } from '@zxing/browser';
 import type { IScannerControls } from '@zxing/browser';
 import { Capacitor } from '@capacitor/core';
-import { Camera as CapacitorCamera } from '@capacitor/camera';
+import { Camera as CapacitorCamera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { addInventoryStock, deductInventoryByBarcode, getInventoryMovements, lookupInventoryBarcode, registerInventoryProduct, uploadProductImage, InventoryMovement } from '../services/supabaseAuth';
 import { CATEGORIES } from '../data/storeData';
 
@@ -30,6 +30,8 @@ export const InventoryCameraModal: React.FC<Props> = ({ isOpen, onClose, accessT
   const [restockOf,setRestockOf]=useState<LookedUpProduct|null>(null);
   const [lookingUp,setLookingUp]=useState(false);
   const [restockQty,setRestockQty]=useState('1');
+  const [takingPhoto,setTakingPhoto]=useState(false);
+  const photoInputRef=useRef<HTMLInputElement|null>(null);
   const videoRef=useRef<HTMLVideoElement|null>(null);
   const streamRef=useRef<MediaStream|null>(null);
   const timerRef=useRef<number|undefined>();
@@ -103,7 +105,37 @@ export const InventoryCameraModal: React.FC<Props> = ({ isOpen, onClose, accessT
       setMessage(ok?'✓ Зургийн чанар хангалттай байна. Дараагийн алхам руу шилжиж байна...':'Зураг бүдэг эсвэл хэт жижиг байж болзошгүй. 900×900-аас дээш, тод зураг дахин авна уу.');
       if(ok) window.setTimeout(()=>setStep(3),700);
     };
+    img.onerror=()=>setMessage('Зураг уншигдсангүй. Өөр зураг сонгох эсвэл дахин зураг авна уу.');
     img.src=URL.createObjectURL(file);
+  };
+
+  const takePhoto=async()=>{
+    stopCamera();
+    if(!Capacitor.isNativePlatform()){
+      photoInputRef.current?.click();
+      return;
+    }
+    setTakingPhoto(true);
+    setMessage('');
+    try {
+      const photo=await CapacitorCamera.getPhoto({
+        source:CameraSource.Camera,
+        resultType:CameraResultType.Uri,
+        quality:90,
+        width:2000,
+        height:2000,
+        correctOrientation:true,
+        saveToGallery:false,
+      });
+      if(!photo.webPath) throw new Error('Missing photo');
+      const response=await fetch(photo.webPath);
+      if(!response.ok) throw new Error('Photo could not be loaded');
+      const blob=await response.blob();
+      await chooseImage(new File([blob], 'inventory-'+Date.now()+'.'+photo.format, {type:blob.type||'image/jpeg'}));
+    } catch(error){
+      const reason=error instanceof Error?error.message:String(error);
+      if(!/cancel/i.test(reason)) setMessage('Камерын зураг авах боломжгүй байна. Утасны тохиргооноос аппын камерын зөвшөөрлийг шалгаад дахин оролдоно уу.');
+    } finally { setTakingPhoto(false); }
   };
 
   const startScanner=async(target:'register'|'deduct')=>{
@@ -211,7 +243,12 @@ export const InventoryCameraModal: React.FC<Props> = ({ isOpen, onClose, accessT
           </section>}
 
           {step===2&&<section className="rounded-2xl border p-4"><h3 className="font-black">2. Барааны зураг</h3>{preview&&<img src={preview} className="mt-3 h-48 w-full rounded-xl object-cover" />}
-          <label className="mt-3 flex cursor-pointer items-center justify-center gap-2 rounded-xl bg-stone-900 p-3 text-sm font-bold text-white"><Camera className="h-4 w-4"/> {image&&!imageOk?'Зургийг дахин авах':'Зураг авах / оруулах'}<input type="file" accept="image/jpeg,image/png,image/webp" capture="environment" className="hidden" onChange={e=>void chooseImage(e.target.files?.[0])}/></label>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            <button type="button" disabled={takingPhoto} onClick={()=>void takePhoto()} className="flex items-center justify-center gap-2 rounded-xl bg-stone-900 p-3 text-sm font-bold text-white disabled:opacity-50"><Camera className="h-4 w-4"/>{takingPhoto?'Камер нээж байна...':'Камераар зураг авах'}</button>
+            <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-stone-300 p-3 text-sm font-bold text-stone-900"><ImagePlus className="h-4 w-4"/>Галерейгаас сонгох<input type="file" accept="image/jpeg,image/png,image/webp" disabled={takingPhoto} className="sr-only" onChange={e=>{void chooseImage(e.target.files?.[0]);e.target.value='';}}/></label>
+          </div>
+          <input ref={photoInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={e=>{void chooseImage(e.target.files?.[0]);e.target.value='';}}/>
+          <p className="mt-2 text-xs text-stone-500">900×900-аас дээш нягтралтай, 40 КБ–5 МБ хэмжээтэй тод зураг оруулна уу.</p>
           {image&&<p className={`mt-2 text-xs font-bold ${imageOk?'text-emerald-700':'text-rose-700'}`}>{imageOk?'✓ Зураг шаардлага хангалаа':'! Зургийг дахин авах шаардлагатай'}</p>}
           <button type="button" onClick={()=>setStep(1)} className="mt-3 text-xs font-bold text-stone-500 cursor-pointer">← Буцах</button>
           </section>}
