@@ -67,13 +67,14 @@ export const ProductCard: React.FC<ProductCardProps> = ({
         ? 'border-stone-200 opacity-80'
         : 'border-stone-200/80 shadow-sm hover:-translate-y-1 hover:shadow-lg hover:shadow-stone-900/10'
     }`}>
-      {/* Photo: square and uniform so rows line up */}
+      {/* Photo: square and uniform so rows line up. The image is absolutely filled
+          because a percentage height does not resolve inside this flex item. */}
       <div className="relative aspect-square w-full bg-stone-100 overflow-hidden cursor-pointer" onClick={() => onOpenDetail(product)}>
         <img
           src={product.image}
           alt={product.name}
           referrerPolicy="no-referrer"
-          className={`w-full h-full object-cover transition-transform duration-500 ${
+          className={`absolute inset-0 w-full h-full object-cover transition-transform duration-500 ${
             !isOutOfStock ? 'group-hover:scale-105' : 'grayscale'
           }`}
           loading="lazy"

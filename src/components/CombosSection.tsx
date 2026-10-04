@@ -50,7 +50,7 @@ export const CombosSection: React.FC<CombosSectionProps> = ({
                   src={combo.image}
                   alt={combo.name}
                   referrerPolicy="no-referrer"
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                  className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                 />
                 <div className="absolute top-3 left-3 flex items-center gap-1.5">
                   <span className="bg-rose-600 text-white text-xs font-black px-2.5 py-1 rounded-lg shadow-md">
