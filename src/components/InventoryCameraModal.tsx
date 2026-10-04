@@ -14,6 +14,23 @@ type Tab = 'register' | 'deduct' | 'history';
 type LookedUpProduct = { id?: string; name?: string; price?: number; weight?: string; origin?: string; category?: string; category_name?: string; badge?: string; description?: string; stock?: number };
 const ORIGINS = ['АНУ', 'БНСУ'] as const;
 const REGISTER_CATEGORIES = CATEGORIES.filter((c) => c.id !== 'all');
+// Phone cameras often produce files over 5 MB or in HEIC; re-encode those to a
+// bounded JPEG so camera photos pass the upload limits instead of being rejected.
+const normalizePhoto=async(file:File,img:HTMLImageElement):Promise<File>=>{
+  if(['image/jpeg','image/png','image/webp'].includes(file.type)&&file.size<=5*1024*1024) return file;
+  const scale=Math.min(1,2000/Math.max(img.naturalWidth,img.naturalHeight));
+  const canvas=document.createElement('canvas');
+  canvas.width=Math.round(img.naturalWidth*scale);
+  canvas.height=Math.round(img.naturalHeight*scale);
+  const context=canvas.getContext('2d');
+  if(!context) return file;
+  context.fillStyle='#fff';
+  context.fillRect(0,0,canvas.width,canvas.height);
+  context.drawImage(img,0,0,canvas.width,canvas.height);
+  const blob=await new Promise<Blob|null>(resolve=>canvas.toBlob(resolve,'image/jpeg',0.88));
+  return blob?new File([blob],file.name.replace(/\.[^.]*$/,'')+'.jpg',{type:'image/jpeg'}):file;
+};
+
 const blank = { name:'', stock:'', origin:'АНУ', category:REGISTER_CATEGORIES[0].id, category_name:REGISTER_CATEGORIES[0].name, price:'', weight:'', badge:'', day_deal:'-1', description:'', barcode:'' };
 
 export const InventoryCameraModal: React.FC<Props> = ({ isOpen, onClose, accessToken, onChanged }) => {
@@ -143,12 +160,16 @@ export const InventoryCameraModal: React.FC<Props> = ({ isOpen, onClose, accessT
     const url=URL.createObjectURL(file);
     setPreview(url);
     const img=new Image();
-    img.onload=()=>{
+    img.onload=async()=>{
       if(generation!==imageGeneration.current) return;
-      const ok=img.naturalWidth>=900&&img.naturalHeight>=900&&file.size>=40*1024&&file.size<=5*1024*1024;
+      const bigEnough=img.naturalWidth>=900&&img.naturalHeight>=900;
+      const ready=bigEnough?await normalizePhoto(file,img):file;
+      if(generation!==imageGeneration.current) return;
+      const ok=bigEnough&&ready.size>=40*1024&&ready.size<=5*1024*1024;
+      if(ready!==file) setImage(ready);
       setImageOk(ok);
-      setMessage(ok?'✓ Зургийн чанар хангалттай байна.':'900×900-аас дээш, 40 КБ–5 МБ хэмжээтэй тод зураг оруулна уу.');
-      if(ok){setStep(3);void findProductInfo(file,snapshot);}
+      setMessage(ok?'✓ Зургийн чанар хангалттай байна.':!bigEnough?'Зураг 900×900-аас жижиг байна. Барааг ойроос, тод авна уу.':'Зургийг боловсруулж чадсангүй. Дахин авах эсвэл галерейгаас сонгоно уу.');
+      if(ok){setStep(3);void findProductInfo(ready,snapshot);}
     };
     img.onerror=()=>{if(generation===imageGeneration.current)setMessage('Зураг уншигдсангүй. Өөр зураг сонгоно уу.');};
     img.src=url;
