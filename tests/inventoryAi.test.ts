@@ -123,3 +123,49 @@ test('provider failures distinguish setup, quota, model and request errors witho
     assert.ok(!result.message.includes('secret-key-value'));
   }
 });
+
+const adminFetcher = (id: string) => async (url: any) => String(url).includes('/auth/') ? json({ id, email_confirmed_at: 'yes' }) : json(null);
+
+test('billing-gated Google Search falls back to reading the label without search', async () => {
+  const old = process.env.GEMINI_API_KEY;
+  process.env.GEMINI_API_KEY = 'test-only-key';
+  try {
+    const calls: boolean[] = [];
+    const result = await lookupInventoryProduct(req, {
+      fetcher: adminFetcher('admin-fallback'),
+      generate: async params => {
+        const withSearch = Boolean(params.config?.tools);
+        calls.push(withSearch);
+        if (withSearch) throw { status: 400, message: 'FAILED_PRECONDITION: billing required for Google Search' };
+        assert.ok(JSON.stringify(params.contents).includes('inlineData'));
+        return response({ candidates: [{ finishReason: 'STOP' }] });
+      },
+    });
+    assert.deepEqual(calls, [true, false]);
+    assert.equal(result.matched, true);
+    assert.equal(result.fields.name, 'Рамен');
+    assert.deepEqual(result.sources, []);
+    assert.match(result.message, /интернэт хайлтгүй/);
+  } finally { if (old === undefined) delete process.env.GEMINI_API_KEY; else process.env.GEMINI_API_KEY = old; }
+});
+
+test('search fallback only runs for billing, quota or tool errors and reports the final failure', async () => {
+  const old = process.env.GEMINI_API_KEY;
+  process.env.GEMINI_API_KEY = 'test-only-key';
+  try {
+    let calls = 0;
+    await assert.rejects(lookupInventoryProduct(req, { fetcher: adminFetcher('admin-timeout'), generate: async () => { calls++; throw { status: 504, message: 'deadline exceeded' }; } }),
+      (e: InventoryAiError) => e.message.includes('[AI_TIMEOUT]'));
+    assert.equal(calls, 1);
+    calls = 0;
+    await assert.rejects(lookupInventoryProduct(req, { fetcher: adminFetcher('admin-billing'), generate: async () => { calls++; throw { status: 402, message: 'billing required' }; } }),
+      (e: InventoryAiError) => e.message.includes('[AI_BILLING]'));
+    assert.equal(calls, 2);
+  } finally { if (old === undefined) delete process.env.GEMINI_API_KEY; else process.env.GEMINI_API_KEY = old; }
+});
+
+test('label-only results still refuse uncertain products', () => {
+  const parsed = parseInventorySuggestion(response({ text: JSON.stringify({ matched: false, name: 'Guess' }), candidates: [{ finishReason: 'STOP' }] }), false);
+  assert.equal(parsed.matched, false);
+  assert.equal(parsed.fields.name, '');
+});

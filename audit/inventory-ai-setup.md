@@ -16,6 +16,7 @@ For local Express execution, load these variables in the Node environment before
 
 - Only name, Mongolian description, pack size and category are suggested. Price, stock, origin, barcode and publishing remain manual.
 - Missing/uncertain matches or no HTTPS grounding sources return empty suggestions.
+- If Google Search grounding is refused for billing, quota or tool-combination reasons, the server retries once without search and fills only what the photographed label shows (no sources; the message asks for a careful check). Enabling billing restores search automatically.
 - Sources and Google's search suggestions are displayed; search HTML is isolated in a sandboxed iframe.
 - Users can cancel, retry or enter details manually. Late results preserve edits; replacing a photo clears unedited prior AI values.
 - The existing registration button is the user's review/submit step; AI never writes the catalog.
