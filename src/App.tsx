@@ -671,6 +671,24 @@ export default function App() {
     void initAdminPushNotifications(currentUser.accessToken);
   }, [isAdminAuthenticated, currentUser?.accessToken]);
 
+  // Inventory writes already succeeded. Refresh only the catalog so the PIN
+  // unlock and the open scanner survive consecutive registrations.
+  const inventoryRefreshGeneration = useRef(0);
+  const handleInventoryChanged = () => {
+    const generation = ++inventoryRefreshGeneration.current;
+    void getStoreSettings().then((settings) => {
+      if (generation !== inventoryRefreshGeneration.current) return;
+      if (!Array.isArray(settings.data.products)) throw new Error('Missing catalog');
+      setProducts(settings.data.products.map((product) => {
+        const stock = Number(product.stock_quantity ?? product.stock ?? (product.in_stock ? 15 : 0));
+        return { ...product, stock_quantity: stock, in_stock: Boolean(product.in_stock) && stock > 0 };
+      }) as Product[]);
+    }).catch(() => {
+      if (generation !== inventoryRefreshGeneration.current) return;
+      showToast('Барааны үйлдэл хадгалагдсан. Жагсаалт шинэчлэгдсэнгүй; дахин бүртгэх шаардлагагүй.');
+    });
+  };
+
   const handleSaveProduct = async (product: Product, originalProduct?: Product | null) => {
     // A modal may still contain an old product after the catalog was refreshed.
     if (originalProduct && products.find((item) => item.id === originalProduct.id) !== originalProduct) {
@@ -1141,10 +1159,7 @@ export default function App() {
               isOpen={isInventoryOpen}
               onClose={() => setIsInventoryOpen(false)}
               accessToken={currentUser.accessToken}
-              onChanged={() => {
-                setIsInventoryOpen(false);
-                window.location.reload();
-              }}
+              onChanged={handleInventoryChanged}
             />
             <InventoryOrdersModal
               isOpen={isInventoryOrdersOpen}
@@ -2171,10 +2186,7 @@ export default function App() {
             isOpen={isInventoryOpen}
             onClose={() => setIsInventoryOpen(false)}
             accessToken={currentUser.accessToken}
-            onChanged={() => {
-              setIsInventoryOpen(false);
-              window.location.reload();
-            }}
+            onChanged={handleInventoryChanged}
           />
         </React.Suspense>
       )}

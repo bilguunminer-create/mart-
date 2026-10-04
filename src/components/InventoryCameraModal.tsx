@@ -162,7 +162,7 @@ export const InventoryCameraModal: React.FC<Props> = ({ isOpen, onClose, accessT
     try {
       const imageUrl=await uploadProductImage(accessToken,image);
       await registerInventoryProduct(accessToken,{...form,id:crypto.randomUUID(),stock:Number(form.stock),price:Number(form.price),day_deal:Number(form.day_deal),image:imageUrl,country:form.origin,origin:form.origin==='БНСУ'?'KR':'US',flag:form.origin==='БНСУ'?'🇰🇷':'🇺🇸',rating:5,published:false,note:'Камерын апп-аар шинээр бүртгэв'});
-      setMessage('Бараа амжилттай бүртгэгдлээ. Админ удирдлагаас шалгаж нийтлээрэй.'); setForm(blank); setImage(null); setPreview(''); setImageOk(false); setStep(1); onChanged();
+      setMessage('Бараа админд илгээгдлээ. Дараагийн барааны barcode-ыг уншуулаад үргэлжлүүлээрэй.'); setForm(blank); setImage(null); setPreview(''); setImageOk(false); setStep(1); onChanged();
     } catch(e){
       const raw=e instanceof Error?e.message:'';
       setMessage(/duplicate|already|exists|unique/i.test(raw)
