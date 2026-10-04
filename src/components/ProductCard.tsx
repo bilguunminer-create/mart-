@@ -132,9 +132,11 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           {/* Category & Weight */}
           <div className="flex items-center justify-between text-[11px] text-stone-600 mb-1 font-medium">
             <span>{product.category_name}</span>
-            <span className="bg-stone-100 text-stone-700 font-semibold px-1.5 py-0.5 rounded text-[10px]">
-              {product.weight}
-            </span>
+            {product.weight?.trim() && (
+              <span className="bg-stone-100 text-stone-700 font-semibold px-1.5 py-0.5 rounded text-[10px]">
+                {product.weight}
+              </span>
+            )}
           </div>
 
           {/* Title */}

@@ -167,9 +167,11 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
           <div>
             <div className="flex items-center justify-between text-xs text-stone-500 font-medium mb-1">
               <span>{product.category_name}</span>
-              <span className="bg-stone-100 text-stone-700 font-bold px-2 py-0.5 rounded">
-                Савлагаа: {product.weight}
-              </span>
+              {product.weight?.trim() && (
+                <span className="bg-stone-100 text-stone-700 font-bold px-2 py-0.5 rounded">
+                  Савлагаа: {product.weight}
+                </span>
+              )}
             </div>
 
             <h3 className="font-serif text-xl sm:text-2xl font-semibold text-stone-900 leading-tight">
