@@ -196,6 +196,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedOrigin, setSelectedOrigin] = useState<'ALL' | 'KR' | 'US'>('ALL');
   const [stockFilter, setStockFilter] = useState<'all' | 'in_stock' | 'low_stock' | 'out_of_stock'>('all');
+  const [productView, setProductView] = useState<'main' | 'draft'>('main');
   const [checkoutDraft, setCheckoutDraft] = useState(checkoutSettings);
   const [checkoutSettingsMessage, setCheckoutSettingsMessage] = useState<string | null>(null);
   const [expandedMemberId, setExpandedMemberId] = useState<string | null>(null);
@@ -557,8 +558,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           ? isLow 
           : isOut;
 
-    return matchesSearch && matchesCat && matchesOrigin && matchesStock;
+    // Drafts (e.g. new warehouse registrations) are listed apart from published products.
+    const matchesView = (prod.published === false) === (productView === 'draft');
+
+    return matchesView && matchesSearch && matchesCat && matchesOrigin && matchesStock;
   });
+  const draftCount = products.filter((prod) => prod.published === false).length;
 
   // Filter orders
   const filteredOrders = orders.filter((order) => {
@@ -1036,6 +1041,24 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               </button>
             </div>
 
+            {/* Published / draft switch */}
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setProductView('main')}
+                className={`px-4 py-2 text-xs font-bold rounded-xl border transition-all cursor-pointer ${productView === 'main' ? 'bg-stone-900 text-white border-stone-900' : 'bg-white text-stone-700 border-stone-200 hover:border-stone-400'}`}
+              >
+                Үндсэн бараа ({products.length - draftCount})
+              </button>
+              <button
+                type="button"
+                onClick={() => setProductView('draft')}
+                className={`px-4 py-2 text-xs font-bold rounded-xl border transition-all cursor-pointer ${productView === 'draft' ? 'bg-indigo-600 text-white border-indigo-600' : draftCount > 0 ? 'bg-indigo-50 text-indigo-800 border-indigo-200 hover:border-indigo-400' : 'bg-white text-stone-700 border-stone-200 hover:border-stone-400'}`}
+              >
+                Ноорог ({draftCount})
+              </button>
+            </div>
+
             {/* Products Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
               {filteredProducts.map((prod) => {
@@ -1256,7 +1279,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             {filteredProducts.length === 0 && (
               <div className="text-center py-12 bg-white rounded-2xl border border-stone-200">
                 <Package className="w-12 h-12 text-stone-300 mx-auto mb-2" />
-                <p className="font-bold text-stone-700 text-sm">Хайлтад тохирох бараа олдсонгүй</p>
+                <p className="font-bold text-stone-700 text-sm">{productView === 'draft' && draftCount === 0 ? 'Ноорог бараа алга' : 'Хайлтад тохирох бараа олдсонгүй'}</p>
                 <p className="text-xs text-stone-400 mt-1">Шүүлтүүрээ өөрчлөх эсвэл шинээр бараа нэмнэ үү.</p>
               </div>
             )}
