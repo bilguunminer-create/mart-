@@ -2,5 +2,10 @@
   "framework": "vite",
   "buildCommand": "vite build",
   "installCommand": "npm install",
-  "outputDirectory": "dist"
+  "outputDirectory": "dist",
+  "functions": {
+    "api/inventory-ai.ts": {
+      "maxDuration": 120
+    }
+  }
 }

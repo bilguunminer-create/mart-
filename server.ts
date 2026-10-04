@@ -9,6 +9,8 @@ import { checkRateLimit, clientIp } from "./api/_rateLimit";
 import { ChatbotServiceError, processChatbotRequest } from "./api/_chatbotService";
 import { recordSiteVisit, SiteVisitError } from "./api/_siteVisitService";
 
+import inventoryAiHandler from './api/inventory-ai';
+
 const SUPABASE_URL = "https://rebtikccivjcsxieeyxe.supabase.co";
 
 function getFirebaseApp(): App | null {
@@ -91,6 +93,8 @@ async function startServer() {
   app.use(express.json({ limit: "25mb" }));
   app.use(express.urlencoded({ extended: true, limit: "25mb" }));
 
+  app.post('/api/inventory-ai', (req, res) => inventoryAiHandler(req as any, res as any));
+
   app.post('/api/site-visit', async (req, res) => {
     res.setHeader('Cache-Control', 'no-store');
     try { res.json(await recordSiteVisit(req)); }
@@ -144,7 +148,7 @@ async function startServer() {
   app.get("/api/health", (req, res) => {
     const smtpConfigured = Boolean(process.env.SMTP_USER && process.env.SMTP_PASS);
     const chatbotConfigured = Boolean(process.env.GEMINI_API_KEY && process.env.SUPABASE_SERVICE_ROLE_KEY);
-    res.json({ status: "ok", smtpConfigured, chatbotConfigured,
+    res.json({ status: "ok", smtpConfigured, chatbotConfigured, inventoryAiConfigured: Boolean(process.env.GEMINI_API_KEY),
       siteVisitTrackingConfigured: Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY) });
   });
 

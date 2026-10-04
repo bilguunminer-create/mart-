@@ -5,6 +5,8 @@ import type { IScannerControls } from '@zxing/browser';
 import { Capacitor } from '@capacitor/core';
 import { Camera as CapacitorCamera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { addInventoryStock, deductInventoryByBarcode, getInventoryMovements, lookupInventoryBarcode, registerInventoryProduct, uploadProductImage, InventoryMovement } from '../services/supabaseAuth';
+import { requestInventorySuggestion } from '../services/inventoryAi';
+import { mergeInventorySuggestion, clearInventorySuggestion, type InventorySuggestion } from '../utils/inventorySuggestion';
 import { CATEGORIES } from '../data/storeData';
 
 type Props = { isOpen: boolean; onClose: () => void; accessToken: string; onChanged: () => void };
@@ -30,6 +32,15 @@ export const InventoryCameraModal: React.FC<Props> = ({ isOpen, onClose, accessT
   const [restockOf,setRestockOf]=useState<LookedUpProduct|null>(null);
   const [lookingUp,setLookingUp]=useState(false);
   const [restockQty,setRestockQty]=useState('1');
+  const [aiLoading,setAiLoading]=useState(false);
+  const [aiResult,setAiResult]=useState<InventorySuggestion|null>(null);
+  const [aiMessage,setAiMessage]=useState('');
+  const aiController=useRef<AbortController|null>(null);
+  const imageGeneration=useRef(0);
+  const cancelAi=()=>{ aiController.current?.abort(); aiController.current=null; setAiLoading(false); };
+  useEffect(()=>()=>{aiController.current?.abort();imageGeneration.current++;},[]);
+  useEffect(()=>{ if(!isOpen) { cancelAi(); imageGeneration.current++; } },[isOpen]);
+  useEffect(()=>()=>{ if(preview) URL.revokeObjectURL(preview); },[preview]);
   const [takingPhoto,setTakingPhoto]=useState(false);
   const photoInputRef=useRef<HTMLInputElement|null>(null);
   const videoRef=useRef<HTMLVideoElement|null>(null);
@@ -96,17 +107,51 @@ export const InventoryCameraModal: React.FC<Props> = ({ isOpen, onClose, accessT
     } finally { setBusy(false); }
   };
 
+  const findProductInfo=async(file:File, snapshot=form)=>{
+    cancelAi();
+    const controller=new AbortController();
+    aiController.current=controller;
+    const before={...snapshot};
+    setAiLoading(true); setAiResult(null); setAiMessage('Зургийг таньж, интернэтээс мэдээлэл хайж байна...');
+    const timeout=window.setTimeout(()=>controller.abort(),100_000);
+    try {
+      const result=await requestInventorySuggestion(accessToken,file,snapshot.barcode,controller.signal);
+      if(aiController.current!==controller||controller.signal.aborted) return;
+      setAiResult(result); setAiMessage(result.message);
+      setForm(current=>{
+        const next=mergeInventorySuggestion(current,before,result);
+        const category=REGISTER_CATEGORIES.find(c=>c.id===next.category);
+        return {...next,category_name:category?.name||current.category_name};
+      });
+    } catch(error){
+      if(aiController.current!==controller) return;
+      setAiMessage(controller.signal.aborted?'Хайлт удаж байна. Дахин оролдох эсвэл гараар бөглөнө үү.':error instanceof Error?error.message:'AI хайлт амжилтгүй байна.');
+    } finally {
+      window.clearTimeout(timeout);
+      if(aiController.current===controller){aiController.current=null;setAiLoading(false);}
+    }
+  };
+
   const chooseImage=async(file?:File)=>{
     if(!file) return;
-    setImageOk(false); setImage(file); setPreview(URL.createObjectURL(file));
-    const img=new Image(); img.onload=()=>{
+    const snapshot={...clearInventorySuggestion(form,aiResult)};
+    snapshot.category_name=REGISTER_CATEGORIES.find(c=>c.id===snapshot.category)?.name||snapshot.category_name;
+    setForm(snapshot);
+    cancelAi(); setAiResult(null); setAiMessage('');
+    const generation=++imageGeneration.current;
+    setImageOk(false); setImage(file);
+    const url=URL.createObjectURL(file);
+    setPreview(url);
+    const img=new Image();
+    img.onload=()=>{
+      if(generation!==imageGeneration.current) return;
       const ok=img.naturalWidth>=900&&img.naturalHeight>=900&&file.size>=40*1024&&file.size<=5*1024*1024;
       setImageOk(ok);
-      setMessage(ok?'✓ Зургийн чанар хангалттай байна. Дараагийн алхам руу шилжиж байна...':'Зураг бүдэг эсвэл хэт жижиг байж болзошгүй. 900×900-аас дээш, тод зураг дахин авна уу.');
-      if(ok) window.setTimeout(()=>setStep(3),700);
+      setMessage(ok?'✓ Зургийн чанар хангалттай байна.':'900×900-аас дээш, 40 КБ–5 МБ хэмжээтэй тод зураг оруулна уу.');
+      if(ok){setStep(3);void findProductInfo(file,snapshot);}
     };
-    img.onerror=()=>setMessage('Зураг уншигдсангүй. Өөр зураг сонгох эсвэл дахин зураг авна уу.');
-    img.src=URL.createObjectURL(file);
+    img.onerror=()=>{if(generation===imageGeneration.current)setMessage('Зураг уншигдсангүй. Өөр зураг сонгоно уу.');};
+    img.src=url;
   };
 
   const takePhoto=async()=>{
@@ -190,6 +235,7 @@ export const InventoryCameraModal: React.FC<Props> = ({ isOpen, onClose, accessT
   const register=async()=>{
     if(!image||!imageOk){ setMessage('Шаардлага хангасан барааны зураг авна уу.'); return; }
     if(!form.barcode||!form.name||!form.stock||!form.price){ setMessage('Зураг, barcode, нэр, тоо, үнийг заавал бөглөнө.'); return; }
+    cancelAi(); setAiResult(null); setAiMessage('');
     setBusy(true); setMessage('');
     try {
       const imageUrl=await uploadProductImage(accessToken,image);
@@ -216,10 +262,10 @@ export const InventoryCameraModal: React.FC<Props> = ({ isOpen, onClose, accessT
     <div className="mx-auto min-h-full w-full max-w-2xl rounded-3xl bg-white shadow-2xl">
       <header className="sticky top-0 z-10 flex items-center justify-between rounded-t-3xl bg-stone-950 p-4 text-white">
         <div><h2 className="font-black">Агуулах · Камер ба Barcode</h2><p className="text-xs text-stone-300">Бараа бүртгэл, борлуулалтын хасалт, хөдөлгөөний түүх</p></div>
-        <button onClick={()=>{stopCamera();onClose();}} className="rounded-xl p-2 hover:bg-white/10"><X /></button>
+        <button onClick={()=>{stopCamera();cancelAi();imageGeneration.current++;onClose();}} className="rounded-xl p-2 hover:bg-white/10"><X /></button>
       </header>
       <div className="flex border-b border-stone-200">
-        {[['register','Бараа бүртгэх',PackagePlus],['deduct','Борлуулалт хасах',MinusCircle],['history','Түүх',History]].map(([id,label,Icon])=><button key={String(id)} onClick={()=>{stopCamera();setTab(id as Tab);}} className={`flex-1 p-3 text-xs font-bold ${tab===id?'border-b-2 border-rose-600 text-rose-700':'text-stone-500'}`}><Icon className="mr-1 inline h-4 w-4"/>{String(label)}</button>)}
+        {[['register','Бараа бүртгэх',PackagePlus],['deduct','Борлуулалт хасах',MinusCircle],['history','Түүх',History]].map(([id,label,Icon])=><button key={String(id)} onClick={()=>{stopCamera();cancelAi();imageGeneration.current++;setTab(id as Tab);}} className={`flex-1 p-3 text-xs font-bold ${tab===id?'border-b-2 border-rose-600 text-rose-700':'text-stone-500'}`}><Icon className="mr-1 inline h-4 w-4"/>{String(label)}</button>)}
       </div>
       <main className="space-y-4 p-4 sm:p-6">
         {message&&<div className="rounded-xl bg-amber-50 p-3 text-sm text-amber-900">{message}</div>}
@@ -265,8 +311,16 @@ export const InventoryCameraModal: React.FC<Props> = ({ isOpen, onClose, accessT
           </>}
 
           {step===3&&!restockOf&&<>
+            <section className="rounded-2xl border border-blue-200 bg-blue-50 p-4" aria-live="polite">
+              <h3 className="font-bold">AI · Барааны мэдээлэл</h3>
+              <p className="mt-1 text-sm">{aiMessage||'Зураг болон barcode-оор мэдээлэл хайж, монголоор бөглөнө.'}</p>
+              <p className="mt-1 text-xs text-stone-600">AI-ийн саналыг шалгаж засаарай. Үнэ, үлдэгдэл, гарал үүслийг та оруулна.</p>
+              {aiResult?.sources.length ? <ul className="mt-2 space-y-1 text-xs">{aiResult.sources.map(source=><li key={source.url}><a href={source.url} target="_blank" rel="noopener noreferrer" className="text-blue-800 underline">{source.title}</a></li>)}</ul> : null}
+              {aiResult?.searchHtml&&<iframe title="Google хайлтын санал" srcDoc={aiResult.searchHtml} sandbox="allow-popups allow-popups-to-escape-sandbox" referrerPolicy="no-referrer" className="mt-2 h-32 w-full border-0"/>}
+              {aiLoading ? <button type="button" onClick={()=>{cancelAi();setAiMessage('AI хайлтыг зогсоолоо. Гараар бөглөж болно.');}} className="mt-2 text-xs font-bold underline">Хүлээлгүй гараар бөглөх</button> : <button type="button" disabled={!image||!imageOk||busy} onClick={()=>image&&void findProductInfo(image)} className="mt-2 text-xs font-bold underline disabled:opacity-50">AI-аар дахин хайх</button>}
+            </section>
             <section className="rounded-2xl border p-4">
-              <div className="mb-1 flex items-center justify-between"><h3 className="font-black">3. Барааны мэдээлэл</h3><button type="button" onClick={()=>setStep(2)} className="text-xs font-bold text-stone-500 cursor-pointer">← Буцах</button></div>
+              <div className="mb-1 flex items-center justify-between"><h3 className="font-black">3. Барааны мэдээлэл</h3><button type="button" onClick={()=>{cancelAi();setStep(2);}} className="text-xs font-bold text-stone-500 cursor-pointer">← Буцах</button></div>
               <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
                 {[['name','Барааны нэр'],['stock','Тоо ширхэг'],['price','Зарах үнэ (₮)'],['weight','Жин / савалгаа']].map(([key,label])=><label key={key} className="text-xs font-bold">{label}<input value={(form as any)[key]} type={key==='stock'||key==='price'?'number':'text'} onChange={e=>setField(key,e.target.value)} className="mt-1 w-full rounded-xl border p-3 font-normal"/></label>)}
                 <label className="text-xs font-bold">Гарал үүсэл<select value={form.origin} onChange={e=>setField('origin',e.target.value)} className="mt-1 w-full rounded-xl border p-3 font-normal">{ORIGINS.map(o=><option key={o} value={o}>{o}</option>)}</select></label>
