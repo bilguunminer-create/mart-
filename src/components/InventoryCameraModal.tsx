@@ -171,7 +171,13 @@ export const InventoryCameraModal: React.FC<Props> = ({ isOpen, onClose, accessT
       setMessage(ok?'✓ Зургийн чанар хангалттай байна.':!bigEnough?'Зураг 900×900-аас жижиг байна. Барааг ойроос, тод авна уу.':'Зургийг боловсруулж чадсангүй. Дахин авах эсвэл галерейгаас сонгоно уу.');
       if(ok){setStep(3);void findProductInfo(ready,snapshot);}
     };
-    img.onerror=()=>{if(generation===imageGeneration.current)setMessage('Зураг уншигдсангүй. Өөр зураг сонгоно уу.');};
+    img.onerror=()=>{
+      if(generation!==imageGeneration.current) return;
+      const heic=/hei[cf]/i.test(file.type)||/\.hei[cf]$/i.test(file.name);
+      setMessage(heic
+        ?'Утас зургийг HEIC форматаар хадгалсан тул уншигдсангүй. Камерын тохиргоо → Формат → "Most compatible" (JPEG) болгоод дахин авна уу.'
+        :'Зураг уншигдсангүй ('+(file.type||file.name.split('.').pop()||'тодорхойгүй формат')+', '+Math.round(file.size/1024)+' КБ). Дахин авах эсвэл галерейгаас сонгоно уу.');
+    };
     img.src=url;
   };
 
@@ -186,18 +192,20 @@ export const InventoryCameraModal: React.FC<Props> = ({ isOpen, onClose, accessT
     try {
       const photo=await CapacitorCamera.getPhoto({
         source:CameraSource.Camera,
-        resultType:CameraResultType.Uri,
+        resultType:CameraResultType.Base64,
         quality:90,
         width:2000,
         height:2000,
         correctOrientation:true,
         saveToGallery:false,
       });
-      if(!photo.webPath) throw new Error('Missing photo');
-      const response=await fetch(photo.webPath);
-      if(!response.ok) throw new Error('Photo could not be loaded');
-      const blob=await response.blob();
-      await chooseImage(new File([blob], 'inventory-'+Date.now()+'.'+photo.format, {type:blob.type||'image/jpeg'}));
+      // Base64 avoids fetching the webPath file URL, which fails to decode on some Android WebViews.
+      if(!photo.base64String) throw new Error('Missing photo');
+      const binary=atob(photo.base64String);
+      const bytes=new Uint8Array(binary.length);
+      for(let i=0;i<binary.length;i++) bytes[i]=binary.charCodeAt(i);
+      const format=photo.format==='png'||photo.format==='webp'?photo.format:'jpeg';
+      await chooseImage(new File([bytes], 'inventory-'+Date.now()+'.'+(format==='jpeg'?'jpg':format), {type:'image/'+format}));
     } catch(error){
       const reason=error instanceof Error?error.message:String(error);
       if(!/cancel/i.test(reason)) setMessage('Камерын зураг авах боломжгүй байна. Утасны тохиргооноос аппын камерын зөвшөөрлийг шалгаад дахин оролдоно уу.');
