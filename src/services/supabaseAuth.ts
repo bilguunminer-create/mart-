@@ -213,12 +213,22 @@ export async function saveStoreOrder(token: string, order: {
     }, token);
   } catch (error) {
     const message = error instanceof Error ? error.message : '';
-    if (message.includes('OUT_OF_STOCK')) {
-      throw new Error('Сонгосон барааны үлдэгдэл өөрчлөгдсөн байна. Сагсаа шинэчлээд тухайн барааны тоог багасган дахин захиална уу.');
-    }
+    const friendly = CHECKOUT_ERRORS.find(([code]) => message.includes(code));
+    if (friendly) throw new Error(friendly[1]);
     throw error;
   }
 }
+
+// Database checkout exceptions are machine codes; customers need plain messages.
+const CHECKOUT_ERRORS: Array<[string, string]> = [
+  ['OUT_OF_STOCK', 'Сонгосон барааны үлдэгдэл өөрчлөгдсөн байна. Сагсаа шинэчлээд тухайн барааны тоог багасган дахин захиална уу.'],
+  ['PRICE_CHANGED', 'Үнэ эсвэл хөнгөлөлт өөрчлөгдсөн байна. Хуудсаа дахин ачаалж шинэ дүнг шалгаад дахин захиална уу.'],
+  ['PRODUCT_UNAVAILABLE', 'Сагсанд байгаа зарим бараа одоогоор худалдаанд байхгүй байна. Сагсаа шалгаад дахин оролдоно уу.'],
+  ['ORDER_LIMIT', 'Нэг цагт хэт олон захиалга өгсөн байна. Түр хүлээгээд дахин оролдоно уу.'],
+  ['LOGIN_REQUIRED', 'Захиалга өгөхийн тулд и-мэйлээ баталгаажуулсан бүртгэлээр дахин нэвтэрнэ үү.'],
+  ['STORE_UNAVAILABLE', 'Дэлгүүрийн систем түр ажиллахгүй байна. Түр хүлээгээд дахин оролдоно уу.'],
+  ['INVALID_ORDER', 'Захиалгын мэдээлэл дутуу эсвэл буруу байна. Нэр (2+ тэмдэгт), 8 оронтой утас, хаяг (5+ тэмдэгт)-аа шалгана уу.'],
+];
 
 
 export type LoyaltyWallet = { available_points: number; lifetime_earned: number };

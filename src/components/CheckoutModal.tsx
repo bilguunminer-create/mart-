@@ -132,7 +132,9 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
   const validateForm = () => {
     const newErrors: { [key: string]: string } = {};
+    // Mirror the database checkout limits so customers see the reason before submitting.
     if (!customerName.trim()) newErrors.name = 'Нэрээ оруулна уу';
+    else if (customerName.trim().length < 2 || customerName.trim().length > 120) newErrors.name = 'Нэр 2–120 тэмдэгттэй байна';
     if (!phone.trim()) {
       newErrors.phone = 'Утасны дугаараа оруулна уу';
     } else if (!/^[0-9]{8}$/.test(phone.replace(/\s+/g, ''))) {
@@ -141,7 +143,10 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     if (email.trim() && (!email.includes('@') || !email.includes('.'))) {
       newErrors.email = 'Зөв и-мэйл хаяг оруулна уу (жишээ: bat@gmail.com)';
     }
-    if (!address.trim()) newErrors.address = 'Хүргүүлэх хаяг, байр, орц, тоотоо тодорхой бичнэ үү';
+    if (address.trim().length < 5) newErrors.address = 'Хүргүүлэх хаяг, байр, орц, тоотоо тодорхой бичнэ үү';
+    else if (address.trim().length > 500) newErrors.address = 'Хаяг хамгийн ихдээ 500 тэмдэгттэй байна';
+    const orderNote = isDalanzadgadDelivery ? notes : `УНААНД ТАВЬЖ ӨГӨХ ЗАХИАЛГА. ${notes}`.trim();
+    if (orderNote.length > 1000) newErrors.form = 'Нэмэлт тайлбар хэт урт байна. 950 тэмдэгтээс богино бичнэ үү.';
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;

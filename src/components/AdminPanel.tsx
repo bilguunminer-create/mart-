@@ -295,9 +295,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     };
   }, [onLogout, onClose]);
 
-  // Reset confirmation
-  const [showResetConfirm, setShowResetConfirm] = useState(false);
-
   // Loyalty Management state
   const [loyaltySearch, setLoyaltySearch] = useState('');
   const [loyaltyFilter, setLoyaltyFilter] = useState<'all' | 'gold' | 'silver' | 'bronze' | 'standard'>('all');
@@ -540,9 +537,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
   // Filter products
   const filteredProducts = products.filter((prod) => {
-    const matchesSearch = prod.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          prod.category_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          prod.id.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesSearch = (prod.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          (prod.category_name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          String(prod.id).toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCat = selectedCategory === 'all' || prod.category === selectedCategory;
     const matchesOrigin = selectedOrigin === 'ALL' || prod.origin === selectedOrigin;
     
@@ -2684,40 +2681,17 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   <RotateCcw className="w-5 h-5" />
                 </div>
                 <div>
-                  <h4 className="font-bold text-stone-900 text-sm">Каталогийг анхны хэвэнд нь оруулах</h4>
-                  <p className="text-xs text-stone-500">Хэрэв өгөгдлөө алдаатай оруулсан бол анхдагч 24 барааг буцааж сэргээнэ</p>
+                  <h4 className="font-bold text-stone-900 text-sm">Каталогийг төв сангаас дахин ачаалах</h4>
+                  <p className="text-xs text-stone-500">«Каталогийн мэдээлэл өөрчлөгдсөн байна» гэсэн алдаа гарвал хамгийн сүүлийн хувилбарыг татаж авна. Юу ч устгахгүй.</p>
                 </div>
               </div>
 
-              {!showResetConfirm ? (
-                <button
-                  onClick={() => setShowResetConfirm(true)}
-                  className="px-4 py-2 border border-rose-300 text-rose-600 hover:bg-rose-50 text-xs font-bold rounded-xl cursor-pointer"
-                >
-                  Анхны каталогийг сэргээх
-                </button>
-              ) : (
-                <div className="p-4 bg-rose-50 rounded-xl border border-rose-200 space-y-3 text-xs text-rose-900">
-                  <p className="font-bold">Та өөрийн нэмсэн болон өөрчилсөн бараануудыг устгаад анхны төлөвт нь оруулахдаа итгэлтэй байна уу?</p>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => {
-                        onResetProducts();
-                        setShowResetConfirm(false);
-                      }}
-                      className="px-3.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-lg cursor-pointer"
-                    >
-                      Тийм, сэргээ
-                    </button>
-                    <button
-                      onClick={() => setShowResetConfirm(false)}
-                      className="px-3.5 py-1.5 bg-white border border-stone-300 text-stone-700 font-bold rounded-lg cursor-pointer"
-                    >
-                      Болих
-                    </button>
-                  </div>
-                </div>
-              )}
+              <button
+                onClick={onResetProducts}
+                className="px-4 py-2 border border-stone-300 text-stone-700 hover:bg-stone-50 text-xs font-bold rounded-xl cursor-pointer"
+              >
+                Дахин ачаалах
+              </button>
               {/* Loyalty System Configuration in Settings */}
               <div className="bg-stone-50 p-4 sm:p-5 rounded-2xl border border-stone-200 space-y-3">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">

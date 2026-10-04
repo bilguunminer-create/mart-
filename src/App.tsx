@@ -96,9 +96,11 @@ export default function App() {
     return new Date().getDay();
   });
 
-  // The public catalog is loaded from Supabase. PRODUCTS is only the first render fallback.
-  const [products, setProducts] = useState<Product[]>(PRODUCTS);
-  const [comboPacks, setComboPacks] = useState<ComboPack[]>(COMBOS);
+  // The public catalog is loaded from Supabase. Start empty so customers never see
+  // the built-in sample items and prices before (or instead of) the real catalog.
+  const [products, setProducts] = useState<Product[]>([]);
+  const [comboPacks, setComboPacks] = useState<ComboPack[]>([]);
+  const [catalogStatus, setCatalogStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [preorderProducts, setPreorderProducts] = useState<PreorderProduct[]>([]);
   const [preorderLoaded, setPreorderLoaded] = useState(false);
   const [preorderLoading, setPreorderLoading] = useState(true);
@@ -141,9 +143,9 @@ export default function App() {
         loadedChatbotSettings.workHours = settings.data.work_hours;
       }
       setChatbotSettings(loadedChatbotSettings);
+      // A missing product list must not skip the delivery/bank settings below.
       const remoteProducts = settings.data.products;
-      if (!Array.isArray(remoteProducts)) return;
-      setProducts(remoteProducts.map((product: any) => {
+      if (Array.isArray(remoteProducts)) setProducts(remoteProducts.map((product: any) => {
         const stock = Number(product.stock_quantity ?? product.stock ?? (product.in_stock ? 15 : 0));
         return {
           ...product,
@@ -168,7 +170,8 @@ export default function App() {
         storeAddress: String(settings.data.store_address ?? STORE_CONFIG.location),
         unpaidCancellationMinutes: Number(settings.data.unpaid_cancellation_minutes ?? 60),
       });
-    }).catch(() => { /* The built-in catalog remains visible if the network is unavailable. */ })
+      setCatalogStatus('ready');
+    }).catch(() => setCatalogStatus('error'))
       .finally(() => setPreorderLoading(false));
   }, []);
 
@@ -760,9 +763,21 @@ export default function App() {
       });
   };
 
+  // Reload the real catalog from the central store (e.g. after a save conflict).
+  // Replacing it locally with the built-in sample items only hid the live catalog
+  // and made every later save fail the baseline check.
   const handleResetProducts = () => {
-    setProducts(PRODUCTS);
-    showToast('Каталог анхдагч 24 бараагаар сэргээгдлээ');
+    const generation = ++inventoryRefreshGeneration.current;
+    void getStoreSettings().then((settings) => {
+      if (generation !== inventoryRefreshGeneration.current) return;
+      if (!Array.isArray(settings.data.products)) throw new Error('Missing catalog');
+      setProducts(settings.data.products.map((product) => {
+        const stock = Number(product.stock_quantity ?? product.stock ?? (product.in_stock ? 15 : 0));
+        return { ...product, stock_quantity: stock, in_stock: Boolean(product.in_stock) && stock > 0 };
+      }) as Product[]);
+      if (Array.isArray(settings.data.combo_packs)) setComboPacks(settings.data.combo_packs as ComboPack[]);
+      showToast('Каталог төв сангаас дахин ачаалагдлаа.');
+    }).catch(() => showToast('Каталогийг дахин ачаалж чадсангүй. Сүлжээгээ шалгаад дахин оролдоно уу.'));
   };
 
   const handleAdminLogout = () => {
@@ -995,10 +1010,11 @@ export default function App() {
       // Search filter
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase().trim();
-        const matchTitle = product.name.toLowerCase().includes(q);
-        const matchDesc = product.description.toLowerCase().includes(q);
-        const matchCategory = product.category_name.toLowerCase().includes(q);
-        const matchCountry = product.country.toLowerCase().includes(q);
+        // Products registered from the warehouse app may omit optional text fields.
+        const matchTitle = (product.name || '').toLowerCase().includes(q);
+        const matchDesc = (product.description || '').toLowerCase().includes(q);
+        const matchCategory = (product.category_name || '').toLowerCase().includes(q);
+        const matchCountry = (product.country || '').toLowerCase().includes(q);
         if (!matchTitle && !matchDesc && !matchCategory && !matchCountry) {
           return false;
         }
@@ -1028,6 +1044,11 @@ export default function App() {
       return true;
     });
   }, [products, searchQuery, selectedCategory, selectedOrigin, showDealsOnly, selectedDay, currentDeal]);
+
+  // A featured product that was later unpublished or sold out is not advertised.
+  const featuredProduct = featuredProductId
+    ? products.find((p) => p.id === featuredProductId && p.published !== false && p.in_stock && Number(p.stock_quantity ?? 1) > 0)
+    : undefined;
 
   // The installed warehouse app is single-purpose: it must never show the public
   // storefront underneath. Before admin login it shows only a focused login screen;
@@ -1333,7 +1354,7 @@ export default function App() {
         />
 
         {/* Curated Combos Section */}
-        {featuredProductId && products.find(p=>p.id===featuredProductId) && <button type="button" onClick={()=>setDetailProduct(products.find(p=>p.id===featuredProductId)!)} className="mb-6 flex w-full items-center gap-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-left"><img src={products.find(p=>p.id===featuredProductId)!.image} className="h-16 w-16 rounded-xl object-cover" /><div><p className="text-xs font-bold text-amber-700">ӨНӨӨДРИЙН ОНЦЛОХ БАРАА</p><p className="font-black text-stone-900">{products.find(p=>p.id===featuredProductId)!.name}</p><p className="font-bold text-rose-600">{formatMNT(products.find(p=>p.id===featuredProductId)!.price)}</p></div></button>}
+        {featuredProduct && <button type="button" onClick={()=>setDetailProduct(featuredProduct)} className="mb-6 flex w-full items-center gap-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-left"><img src={featuredProduct.image} className="h-16 w-16 rounded-xl object-cover" /><div><p className="text-xs font-bold text-amber-700">ӨНӨӨДРИЙН ОНЦЛОХ БАРАА</p><p className="font-black text-stone-900">{featuredProduct.name}</p><p className="font-bold text-rose-600">{formatMNT(featuredProduct.price)}</p></div></button>}
         <CombosSection
           combos={comboPacks.filter((combo) => combo.published !== false)}
           products={products}
@@ -1557,7 +1578,24 @@ export default function App() {
           )}
 
           {/* Product Grid */}
-          {filteredProducts.length === 0 ? (
+          {catalogStatus !== 'ready' && products.length === 0 ? (
+            <div className="bg-white rounded-3xl p-12 text-center border border-stone-200 shadow-xs space-y-3" role="status">
+              <h3 className="text-lg font-black text-stone-800">
+                {catalogStatus === 'loading' ? 'Бараануудыг ачаалж байна…' : 'Бараануудыг ачаалж чадсангүй'}
+              </h3>
+              {catalogStatus === 'error' && (
+                <>
+                  <p className="text-xs text-stone-500 max-w-sm mx-auto">Интернэт холболтоо шалгаад хуудсаа дахин ачаална уу.</p>
+                  <button
+                    onClick={() => window.location.reload()}
+                    className="px-4 py-2 bg-stone-900 text-white rounded-xl text-xs font-bold hover:bg-stone-800 transition-colors cursor-pointer"
+                  >
+                    Дахин ачаалах
+                  </button>
+                </>
+              )}
+            </div>
+          ) : filteredProducts.length === 0 ? (
             <div className="bg-white rounded-3xl p-12 text-center border border-stone-200 shadow-xs space-y-3">
               <div className="w-16 h-16 rounded-2xl bg-stone-100 flex items-center justify-center mx-auto text-stone-400">
                 <Filter className="w-8 h-8" />
@@ -1902,18 +1940,17 @@ export default function App() {
             (orderPhoneClean && orderPhoneClean === currentPhoneClean) ||
             (orderEmailClean && orderEmailClean === currentEmailClean)
           );
+          // Tiers count delivered orders only (excluding delivery fees) and use the
+          // admin-configured thresholds, so announce what this order unlocks once delivered.
           const prevUserSpent = isCurrentAccount ? userTotalSpent : 0;
-          const nextSpent = prevUserSpent + (order.total || 0);
+          const nextSpent = prevUserSpent + Math.max(0, (order.total || 0) - (order.deliveryFee || 0));
 
           let promotionMsg = '';
           if (isCurrentAccount) {
-            if (nextSpent >= 2000000 && prevUserSpent < 2000000) {
-              promotionMsg = ' 🎉 Баяр хүргэе! Та дээд түвшний Алтан VIP (5%) гишүүн боллоо!';
-            } else if (nextSpent >= 1000000 && prevUserSpent < 1000000) {
-              promotionMsg = ' 🎉 Баяр хүргэе! Та Мөнгөн (3%) гишүүн боллоо!';
-            } else if (nextSpent >= 500000 && prevUserSpent < 500000) {
-              promotionMsg = ' 🎉 Баяр хүргэе! Та Хүрэл (2%) гишүүн боллоо!';
-            }
+            const reached = activeLoyaltyTiers
+              .filter((tier) => tier.threshold > 0 && prevUserSpent < tier.threshold && nextSpent >= tier.threshold)
+              .sort((a, b) => b.threshold - a.threshold)[0];
+            if (reached) promotionMsg = ` 🎉 Энэ захиалга хүргэгдсэний дараа та ${reached.name} (${reached.discount_pct}%) гишүүн болно!`;
           }
 
           // Deduct stock quantity for ordered products

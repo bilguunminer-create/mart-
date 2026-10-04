@@ -16,6 +16,8 @@ export const CombosSection: React.FC<CombosSectionProps> = ({
   combos = COMBOS,
   products = PRODUCTS
 }) => {
+  // No published combos (or catalog still loading): don't show an empty section.
+  if (combos.length === 0) return null;
   return (
     <section className="my-8">
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-2 mb-5">
@@ -35,7 +37,7 @@ export const CombosSection: React.FC<CombosSectionProps> = ({
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
         {combos.map((combo) => {
-          const discountPct = Math.round(((combo.orig_price - combo.price) / combo.orig_price) * 100);
+          const discountPct = combo.orig_price > 0 ? Math.round(((combo.orig_price - combo.price) / combo.orig_price) * 100) : 0;
           
           return (
             <div

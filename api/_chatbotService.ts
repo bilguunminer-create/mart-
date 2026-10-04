@@ -6,7 +6,7 @@ const DEFAULT_SUPABASE_URL = 'https://rebtikccivjcsxieeyxe.supabase.co';
 const DEFAULT_MODEL = 'gemini-3.8-flash';
 const HUMAN_HANDOFF_MESSAGE = 'Таны хүсэлтийг дэлгүүрийн админд шилжүүллээ. Админ боломжтой болмогц энэ чатаар хариу өгнө.';
 
-type AuthUser = { id: string; email?: string };
+type AuthUser = { id: string; email?: string; email_confirmed_at?: string | null; is_anonymous?: boolean };
 type SupportRow = { sender: 'customer' | 'admin' | 'bot'; message: string; created_at: string };
 type ThreadState = { customer_id: string; bot_enabled: boolean; needs_human: boolean };
 type StoreSettingsRow = { data?: Record<string, unknown> };
@@ -58,7 +58,12 @@ async function authenticateUser(supabaseUrl: string, serviceRoleKey: string, tok
     headers: { apikey: serviceRoleKey, Authorization: `Bearer ${token}` },
   });
   if (!response.ok) throw new ChatbotServiceError(401, 'Нэвтрэх хугацаа дууссан байна. Дахин нэвтэрнэ үү.');
-  return readJson<AuthUser>(response);
+  const user = await readJson<AuthUser>(response);
+  // Same rule as checkout: only verified store accounts may spend AI requests.
+  if (!user.id || !user.email_confirmed_at || user.is_anonymous) {
+    throw new ChatbotServiceError(401, 'И-мэйлээ баталгаажуулсан бүртгэлээр нэвтэрнэ үү.');
+  }
+  return user;
 }
 
 async function getThreadState(supabaseUrl: string, serviceRoleKey: string, customerId: string): Promise<ThreadState> {
