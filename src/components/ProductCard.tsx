@@ -147,9 +147,11 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           </h3>
 
           {/* Description snippet */}
-          <p className="text-stone-600 text-xs mt-1.5 line-clamp-2 leading-relaxed">
-            {product.description}
-          </p>
+          {product.description?.trim() && (
+            <p className="text-stone-600 text-xs mt-1.5 line-clamp-2 leading-relaxed">
+              {product.description}
+            </p>
+          )}
         </div>
 
         {/* Bottom Price and Actions */}

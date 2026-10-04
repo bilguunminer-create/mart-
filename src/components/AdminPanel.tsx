@@ -1145,7 +1145,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                         {prod.name}
                       </h4>
                       <p className="text-[11px] text-stone-500 mt-1 line-clamp-1">
-                        {prod.weight} • {prod.description}
+                        {[prod.weight, prod.description].map(part => part?.trim()).filter(Boolean).join(' • ')}
                       </p>
                     </div>
 

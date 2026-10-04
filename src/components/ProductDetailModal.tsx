@@ -198,9 +198,12 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             </div>
           </div>
 
-          <p className="text-stone-600 text-sm leading-relaxed bg-stone-50 p-4 rounded-2xl border border-stone-100">
-            {product.description}
-          </p>
+          {/* Skip the box when there is no description so the details below move up. */}
+          {product.description?.trim() && (
+            <p className="text-stone-600 text-sm leading-relaxed bg-stone-50 p-4 rounded-2xl border border-stone-100">
+              {product.description}
+            </p>
+          )}
 
           <div className="grid grid-cols-2 gap-3 text-xs text-stone-600 pt-1">
             <div className="flex items-center gap-2 bg-stone-50 p-2.5 rounded-xl border border-stone-100">
