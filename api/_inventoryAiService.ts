@@ -7,6 +7,32 @@ const EMPTY = { name: '', description: '', weight: '', category: '' };
 export class InventoryAiError extends Error {
   constructor(public status: number, message: string) { super(message); }
 }
+// Never echo provider messages: they can contain keys, URLs or request data.
+export function inventoryProviderError(error: unknown): InventoryAiError {
+  const detail = error as { status?: number; message?: string; name?: string } | null;
+  const status = Number(detail?.status || 0);
+  const message = typeof detail?.message === 'string' ? detail.message : '';
+  if (/API_KEY_INVALID|API key not valid|API key expired|reported as leaked/i.test(message) || status === 401)
+    return new InventoryAiError(503, '[AI_KEY] Gemini түлхүүр хүчингүй эсвэл хаагдсан байна. Google AI Studio-оос шинэ түлхүүр авч серверт тохируулна уу.');
+  if (status === 402 || /billing|prepay|payment|FAILED_PRECONDITION/i.test(message))
+    return new InventoryAiError(503, '[AI_BILLING] Gemini төслийн төлбөрийн тохиргоо эсвэл үйлчилгээний эрхийг Google AI Studio дээр шалгана уу.');
+  if (status === 429 || /RESOURCE_EXHAUSTED/i.test(message))
+    return new InventoryAiError(429, '[AI_QUOTA] Gemini хүсэлтийн квотод хүрсэн байна. Google AI Studio дээр квот, төлбөрийн төлөвөө шалгах эсвэл түр хүлээгээд дахин оролдоно уу.');
+  if (status === 403)
+    return new InventoryAiError(503, '[AI_PERMISSION] Энэ түлхүүр Gemini API ашиглах эрхгүй байна. API restrictions болон төслийн эрхийг шалгана уу.');
+  if (status === 404)
+    return new InventoryAiError(503, '[AI_MODEL] Сонгосон Gemini загвар энэ төсөлд олдохгүй эсвэл дэмжигдэхгүй байна. Серверийн загварын тохиргоог засах шаардлагатай.');
+  if (status === 400 && /tool|search|grounding|response.?mime|schema|structured|json mode/i.test(message))
+    return new InventoryAiError(502, '[AI_REQUEST] Gemini зураг, хайлт, JSON хариуг хамтад нь авах тохиргоог хүлээн авсангүй. Хайлтын кодыг засах шаардлагатай.');
+  if (status === 400)
+    return new InventoryAiError(502, '[AI_INPUT] Gemini зургийн хүсэлтийг хүлээн авсангүй. Өөр тод зураг авч дахин оролдоно уу.');
+  if (status === 408 || status === 504 || /timeout|timed out|abort/i.test(message + ' ' + detail?.name))
+    return new InventoryAiError(504, '[AI_TIMEOUT] Gemini хариу удаж байна. Түр хүлээгээд дахин оролдох эсвэл гараар бөглөнө үү.');
+  if (status >= 500)
+    return new InventoryAiError(503, '[AI_UNAVAILABLE] Gemini үйлчилгээ түр алдаатай байна. Түр хүлээгээд дахин оролдоно уу.');
+  return new InventoryAiError(502, '[AI_CONNECTION] Gemini холболт амжилтгүй байна. Түр хүлээгээд дахин оролдох эсвэл гараар бөглөнө үү.');
+}
+
 type Request = { headers: Record<string, unknown>; body?: unknown };
 type Dependencies = {
   fetcher?: typeof fetch;
@@ -74,7 +100,7 @@ export async function lookupInventoryProduct(req: Request, deps: Dependencies = 
   });
   if (!admin.ok) throw new InventoryAiError(403, 'Зөвхөн агуулахын админ AI хайлт ашиглана.');
   if (!checkRateLimit('inventory-ai:' + user.id, 10, 10 * 60_000)) throw new InventoryAiError(429, 'AI хайлтын түр хязгаарт хүрлээ. Дараа дахин оролдох эсвэл гараар бөглөнө үү.');
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey = process.env.GEMINI_API_KEY?.trim();
   if (!apiKey) throw new InventoryAiError(503, 'Gemini API түлхүүр серверт тохируулагдаагүй байна. Одоогоор гараар бөглөнө үү.');
   const generate = deps.generate || ((params) => new GoogleGenAI({ apiKey }).models.generateContent(params));
   try {
@@ -98,6 +124,8 @@ export async function lookupInventoryProduct(req: Request, deps: Dependencies = 
     return parseInventorySuggestion(response);
   } catch (error) {
     if (error instanceof InventoryAiError) throw error;
-    throw new InventoryAiError(502, 'AI хайлт одоогоор амжилтгүй байна. Дахин оролдох эсвэл гараар бөглөнө үү.');
+    const safeError = inventoryProviderError(error);
+    console.error('[Inventory AI]', { code: safeError.message.match(/\[([A-Z_]+)\]/)?.[1], providerStatus: Number((error as { status?: number })?.status) || 0 });
+    throw safeError;
   }
 }

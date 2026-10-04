@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { InventoryAiError, lookupInventoryProduct, parseInventorySuggestion, validateInventoryImage } from '../api/_inventoryAiService';
+import { inventoryProviderError, InventoryAiError, lookupInventoryProduct, parseInventorySuggestion, validateInventoryImage } from '../api/_inventoryAiService';
 import { mergeInventorySuggestion, clearInventorySuggestion } from '../src/utils/inventorySuggestion';
 
 const body = { barcode: '8801234567890', image: 'data:image/jpeg;base64,/9j/AA==' };
@@ -91,6 +91,15 @@ test('late AI results preserve user edits, price, stock, barcode and origin', ()
   for (const key of ['price', 'stock', 'barcode', 'origin']) assert.equal(merged[key], current[key]);
 });
 
+test('AI never overwrites text entered before the request started', () => {
+  const before = { name: 'Өмнө бичсэн нэр', description: '', weight: '500 г', category: 'food' };
+  const merged = mergeInventorySuggestion({ ...before }, before, parseInventorySuggestion(response()));
+  assert.equal(merged.name, 'Өмнө бичсэн нэр');
+  assert.equal(merged.weight, '500 г');
+  assert.equal(merged.description, 'Солонгос гоймон');
+  assert.equal(merged.category, 'food');
+});
+
 test('replacing a photo clears old AI values but keeps manual corrections', () => {
   const previous = parseInventorySuggestion(response());
   const current = { ...previous.fields, name: 'Гараар зассан нэр', price: '5000' };
@@ -99,4 +108,18 @@ test('replacing a photo clears old AI values but keeps manual corrections', () =
   assert.equal(cleared.description, '');
   assert.equal(cleared.weight, '');
   assert.equal(cleared.price, '5000');
+});
+
+test('provider failures distinguish setup, quota, model and request errors without exposing secrets', () => {
+  const cases: [number, string, string][] = [
+    [400, 'API key not valid', 'AI_KEY'], [403, 'Forbidden', 'AI_PERMISSION'],
+    [429, 'RESOURCE_EXHAUSTED', 'AI_QUOTA'], [402, 'payment required', 'AI_BILLING'],
+    [404, 'model not found', 'AI_MODEL'], [400, 'response mime JSON unsupported with tools', 'AI_REQUEST'],
+    [400, 'invalid image', 'AI_INPUT'], [504, 'deadline exceeded', 'AI_TIMEOUT'], [503, 'unavailable', 'AI_UNAVAILABLE'],
+  ];
+  for (const [status, message, code] of cases) {
+    const result = inventoryProviderError({ status, message: message + ' secret-key-value' });
+    assert.ok(result.message.includes('[' + code + ']'));
+    assert.ok(!result.message.includes('secret-key-value'));
+  }
 });
