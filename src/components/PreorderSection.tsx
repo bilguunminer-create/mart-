@@ -13,6 +13,9 @@ export function PreorderImage({ image, name, className = '' }: { image: string; 
 export function PreorderSection({ products, storePhone, loading = false, error = false }: { products: PreorderProduct[]; storePhone: string; loading?: boolean; error?: boolean }) {
   const published = products.filter((product) => product.published);
   const phone = storePhone.replace(/[^+\d]/g, '');
+  // An empty "coming soon" box makes the storefront look unfinished; show the
+  // section only once there is something to order.
+  if (loading || (!error && published.length === 0)) return null;
   return (
     <section id="preorder-products" aria-labelledby="preorder-heading" className="my-8 scroll-mt-40 rounded-3xl border border-amber-200 bg-amber-50/60 p-4 sm:p-6">
       <div className="mb-5 flex items-start gap-3">

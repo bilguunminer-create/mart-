@@ -1,5 +1,5 @@
 import React from 'react';
-import { Plus, Minus, Star, ShoppingBag, Eye } from 'lucide-react';
+import { Plus, Minus, ShoppingBag, Eye } from 'lucide-react';
 import { Product } from '../types';
 import { formatMNT, DAILY_DEALS } from '../data/storeData';
 
@@ -47,15 +47,28 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   const isOutOfStock = !product.in_stock || availableStock <= 0;
   const isLowStock = !isOutOfStock && availableStock <= 5;
   const isMaxInCart = cartQuantity >= availableStock;
+  const oldPrice = isDealActive ? product.price : hasStandingSale ? product.old_price! : null;
+  const savingPercent = isDealActive ? discountPercent : standingSalePercent;
+  // One badge on the photo keeps the product visible; the most useful one wins.
+  const badge = isOutOfStock
+    ? { text: 'Түр дууссан', className: 'bg-stone-900/90 text-white' }
+    : savingPercent > 0
+      ? { text: `-${savingPercent}%`, className: 'bg-rose-600 text-white' }
+      : isLowStock
+        ? { text: 'Цөөн үлдсэн', className: 'bg-amber-500 text-stone-950' }
+        : product.badge
+          ? { text: product.badge, className: `${product.badge_color || 'bg-stone-900'} text-white` }
+          : null;
+  const details = [product.category_name, product.weight].map((part) => part?.trim()).filter(Boolean).join(' · ');
 
   return (
-    <div className={`group relative flex flex-col bg-white rounded-2xl border transition-all duration-300 ${
+    <div className={`group relative flex flex-col overflow-hidden bg-white rounded-2xl border transition-all duration-300 ${
       isOutOfStock
         ? 'border-stone-200 opacity-80'
-        : 'border-stone-200/90 hover:-translate-y-1.5 hover:shadow-xl hover:shadow-stone-900/10 hover:border-amber-300'
+        : 'border-stone-200/80 shadow-sm hover:-translate-y-1 hover:shadow-lg hover:shadow-stone-900/10'
     }`}>
-      {/* Top Image Container */}
-      <div className="relative aspect-4/3 w-full bg-stone-100 overflow-hidden cursor-pointer" onClick={() => onOpenDetail(product)}>
+      {/* Photo: square and uniform so rows line up */}
+      <div className="relative aspect-square w-full bg-stone-100 overflow-hidden cursor-pointer" onClick={() => onOpenDetail(product)}>
         <img
           src={product.image}
           alt={product.name}
@@ -66,39 +79,14 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           loading="lazy"
         />
 
-        {/* Badges Overlay */}
-        <div className="absolute top-2.5 left-2.5 flex flex-col gap-1 items-start">
-          {product.badge && (
-            <span className={`${product.badge_color} text-white text-[10px] sm:text-xs font-bold px-2 py-0.5 rounded-md shadow-xs`}>
-              {product.badge}
-            </span>
-          )}
+        {badge && (
+          <span className={`absolute top-2 left-2 ${badge.className} text-[11px] font-black px-2 py-0.5 rounded-full shadow-sm`}>
+            {badge.text}
+          </span>
+        )}
 
-          {isDealActive && !isOutOfStock && (
-            <span className="bg-rose-600 text-white text-[10px] sm:text-xs font-black px-2 py-0.5 rounded-md shadow-xs animate-pulse">
-              -{discountPercent}% Онцгой
-            </span>
-          )}
-
-          {hasStandingSale && !isOutOfStock && (
-            <span className="bg-rose-600 text-white text-[10px] sm:text-xs font-black px-2 py-0.5 rounded-md shadow-xs">
-              -{standingSalePercent}% Хямдрал
-            </span>
-          )}
-
-          {isOutOfStock ? (
-            <span className="bg-stone-900 text-rose-300 text-[10px] sm:text-xs font-bold px-2 py-0.5 rounded-md shadow-xs">
-              Түр дууссан
-            </span>
-          ) : isLowStock ? (
-            <span className="bg-amber-600 text-white text-[10px] sm:text-xs font-black px-2 py-0.5 rounded-md shadow-xs animate-pulse">
-              Цөөн: {availableStock}ш
-            </span>
-          ) : null}
-        </div>
-
-        {/* Origin Flag Badge & Admin Edit Button */}
-        <div className="absolute top-2.5 right-2.5 flex items-center gap-1.5">
+        {/* Origin flag & admin edit */}
+        <div className="absolute top-2 right-2 flex items-center gap-1.5">
           {isAdmin && onEditProduct && (
             <button
               type="button"
@@ -112,88 +100,36 @@ export const ProductCard: React.FC<ProductCardProps> = ({
               <Eye className="w-3.5 h-3.5" />
             </button>
           )}
-          <div className="bg-white/95 backdrop-blur-xs px-2 py-0.5 rounded-full text-xs font-semibold text-stone-800 shadow-xs flex items-center gap-1 border border-stone-200/60">
-            <span>{product.flag}</span>
-            <span>{product.origin === 'KR' ? 'Солонгос' : 'АНУ'}</span>
-          </div>
-        </div>
-
-        {/* Quick View Hover Button */}
-        <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
-          <span className="bg-white/90 backdrop-blur-xs text-stone-900 text-xs font-semibold px-3 py-1.5 rounded-full shadow-md flex items-center gap-1.5 transform translate-y-2 group-hover:translate-y-0 transition-transform">
-            <Eye className="w-3.5 h-3.5" /> Дэлгэрэнгүй
+          <span
+            className="w-7 h-7 rounded-full bg-white/95 shadow-sm flex items-center justify-center text-sm"
+            title={product.origin === 'KR' ? 'Солонгос' : 'АНУ'}
+          >
+            {product.flag}
           </span>
         </div>
       </div>
 
       {/* Product Content */}
-      <div className="flex-1 p-4 flex flex-col justify-between">
-        <div>
-          {/* Category & Weight */}
-          <div className="flex items-center justify-between text-[11px] text-stone-600 mb-1 font-medium">
-            <span>{product.category_name}</span>
-            {product.weight?.trim() && (
-              <span className="bg-stone-100 text-stone-700 font-semibold px-1.5 py-0.5 rounded text-[10px]">
-                {product.weight}
-              </span>
-            )}
-          </div>
+      <div className="flex-1 p-3 sm:p-4 flex flex-col">
+        {details && (
+          <p className="text-[11px] text-stone-500 font-medium truncate">{details}</p>
+        )}
+        <h3
+          onClick={() => onOpenDetail(product)}
+          className="mt-0.5 font-semibold text-stone-900 text-sm sm:text-[15px] leading-snug line-clamp-2 min-h-[2.5rem] sm:min-h-[2.75rem] hover:text-rose-600 transition-colors cursor-pointer"
+          title={product.name}
+        >
+          {product.name}
+        </h3>
 
-          {/* Title */}
-          <h3 
-            onClick={() => onOpenDetail(product)}
-            className="font-serif font-semibold text-stone-900 text-sm sm:text-base leading-snug line-clamp-2 hover:text-rose-600 transition-colors cursor-pointer"
-            title={product.name}
-          >
-            {product.name}
-          </h3>
-
-          {/* Description snippet */}
-          {product.description?.trim() && (
-            <p className="text-stone-600 text-xs mt-1.5 line-clamp-2 leading-relaxed">
-              {product.description}
-            </p>
-          )}
-        </div>
-
-        {/* Bottom Price and Actions */}
-        <div className="mt-4 pt-3 border-t border-stone-100">
-          <div className="flex items-center justify-between gap-2 mb-3">
-            <div>
-              <div className="flex items-baseline gap-1.5">
-                <span className="text-base sm:text-lg font-black text-stone-900 tracking-tight">
-                  {formatMNT(finalPrice)}
-                </span>
-                {isDealActive && (
-                  <span className="text-xs text-stone-500 line-through">
-                    {formatMNT(product.price)}
-                  </span>
-                )}
-                {hasStandingSale && (
-                  <span className="text-xs text-stone-500 line-through">
-                    {formatMNT(product.old_price!)}
-                  </span>
-                )}
-              </div>
-              <div className="flex items-center gap-1 text-[11px] text-amber-500">
-                <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
-                <span className="font-bold text-stone-800">{product.rating}</span>
-                <span className="text-stone-500">(баталгаат)</span>
-              </div>
-            </div>
-
-            {isOutOfStock ? (
-              <span className="text-[10px] font-bold text-rose-800 bg-rose-50 px-2 py-0.5 rounded-full border border-rose-200">
-                Дууссан
-              </span>
-            ) : isLowStock ? (
-              <span className="text-[10px] font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-300">
-                Үлдэгдэл {availableStock} ш
-              </span>
-            ) : (
-              <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                Үлдэгдэл {availableStock} ш
-              </span>
+        {/* Price and Actions */}
+        <div className="mt-auto pt-2">
+          <div className="flex items-baseline flex-wrap gap-x-1.5 mb-2.5">
+            <span className={`text-lg sm:text-xl font-black tracking-tight ${oldPrice ? 'text-rose-600' : 'text-stone-900'}`}>
+              {formatMNT(finalPrice)}
+            </span>
+            {oldPrice && (
+              <span className="text-xs text-stone-400 line-through">{formatMNT(oldPrice)}</span>
             )}
           </div>
 
@@ -201,7 +137,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           {isOutOfStock ? (
             <button
               disabled
-              className="w-full flex items-center justify-center gap-1.5 bg-stone-100 text-stone-400 font-semibold text-xs py-2 px-3 rounded-xl cursor-not-allowed border border-stone-200"
+              className="w-full flex items-center justify-center gap-1.5 bg-stone-100 text-stone-400 font-semibold text-xs py-2.5 px-3 rounded-xl cursor-not-allowed"
             >
               <span>Түр дууссан</span>
             </button>
@@ -237,9 +173,9 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           ) : (
             <button
               onClick={() => onAddToCart(product, 1)}
-              className="w-full flex items-center justify-center gap-1.5 bg-stone-100 hover:bg-stone-900 hover:text-white text-stone-900 font-bold text-xs sm:text-sm py-2 px-3 rounded-xl transition-all cursor-pointer group/btn"
+              className="w-full flex items-center justify-center gap-1.5 bg-stone-900 hover:bg-rose-600 active:scale-[0.98] text-white font-bold text-xs sm:text-sm py-2.5 px-3 rounded-xl transition-all cursor-pointer"
             >
-              <ShoppingBag className="w-3.5 h-3.5 text-stone-600 group-hover/btn:text-amber-400 transition-colors" />
+              <ShoppingBag className="w-4 h-4 text-amber-400" />
               <span>Сагслах</span>
             </button>
           )}

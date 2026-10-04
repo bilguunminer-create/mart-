@@ -1367,79 +1367,6 @@ export default function App() {
 
         <PreorderSection products={preorderProducts} storePhone={checkoutSettings.storePhone} loading={preorderLoading} error={!preorderLoading && !preorderLoaded} />
 
-        {/* Customer Services Duo: User Security & Registration / Google Forms */}
-        <div className={`grid grid-cols-1 gap-4 ${GOOGLE_FORMS_ENABLED ? 'md:grid-cols-2' : ''}`}>
-          {/* User Profile & Security Banner */}
-          <div className="bg-gradient-to-br from-emerald-950 via-stone-900 to-slate-900 rounded-2xl p-4 sm:p-5 text-white shadow-xs border border-emerald-800/40 flex flex-col justify-between gap-4">
-            <div className="flex items-start gap-3.5">
-              <div className="w-11 h-11 rounded-xl bg-emerald-500/20 border border-emerald-400/30 flex items-center justify-center shrink-0 p-2.5 text-emerald-400">
-                <ShieldCheck className="w-full h-full" />
-              </div>
-              <div>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <h3 className="text-sm font-bold text-white">Хэрэглэгчийн Бүртгэл & Нууцлал</h3>
-                  <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/30">
-                    ✉️ И-мэйл баталгаажуулалт
-                  </span>
-                </div>
-                <p className="text-xs text-emerald-200/90 mt-1 leading-relaxed">
-                  И-мэйлээ баталгаажуулж, нууц үгээ үүсгэн бүртгүүлээрэй. Дараа нь и-мэйл, нууц үгээрээ нэвтэрч худалдан авалтын түүх болон лояалти хөнгөлөлтөө харах боломжтой.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between pt-2 border-t border-emerald-900/50">
-              <span className="text-[11px] text-emerald-300/80">
-                {currentUser ? `Нэвтэрсэн: ${currentUser.name}` : 'Энгийн & Аюулгүй систем'}
-              </span>
-              <button
-                id="open-profile-banner-btn"
-                onClick={() => setIsProfileOpen(true)}
-                className="px-4 py-2 bg-white hover:bg-emerald-50 text-emerald-950 font-bold text-xs rounded-xl shadow-xs transition-all flex items-center justify-center gap-1.5 shrink-0 cursor-pointer"
-              >
-                <span>{currentUser ? 'Миний Профайл' : 'Бүртгүүлэх / Нэвтрэх'}</span>
-                <span className="text-emerald-600 font-black">→</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Google Forms Banner */}
-          {GOOGLE_FORMS_ENABLED && <div className="bg-gradient-to-br from-purple-950 via-indigo-950 to-slate-900 rounded-2xl p-4 sm:p-5 text-white shadow-xs border border-purple-800/40 flex flex-col justify-between gap-4">
-            <div className="flex items-start gap-3.5">
-              <div className="w-11 h-11 rounded-xl bg-purple-500/20 border border-purple-400/30 flex items-center justify-center shrink-0 p-2.5">
-                <svg className="w-full h-full" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <rect width="40" height="40" rx="8" fill="#9065D0"/>
-                  <path d="M14 12H26C27.1 12 28 12.9 28 14V26C28 27.1 27.1 28 26 28H14C12.9 28 12 27.1 12 26V14C12 12.9 12.9 12 14 12Z" fill="white"/>
-                  <path d="M16 16H24M16 20H24M16 24H21" stroke="#7248B9" strokeWidth="2" strokeLinecap="round"/>
-                </svg>
-              </div>
-              <div>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <h3 className="text-sm font-bold text-white">Захиалгат Бараа & Санал Асуулга</h3>
-                  <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-purple-400/30 text-purple-200 border border-purple-400/20">
-                    Google Forms
-                  </span>
-                </div>
-                <p className="text-xs text-purple-200/90 mt-1 leading-relaxed">
-                  АНУ & Солонгосоос захиалах барааны тусгай хүсэлт илгээх болон үйлчилгээний санал асуулга бөглөж оноо аваарай.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between pt-2 border-t border-purple-900/50">
-              <span className="text-[11px] text-purple-300/80">Оноо & тусгай хүсэлт</span>
-              <button
-                id="open-forms-banner-btn"
-                onClick={() => setIsFormsOpen(true)}
-                className="px-4 py-2 bg-white hover:bg-purple-50 text-purple-950 font-bold text-xs rounded-xl shadow-xs transition-all flex items-center justify-center gap-1.5 shrink-0 cursor-pointer"
-              >
-                <span>Судалгаа & Захиалга</span>
-                <span className="text-purple-600 font-black">→</span>
-              </button>
-            </div>
-          </div>}
-        </div>
-
         {/* Catalog Control Section: Categories, Country Origin Tabs, Filters */}
         <section id="catalog-section" className="space-y-4 pt-4 border-t border-stone-200">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
@@ -1619,7 +1546,7 @@ export default function App() {
               </button>
             </div>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-5">
               {filteredProducts.map((product) => {
                 const cartItem = cart.find((i) => i.id === product.id);
                 const quantity = cartItem ? cartItem.quantity : 0;
@@ -1644,6 +1571,81 @@ export default function App() {
             </div>
           )}
         </section>
+
+        {/* Customer Services Duo: User Security & Registration / Google Forms.
+            Shown after the catalog so products come first; the sign-up card is
+            only for visitors who are not signed in. */}
+        {(!currentUser || GOOGLE_FORMS_ENABLED) && <div className={`grid grid-cols-1 gap-4 ${GOOGLE_FORMS_ENABLED && !currentUser ? 'md:grid-cols-2' : ''}`}>
+          {/* User Profile & Security Banner */}
+          {!currentUser && <div className="bg-gradient-to-br from-emerald-950 via-stone-900 to-slate-900 rounded-2xl p-4 sm:p-5 text-white shadow-xs border border-emerald-800/40 flex flex-col justify-between gap-4">
+            <div className="flex items-start gap-3.5">
+              <div className="w-11 h-11 rounded-xl bg-emerald-500/20 border border-emerald-400/30 flex items-center justify-center shrink-0 p-2.5 text-emerald-400">
+                <ShieldCheck className="w-full h-full" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="text-sm font-bold text-white">Хэрэглэгчийн Бүртгэл & Нууцлал</h3>
+                  <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/30">
+                    ✉️ И-мэйл баталгаажуулалт
+                  </span>
+                </div>
+                <p className="text-xs text-emerald-200/90 mt-1 leading-relaxed">
+                  И-мэйлээ баталгаажуулж, нууц үгээ үүсгэн бүртгүүлээрэй. Дараа нь и-мэйл, нууц үгээрээ нэвтэрч худалдан авалтын түүх болон лояалти хөнгөлөлтөө харах боломжтой.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between pt-2 border-t border-emerald-900/50">
+              <span className="text-[11px] text-emerald-300/80">
+                {currentUser ? `Нэвтэрсэн: ${currentUser.name}` : 'Энгийн & Аюулгүй систем'}
+              </span>
+              <button
+                id="open-profile-banner-btn"
+                onClick={() => setIsProfileOpen(true)}
+                className="px-4 py-2 bg-white hover:bg-emerald-50 text-emerald-950 font-bold text-xs rounded-xl shadow-xs transition-all flex items-center justify-center gap-1.5 shrink-0 cursor-pointer"
+              >
+                <span>{currentUser ? 'Миний Профайл' : 'Бүртгүүлэх / Нэвтрэх'}</span>
+                <span className="text-emerald-600 font-black">→</span>
+              </button>
+            </div>
+          </div>}
+
+          {/* Google Forms Banner */}
+          {GOOGLE_FORMS_ENABLED && <div className="bg-gradient-to-br from-purple-950 via-indigo-950 to-slate-900 rounded-2xl p-4 sm:p-5 text-white shadow-xs border border-purple-800/40 flex flex-col justify-between gap-4">
+            <div className="flex items-start gap-3.5">
+              <div className="w-11 h-11 rounded-xl bg-purple-500/20 border border-purple-400/30 flex items-center justify-center shrink-0 p-2.5">
+                <svg className="w-full h-full" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <rect width="40" height="40" rx="8" fill="#9065D0"/>
+                  <path d="M14 12H26C27.1 12 28 12.9 28 14V26C28 27.1 27.1 28 26 28H14C12.9 28 12 27.1 12 26V14C12 12.9 12.9 12 14 12Z" fill="white"/>
+                  <path d="M16 16H24M16 20H24M16 24H21" stroke="#7248B9" strokeWidth="2" strokeLinecap="round"/>
+                </svg>
+              </div>
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="text-sm font-bold text-white">Захиалгат Бараа & Санал Асуулга</h3>
+                  <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-purple-400/30 text-purple-200 border border-purple-400/20">
+                    Google Forms
+                  </span>
+                </div>
+                <p className="text-xs text-purple-200/90 mt-1 leading-relaxed">
+                  АНУ & Солонгосоос захиалах барааны тусгай хүсэлт илгээх болон үйлчилгээний санал асуулга бөглөж оноо аваарай.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between pt-2 border-t border-purple-900/50">
+              <span className="text-[11px] text-purple-300/80">Оноо & тусгай хүсэлт</span>
+              <button
+                id="open-forms-banner-btn"
+                onClick={() => setIsFormsOpen(true)}
+                className="px-4 py-2 bg-white hover:bg-purple-50 text-purple-950 font-bold text-xs rounded-xl shadow-xs transition-all flex items-center justify-center gap-1.5 shrink-0 cursor-pointer"
+              >
+                <span>Судалгаа & Захиалга</span>
+                <span className="text-purple-600 font-black">→</span>
+              </button>
+            </div>
+          </div>}
+        </div>}
 
         {/* Benefits & Trust Strip */}
         <section className="bg-white rounded-3xl border border-stone-200/90 p-6 sm:p-8 shadow-xs">
