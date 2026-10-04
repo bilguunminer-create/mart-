@@ -57,8 +57,9 @@ export const CategoryBentoGrid: React.FC<CategoryBentoGridProps> = ({ products, 
   const heroTile = tiles.find((cat) => cat.id === HERO_CATEGORY_ID) ?? tiles[0];
   const restTiles = tiles.filter((cat) => cat.id !== heroTile.id);
 
+  // Drafts are hidden from the catalog, so they must not inflate the tile counts.
   const countFor = (categoryId: string) =>
-    products.filter((p) => p.category === categoryId && p.in_stock).length;
+    products.filter((p) => p.category === categoryId && p.in_stock && p.published !== false).length;
 
   const imagesFor = (categoryId: string) => {
     const configured = categoryImages[categoryId];
