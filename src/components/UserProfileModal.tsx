@@ -14,6 +14,12 @@ interface Props {
 type Mode = 'login' | 'signup' | 'recover' | 'reset';
 type SignupStep = 'details' | 'otp' | 'password';
 
+// Kept per tab so a reload during the password step can resume the signup.
+const SIGNUP_TOKEN_KEY = 'usk_signup_token';
+function forgetSignupToken() {
+  try { sessionStorage.removeItem(SIGNUP_TOKEN_KEY); } catch { /* storage may be disabled */ }
+}
+
 export const UserProfileModal: React.FC<Props> = ({ isOpen, onClose, user, onSaveUser, onLogoutUser, orders, activeLoyalty, totalSpent }) => {
   const [mode, setMode] = useState<Mode>('login');
   const [signupStep, setSignupStep] = useState<SignupStep>('details');
@@ -41,6 +47,18 @@ export const UserProfileModal: React.FC<Props> = ({ isOpen, onClose, user, onSav
     const timer = window.setTimeout(() => setResendSeconds(value => Math.max(0, value - 1)), 1000);
     return () => window.clearTimeout(timer);
   }, [resendSeconds]);
+
+  // Show the password step for a verified signup and remember it for this tab.
+  function resumeSignup(session: AuthSession, notice: string) {
+    try { sessionStorage.setItem(SIGNUP_TOKEN_KEY, session.access_token); } catch { /* keep the in-memory session */ }
+    setSignupSession(session);
+    setEmail(session.user.email || '');
+    setName(session.user.user_metadata?.name || '');
+    setPhone(session.user.user_metadata?.phone || '');
+    setAddress(session.user.user_metadata?.address || '');
+    setMode('signup'); setSignupStep('password');
+    setMessage(notice);
+  }
 
   async function handleAvatarChange(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -81,6 +99,21 @@ export const UserProfileModal: React.FC<Props> = ({ isOpen, onClose, user, onSav
           if (savedRecovery) {
             await getAuthUser(savedRecovery);
             if (active) { setRecoveryToken(savedRecovery); setMode('reset'); }
+            return;
+          }
+          // A verified signup that was interrupted (reload/closed tab) before the
+          // password step would otherwise leave the account with an unknown password.
+          let savedSignup: string | null = null;
+          try { savedSignup = sessionStorage.getItem(SIGNUP_TOKEN_KEY); } catch { /* storage may be disabled */ }
+          if (savedSignup) {
+            try {
+              const signupUser = await getAuthUser(savedSignup);
+              if (!signupUser.email_confirmed_at || signupUser.is_anonymous) throw new Error('unverified');
+              if (active) resumeSignup({ access_token: savedSignup, user: signupUser }, 'Бүртгэлээ дуусгахын тулд нууц үгээ үүсгэнэ үү.');
+            } catch {
+              forgetSignupToken();
+              if (active) setMessage('Бүртгэлийн баталгаажуулалтын хугацаа дууссан. «Нууц үг сэргээх» хэсгээр нууц үгээ тохируулна уу.');
+            }
           }
           return;
         }
@@ -89,13 +122,7 @@ export const UserProfileModal: React.FC<Props> = ({ isOpen, onClose, user, onSav
           try { sessionStorage.setItem('usk_recovery_token', session.access_token); } catch { /* keep the in-memory token */ }
           setRecoveryToken(session.access_token); setMode('reset');
         } else {
-          setSignupSession(session);
-          setEmail(session.user.email || '');
-          setName(session.user.user_metadata?.name || '');
-          setPhone(session.user.user_metadata?.phone || '');
-          setAddress(session.user.user_metadata?.address || '');
-          setMode('signup'); setSignupStep('password');
-          setMessage('И-мэйл баталгаажлаа. Одоо өөрийн нууц үгээ үүсгэнэ үү.');
+          resumeSignup(session, 'И-мэйл баталгаажлаа. Одоо өөрийн нууц үгээ үүсгэнэ үү.');
         }
       } catch (error) {
         if (active) {
@@ -219,8 +246,7 @@ export const UserProfileModal: React.FC<Props> = ({ isOpen, onClose, user, onSav
             return;
           }
           if (signup.session) {
-            setSignupSession(signup.session); setSignupStep('password');
-            setMessage('Одоо өөрийн нууц үгээ үүсгэнэ үү.');
+            resumeSignup(signup.session, 'Одоо өөрийн нууц үгээ үүсгэнэ үү.');
           } else {
             setSignupStep('otp'); setResendSeconds(60);
             setMessage('И-мэйлээ шалгаж баталгаажуулах холбоосыг нээнэ үү. Код ирсэн бол доор оруулна уу. Spam хавтсаа мөн шалгаарай.');
@@ -230,8 +256,8 @@ export const UserProfileModal: React.FC<Props> = ({ isOpen, onClose, user, onSav
         if (signupStep === 'otp') {
           if (!otp.trim()) throw new Error('И-мэйлээр ирсэн баталгаажуулах кодоо оруулна уу.');
           const session = await verifySignupOtp(cleanEmail, otp);
-          setSignupSession(session); setSignupStep('password'); setOtp('');
-          setMessage('Код баталгаажлаа. Одоо өөрийн нууц үгээ үүсгэнэ үү.');
+          setOtp('');
+          resumeSignup(session, 'Код баталгаажлаа. Одоо өөрийн нууц үгээ үүсгэнэ үү.');
           return;
         }
         if (!signupSession) throw new Error('Баталгаажуулалтын хугацаа дууссан байна. Кодыг дахин авна уу.');
@@ -242,6 +268,7 @@ export const UserProfileModal: React.FC<Props> = ({ isOpen, onClose, user, onSav
         // Save the profile first so a retry after a profile error does not attempt
         // to set an already changed password and fail with same_password.
         await updatePassword(signupSession.access_token, password);
+        forgetSignupToken();
         setSignupSession(null); setPassword(''); setPasswordConfirm('');
         setMode('login'); setSignupStep('details');
         onSaveUser(nextProfile); onClose();
@@ -250,6 +277,7 @@ export const UserProfileModal: React.FC<Props> = ({ isOpen, onClose, user, onSav
 
       if (!password) throw new Error('Нууц үгээ оруулна уу.');
       const session = await signIn(cleanEmail, password);
+      forgetSignupToken();
       const nextProfile = await profileFromSession(session, { name: '', phone: '', address: '' });
       setPassword('');
       onSaveUser(nextProfile); onClose();

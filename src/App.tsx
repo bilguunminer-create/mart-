@@ -546,7 +546,8 @@ export default function App() {
     const token = hash.get('access_token') || query.get('access_token');
     const hasError = hash.has('error') || hash.has('error_code') || query.has('error') || query.has('error_code');
     let hasRecovery = false;
-    try { hasRecovery = Boolean(sessionStorage.getItem('usk_recovery_token')); } catch { /* Storage may be disabled. */ }
+    // An unfinished signup (verified, password not yet set) also reopens the form.
+    try { hasRecovery = Boolean(sessionStorage.getItem('usk_recovery_token') || sessionStorage.getItem('usk_signup_token')); } catch { /* Storage may be disabled. */ }
     if ((['signup', 'email', 'recovery'].includes(type || '') && token) || hasError || hasRecovery) setIsProfileOpen(true);
   }, []);
 
