@@ -707,6 +707,12 @@ export default function App() {
     return saved;
   };
 
+  const handlePublishProducts = async (productIds: string[]) => {
+    const ids = new Set(productIds);
+    const next = products.map((p) => (ids.has(p.id) ? { ...p, published: true } : p));
+    if (await persistProducts(next)) showToast(`${ids.size} бараа нийтлэгдлээ.`);
+  };
+
   const handleDeleteProduct = async (productId: string) => {
     if (await persistProducts(products.filter((p) => p.id !== productId))) {
       showToast('Бараа Supabase каталогоос хасагдлаа');
@@ -2093,6 +2099,7 @@ export default function App() {
           }}
           onSaveProduct={handleSaveProduct}
           onDeleteProduct={handleDeleteProduct}
+          onPublishProducts={handlePublishProducts}
           onToggleStock={handleToggleStock}
           onUpdateOrderStatus={handleUpdateOrderStatus}
           onConfirmPayment={async (orderId) => {
