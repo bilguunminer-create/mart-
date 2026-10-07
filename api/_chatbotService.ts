@@ -171,8 +171,8 @@ function relevantProducts(data: Record<string, unknown>, question: string) {
     .map(({ product }) => ({
       name: asText(product.name),
       price: asNumber(product.price, 0),
+      // Exact stock counts are admin-only; customers only learn whether it is available.
       inStock: product.in_stock !== false && asNumber(product.stock_quantity ?? product.stock, 1) > 0,
-      stock: asNumber(product.stock_quantity ?? product.stock, 0),
       weight: asText(product.weight),
       description: asText(product.description).slice(0, 240),
     }));

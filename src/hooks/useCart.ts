@@ -67,7 +67,7 @@ export function useCart(showToast: (msg: string) => void): CartHandlers {
       ? Math.max(0, Number(product.stock_quantity ?? (product.in_stock ? 1 : 0)))
       : quantity;
     if (product && quantity > available) {
-      showToast(`"${product.name}"-ын үлдэгдэл ${available} ш байна.`);
+      showToast(`"${product.name}"-ыг үүнээс олон ширхэгээр захиалах боломжгүй.`);
       return;
     }
     setCart((prev) => prev.map((item) => (item.id === id ? { ...item, quantity } : item)));
@@ -85,7 +85,7 @@ export function useCart(showToast: (msg: string) => void): CartHandlers {
       return;
     }
     if (alreadyInCart + quantity > available) {
-      showToast(`"${product.name}"-ын үлдэгдэл ${available} ш байна. Нэг барааны тоо үлдэгдлээс их байж болохгүй.`);
+      showToast(`"${product.name}"-ыг үүнээс олон ширхэгээр захиалах боломжгүй.`);
       return;
     }
     const price = pricing?.price ?? product.price;

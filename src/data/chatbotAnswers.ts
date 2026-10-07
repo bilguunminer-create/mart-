@@ -48,7 +48,7 @@ export function getConfiguredAnswer(data: Record<string, unknown>, message: stri
     return matches.map(product => {
       const stock = asNumber(product.stock ?? product.stock_quantity, 0);
       const available = product.in_stock !== false && stock > 0;
-      return `${asText(product.name)}: ${formatMnt(asNumber(product.price, 0))}. ${available ? `Үлдэгдэл ${stock} ш.` : 'Одоогоор дууссан.'}`;
+      return `${asText(product.name)}: ${formatMnt(asNumber(product.price, 0))}. ${available ? 'Бэлэн байгаа.' : 'Одоогоор дууссан.'}`;
     }).join('\n');
   }
 

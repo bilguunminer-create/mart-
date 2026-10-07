@@ -165,7 +165,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                       </div>
                       {item.stock_quantity !== undefined && item.quantity >= item.stock_quantity && (
                         <span className="text-[10px] text-amber-700 font-semibold block mt-0.5">
-                          Дээд үлдэгдэл: {item.stock_quantity}ш
+                          Захиалах боломжит дээд тоо
                         </span>
                       )}
                     </div>

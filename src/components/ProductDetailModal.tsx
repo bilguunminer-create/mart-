@@ -202,15 +202,15 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               <span className="text-stone-300">•</span>
               {isOutOfStock ? (
                 <span className="text-xs text-rose-700 font-bold bg-rose-50 px-2.5 py-0.5 rounded-md border border-rose-200">
-                  🚫 Агуулахад дууссан (0 ш)
+                  🚫 Түр дууссан
                 </span>
               ) : isLowStock ? (
                 <span className="text-xs text-amber-800 font-bold bg-amber-50 px-2.5 py-0.5 rounded-md border border-amber-300 animate-pulse">
-                  ⚠️ Үлдэгдэл цөөн: {availableStock} ширхэг
+                  ⚠️ Цөөн үлдсэн
                 </span>
               ) : (
                 <span className="text-xs text-emerald-700 font-semibold bg-emerald-50 px-2.5 py-0.5 rounded-md border border-emerald-200">
-                  Бэлэн байгаа ({availableStock} ширхэг)
+                  Бэлэн байгаа
                 </span>
               )}
             </div>
