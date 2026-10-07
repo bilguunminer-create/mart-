@@ -98,6 +98,10 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   const isOutOfStock = !product.in_stock || availableStock <= 0;
   const isLowStock = !isOutOfStock && availableStock <= 5;
 
+  const features = Array.isArray(product.features)
+    ? product.features.map((feature) => String(feature).trim()).filter(Boolean)
+    : [];
+
   // /p/<id> serves Facebook a preview with this product's photo, name and price.
   const shareUrl = `${window.location.origin}/p/${encodeURIComponent(product.id)}`;
   // Facebook does not let sites prefill the post text, so the caption goes to the
@@ -107,6 +111,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
       product.name,
       `💰 Үнэ: ${formatMNT(finalPrice)}`,
       product.description?.trim() ? `\n${product.description.trim()}` : '',
+      features.length > 0 ? `\n${features.map((feature) => `✅ ${feature}`).join('\n')}` : '',
       `\n🛒 Захиалах: ${shareUrl}`,
     ].filter(Boolean).join('\n');
     navigator.clipboard?.writeText(caption).then(() => {
@@ -244,6 +249,20 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             <p className="text-stone-600 text-sm leading-relaxed bg-stone-50 p-4 rounded-2xl border border-stone-100">
               {product.description}
             </p>
+          )}
+
+          {features.length > 0 && (
+            <div>
+              <h4 className="text-xs font-black text-stone-900 mb-2">Давуу талууд</h4>
+              <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {features.map((feature) => (
+                  <li key={feature} className="flex items-start gap-2 text-xs text-stone-700 bg-emerald-50/60 border border-emerald-100 rounded-xl px-3 py-2">
+                    <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
+                    <span>{feature}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
 
           <div className="grid grid-cols-2 gap-3 text-xs text-stone-600 pt-1">

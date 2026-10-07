@@ -27,6 +27,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   const [badgeColor, setBadgeColor] = useState('bg-rose-500');
   const [image, setImage] = useState('');
   const [description, setDescription] = useState('');
+  const [featuresText, setFeaturesText] = useState('');
   const [inStock, setInStock] = useState(true);
   const [stockQuantity, setStockQuantity] = useState<number>(18);
   const [dayDeal, setDayDeal] = useState<number>(1);
@@ -57,6 +58,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       setImage(productToEdit.image);
       setImageUrlInput(productToEdit.image);
       setDescription(productToEdit.description);
+      setFeaturesText((productToEdit.features ?? []).join('\n'));
       const initialStock = productToEdit.stock_quantity !== undefined 
         ? productToEdit.stock_quantity 
         : (productToEdit.in_stock ? 18 : 0);
@@ -82,6 +84,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       setImage('');
       setImageUrlInput('');
       setDescription('');
+      setFeaturesText('');
       setStockQuantity(20);
       setInStock(true);
       setDayDeal(-1); // Default to no day deal (none)
@@ -187,6 +190,11 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       badge_color: badgeColor,
       image: cleanImage,
       description: description.trim().slice(0, 2000) || `${cleanName} - Чанартай баталгаат импортын бүтээгдэхүүн.`,
+      // One selling point per line; leading bullets typed by hand are stripped.
+      features: featuresText.split('\n')
+        .map((line) => line.replace(/^\s*[-•*✓✔✅]+\s*/, '').trim().slice(0, 120))
+        .filter(Boolean)
+        .slice(0, 8),
       in_stock: finalInStock,
       stock_quantity: finalStock,
       rating: Math.min(5, Math.max(1, Number(rating) || 4.8)),
@@ -527,6 +535,20 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
               placeholder="Барааны орц, онцлог, хэрэглэх заавар зэргийг бичнэ..."
               value={description}
               onChange={(e) => setDescription(e.target.value)}
+              className="w-full px-3.5 py-2 text-xs border border-stone-300 rounded-xl focus:outline-none focus:border-rose-500"
+            />
+          </div>
+
+          {/* Selling points */}
+          <div>
+            <label className="block text-xs font-bold text-stone-800 mb-1">
+              Давуу талууд <span className="font-normal text-stone-500">(мөр бүрт нэгийг, дээд тал нь 8)</span>
+            </label>
+            <textarea
+              rows={4}
+              placeholder={'Жишээ:\n100% хулсны эслэг\nАгаар сайн нэвтрүүлнэ\nХүүхдийн эмзэг арьсанд ээлтэй'}
+              value={featuresText}
+              onChange={(e) => setFeaturesText(e.target.value)}
               className="w-full px-3.5 py-2 text-xs border border-stone-300 rounded-xl focus:outline-none focus:border-rose-500"
             />
           </div>

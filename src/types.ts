@@ -24,6 +24,8 @@ export interface Product {
   badge_color: string;
   image: string;
   description: string;
+  // Short selling points shown as a checklist on the product page.
+  features?: string[];
   in_stock: boolean;
   stock_quantity?: number;
   rating: number;
