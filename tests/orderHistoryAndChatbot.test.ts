@@ -21,9 +21,11 @@ test('simple answers reflect current site settings without AI', () => {
   assert.equal(getConfiguredAnswer({}, 'админтай холбоо барих'), null);
 });
 
-test('product answers update with stock and exclude unpublished items', () => {
+test('product answers show availability without exact stock and exclude unpublished items', () => {
   const product = { name: 'Алим', price: 5000, stock: 3, published: true };
-  assert.match(getConfiguredAnswer({ products: [product] }, 'алим хэд вэ')!, /3 ш/);
+  const answer = getConfiguredAnswer({ products: [product] }, 'алим хэд вэ')!;
+  assert.match(answer, /Бэлэн байгаа/);
+  assert.doesNotMatch(answer, /3 ш/);
   assert.match(getConfiguredAnswer({ products: [{ ...product, stock: 0 }] }, 'алим хэд вэ')!, /дууссан/);
   assert.equal(getConfiguredAnswer({ products: [{ ...product, published: false }] }, 'алим хэд вэ'), null);
 });
