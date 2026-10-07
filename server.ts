@@ -9,6 +9,7 @@ import { recordSiteVisit, SiteVisitError } from "./api/_siteVisitService";
 import { NewOrderNotificationError, sendNewOrderNotification } from "./api/_newOrderNotification";
 
 import inventoryAiHandler from './api/inventory-ai';
+import shareHandler from './api/share';
 
 // In-memory OTP storage: email -> { code, expiresAt, name }
 interface OtpEntry {
@@ -78,6 +79,9 @@ async function startServer() {
   app.use(express.urlencoded({ extended: true, limit: "25mb" }));
 
   app.post('/api/inventory-ai', (req, res) => inventoryAiHandler(req as any, res as any));
+  // Mirrors the /p/<id> rewrites in vercel.json.
+  app.get('/p/:id/image', (req, res) => shareHandler({ headers: req.headers, query: { id: req.params.id, img: '1' } } as any, res as any));
+  app.get('/p/:id', (req, res) => shareHandler({ headers: req.headers, query: { id: req.params.id } } as any, res as any));
 
   app.post('/api/site-visit', async (req, res) => {
     res.setHeader('Cache-Control', 'no-store');

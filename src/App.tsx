@@ -514,6 +514,21 @@ export default function App() {
   const [detailProduct, setDetailProduct] = useState<Product | null>(null);
   const overlayHistoryRef = useRef(false);
 
+  // Shared product links (/p/<id> → /?product=<id>) open that product once the catalog loads.
+  const sharedProductHandled = useRef(false);
+  useEffect(() => {
+    if (sharedProductHandled.current || catalogStatus !== 'ready') return;
+    sharedProductHandled.current = true;
+    const params = new URLSearchParams(window.location.search);
+    const sharedId = params.get('product');
+    if (!sharedId) return;
+    params.delete('product');
+    const query = params.toString();
+    window.history.replaceState(window.history.state, '', window.location.pathname + (query ? `?${query}` : '') + window.location.hash);
+    const found = products.find((p) => p.id === sharedId && p.published !== false);
+    if (found) setDetailProduct(found);
+  }, [catalogStatus, products]);
+
   // Browser back closes the current site panel first, instead of leaving the store.
   useEffect(() => {
     const overlayOpen = isCartOpen || isCheckoutOpen || isLoyaltyOpen || isProfileOpen

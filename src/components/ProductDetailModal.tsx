@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Star, ShoppingBag, Plus, Minus, Truck, ShieldCheck, Check, MessageSquare, Clock } from 'lucide-react';
+import { X, Star, ShoppingBag, Plus, Minus, Truck, ShieldCheck, Check, MessageSquare, Clock, Share2, Link2 } from 'lucide-react';
 import { Product, UserProfile, ProductReview } from '../types';
 import { formatMNT, DAILY_DEALS } from '../data/storeData';
 import { getProductReviews, getMyProductReview, submitProductReview } from '../services/supabaseAuth';
@@ -25,6 +25,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 }) => {
   const [quantity, setQuantity] = useState(1);
   const [addedAnimation, setAddedAnimation] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
 
   // Reviews & ratings
   const [reviews, setReviews] = useState<ProductReview[]>([]);
@@ -95,6 +96,21 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
     : (product.in_stock ? 18 : 0);
   const isOutOfStock = !product.in_stock || availableStock <= 0;
   const isLowStock = !isOutOfStock && availableStock <= 5;
+
+  // /p/<id> serves Facebook a preview with this product's photo, name and price.
+  const shareUrl = `${window.location.origin}/p/${encodeURIComponent(product.id)}`;
+  const shareOnFacebook = () => {
+    window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`, '_blank', 'noopener,noreferrer,width=640,height=600');
+  };
+  const copyShareLink = async () => {
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setLinkCopied(true);
+      setTimeout(() => setLinkCopied(false), 2000);
+    } catch {
+      window.prompt('Холбоосыг хуулна уу:', shareUrl);
+    }
+  };
 
   const handleAdd = () => {
     if (isOutOfStock) return;
@@ -217,6 +233,27 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               <span>100% Үйлдвэрийн лацтай оригинал</span>
             </div>
           </div>
+
+          {product.published !== false && (
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={shareOnFacebook}
+                className="flex-1 flex items-center justify-center gap-2 bg-[#1877F2] hover:bg-[#166FE5] text-white text-xs font-bold px-4 py-2.5 rounded-xl transition-colors cursor-pointer"
+              >
+                <Share2 className="w-4 h-4" />
+                <span>Facebook-т хуваалцах</span>
+              </button>
+              <button
+                type="button"
+                onClick={copyShareLink}
+                className="flex items-center justify-center gap-2 bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-bold px-4 py-2.5 rounded-xl border border-stone-200 transition-colors cursor-pointer"
+              >
+                {linkCopied ? <Check className="w-4 h-4 text-emerald-600" /> : <Link2 className="w-4 h-4" />}
+                <span>{linkCopied ? 'Хуулагдлаа' : 'Холбоос хуулах'}</span>
+              </button>
+            </div>
+          )}
 
           {/* Pricing & Add to Cart Controls */}
           <div className="pt-4 border-t border-stone-200 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
