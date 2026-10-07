@@ -113,7 +113,17 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
       setCaptionCopied(true);
       setTimeout(() => setCaptionCopied(false), 8000);
     }).catch(() => {});
-    window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`, '_blank', 'noopener,noreferrer,width=640,height=600');
+    // Phones use the system share sheet, which hands the link straight to the
+    // Facebook app; mobile Safari often blocks or loses the sharer.php popup.
+    const isPhone = window.matchMedia?.('(pointer: coarse)').matches;
+    if (isPhone && typeof navigator.share === 'function') {
+      navigator.share({ title: product.name, text: caption, url: shareUrl }).catch(() => {});
+      return;
+    }
+    const sharerUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`;
+    const popup = window.open(sharerUrl, '_blank', 'width=640,height=600');
+    if (popup) popup.opener = null;
+    else window.location.href = sharerUrl;
   };
   const copyShareLink = async () => {
     try {
