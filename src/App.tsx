@@ -313,7 +313,7 @@ export default function App() {
         setMemberProfiles(profilesResult.value);
       } else {
         console.error('[Admin] Гишүүдийн мэдээлэл татахад алдаа гарлаа:', profilesResult.reason);
-        setMemberProfiles([]);
+        // Keep the last successful list during a failed refresh. Account changes clear it above.
         failures.push('хэрэглэгчийн мэдээлэл');
       }
 
@@ -325,7 +325,7 @@ export default function App() {
       }
 
       if (failures.length > 0) {
-        showToast(`Төв сангаас ${failures.join(', ')} татаж чадсангүй. Дахин нэвтэрч үзнэ үү.`);
+        showToast(`Төв сангаас ${failures.join(', ')} шинэчилж чадсангүй. Түр хүлээгээд дахин оролдоно уу.`);
       }
     };
 
