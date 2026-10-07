@@ -108,8 +108,8 @@ export default function App() {
   const [categoryImages, setCategoryImages] = useState<Record<string, string[]>>({});
   const [storeLogoUrl, setStoreLogoUrl] = useState<string | null>(null);
   const [storeBannerUrl, setStoreBannerUrl] = useState<string | null>(null);
-  const [checkoutSettings, setCheckoutSettings] = useState<{ deliveryFee: number; freeDeliveryThreshold: number; bankName: string; accountNumber: string; iban: string; accountHolder: string; storePhone: string; storeEmail: string; facebookUrl: string; messengerUrl: string; googleMapsUrl: string; storeAddress: string; unpaidCancellationMinutes: number }>({
-    deliveryFee: 3000, freeDeliveryThreshold: STORE_CONFIG.free_delivery_threshold, bankName: '', accountNumber: '', iban: '', accountHolder: '', storePhone: STORE_CONFIG.phone, storeEmail: '', facebookUrl: '', messengerUrl: '', googleMapsUrl: '', storeAddress: STORE_CONFIG.location, unpaidCancellationMinutes: 60,
+  const [checkoutSettings, setCheckoutSettings] = useState<{ deliveryFee: number; freeDeliveryThreshold: number; minOrderAmount: number; bankName: string; accountNumber: string; iban: string; accountHolder: string; storePhone: string; storeEmail: string; facebookUrl: string; messengerUrl: string; googleMapsUrl: string; storeAddress: string; unpaidCancellationMinutes: number }>({
+    deliveryFee: 3000, freeDeliveryThreshold: STORE_CONFIG.free_delivery_threshold, minOrderAmount: 0, bankName: '', accountNumber: '', iban: '', accountHolder: '', storePhone: STORE_CONFIG.phone, storeEmail: '', facebookUrl: '', messengerUrl: '', googleMapsUrl: '', storeAddress: STORE_CONFIG.location, unpaidCancellationMinutes: 60,
   });
   const [chatbotSettings, setChatbotSettings] = useState<ChatbotSettings>(DEFAULT_CHATBOT_SETTINGS);
   useEffect(() => {
@@ -158,6 +158,7 @@ export default function App() {
       setCheckoutSettings({
         deliveryFee: Number(settings.data.delivery_fee ?? 3000),
         freeDeliveryThreshold: Number(settings.data.free_delivery_threshold ?? STORE_CONFIG.free_delivery_threshold),
+        minOrderAmount: Math.max(0, Number(settings.data.min_order_amount ?? 0) || 0),
         bankName: String(bank?.bankName ?? ''),
         accountNumber: String(bank?.accountNumber ?? ''),
         iban: String(bank?.iban ?? ''),
@@ -513,6 +514,21 @@ export default function App() {
   const [detailProduct, setDetailProduct] = useState<Product | null>(null);
   const overlayHistoryRef = useRef(false);
 
+  // Shared product links (/p/<id> → /?product=<id>) open that product once the catalog loads.
+  const sharedProductHandled = useRef(false);
+  useEffect(() => {
+    if (sharedProductHandled.current || catalogStatus !== 'ready') return;
+    sharedProductHandled.current = true;
+    const params = new URLSearchParams(window.location.search);
+    const sharedId = params.get('product');
+    if (!sharedId) return;
+    params.delete('product');
+    const query = params.toString();
+    window.history.replaceState(window.history.state, '', window.location.pathname + (query ? `?${query}` : '') + window.location.hash);
+    const found = products.find((p) => p.id === sharedId && p.published !== false);
+    if (found) setDetailProduct(found);
+  }, [catalogStatus, products]);
+
   // Browser back closes the current site panel first, instead of leaving the store.
   useEffect(() => {
     const overlayOpen = isCartOpen || isCheckoutOpen || isLoyaltyOpen || isProfileOpen
@@ -706,6 +722,12 @@ export default function App() {
     return saved;
   };
 
+  const handlePublishProducts = async (productIds: string[]) => {
+    const ids = new Set(productIds);
+    const next = products.map((p) => (ids.has(p.id) ? { ...p, published: true } : p));
+    if (await persistProducts(next)) showToast(`${ids.size} бараа нийтлэгдлээ.`);
+  };
+
   const handleDeleteProduct = async (productId: string) => {
     if (await persistProducts(products.filter((p) => p.id !== productId))) {
       showToast('Бараа Supabase каталогоос хасагдлаа');
@@ -857,7 +879,7 @@ export default function App() {
       return;
     }
     if (alreadyInCart + quantity > available) {
-      showToast(`"${product.name}"-ын үлдэгдэл ${available} ш байна. Нэг барааны тоо үлдэгдлээс их байж болохгүй.`);
+      showToast(`"${product.name}"-ыг үүнээс олон ширхэгээр захиалах боломжгүй.`);
       return;
     }
 
@@ -934,7 +956,7 @@ export default function App() {
     const product = products.find((item) => item.id === id);
     const available = product ? Math.max(0, Number(product.stock_quantity ?? (product.in_stock ? 1 : 0))) : quantity;
     if (product && quantity > available) {
-      showToast(`"${product.name}"-ын үлдэгдэл ${available} ш байна.`);
+      showToast(`"${product.name}"-ыг үүнээс олон ширхэгээр захиалах боломжгүй.`);
       return;
     }
     setCart((prev) => prev.map((item) => (item.id === id ? { ...item, quantity } : item)));
@@ -1879,6 +1901,7 @@ export default function App() {
         dailyDiscountTotal={dailyDiscountTotal}
         freeDeliveryThreshold={checkoutSettings.freeDeliveryThreshold}
         deliveryFee={checkoutSettings.deliveryFee}
+        minOrderAmount={checkoutSettings.minOrderAmount}
       />
 
       <CheckoutModal
@@ -2091,6 +2114,7 @@ export default function App() {
           }}
           onSaveProduct={handleSaveProduct}
           onDeleteProduct={handleDeleteProduct}
+          onPublishProducts={handlePublishProducts}
           onToggleStock={handleToggleStock}
           onUpdateOrderStatus={handleUpdateOrderStatus}
           onConfirmPayment={async (orderId) => {
@@ -2187,6 +2211,7 @@ export default function App() {
             const data = await saveStoreSettings(currentUser.accessToken, {
               delivery_fee: settings.deliveryFee,
               free_delivery_threshold: settings.freeDeliveryThreshold,
+              min_order_amount: settings.minOrderAmount,
               bank_accounts: {
                 bankName: settings.bankName,
                 accountNumber: settings.accountNumber,
@@ -2204,6 +2229,7 @@ export default function App() {
             setCheckoutSettings({
               deliveryFee: Number(data.delivery_fee ?? settings.deliveryFee),
               freeDeliveryThreshold: Number(data.free_delivery_threshold ?? settings.freeDeliveryThreshold),
+              minOrderAmount: Math.max(0, Number(data.min_order_amount ?? settings.minOrderAmount) || 0),
               bankName: settings.bankName,
               accountNumber: settings.accountNumber,
               iban: settings.iban,
@@ -2319,6 +2345,7 @@ export default function App() {
               chatbot_settings: chatbotSettings,
               delivery_fee: checkoutSettings.deliveryFee,
               free_delivery_threshold: checkoutSettings.freeDeliveryThreshold,
+              min_order_amount: checkoutSettings.minOrderAmount,
               unpaid_cancellation_minutes: checkoutSettings.unpaidCancellationMinutes,
               bank_accounts: checkoutSettings,
               loyalty_cashback_pct: loyaltyCashbackPct,

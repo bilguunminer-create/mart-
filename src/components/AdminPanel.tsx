@@ -85,6 +85,7 @@ interface AdminPanelProps {
   onSaveTierOverride?: (userId: string, tierId: string | null) => Promise<void>;
   onSaveProduct: (product: Product, originalProduct?: Product | null) => void | Promise<boolean>;
   onDeleteProduct: (productId: string) => void;
+  onPublishProducts?: (productIds: string[]) => Promise<void> | void;
   onToggleStock: (productId: string) => void;
   onUpdateOrderStatus: (orderId: string, status: 'new' | 'confirmed' | 'shipping' | 'delivered' | 'cancelled') => void;
   onConfirmPayment: (orderId: string) => Promise<void>;
@@ -112,8 +113,8 @@ interface AdminPanelProps {
   onSaveChatbotSettings?: (settings: ChatbotSettings, linkedSettings: { deliveryFee: number; freeDeliveryThreshold: number; loyaltyCashbackPct: number }) => Promise<void> | void;
   onModerateReview?: (reviewId: string, approve: boolean) => Promise<void> | void;
   onDeleteReview?: (reviewId: string) => Promise<void> | void;
-  checkoutSettings?: { deliveryFee: number; freeDeliveryThreshold: number; bankName: string; accountNumber: string; iban: string; accountHolder: string; storePhone: string; storeEmail: string; facebookUrl: string; messengerUrl: string; googleMapsUrl: string; storeAddress: string; unpaidCancellationMinutes: number };
-  onSaveCheckoutSettings?: (settings: { deliveryFee: number; freeDeliveryThreshold: number; bankName: string; accountNumber: string; iban: string; accountHolder: string; storePhone: string; storeEmail: string; facebookUrl: string; messengerUrl: string; googleMapsUrl: string; storeAddress: string; unpaidCancellationMinutes: number }) => Promise<void> | void;
+  checkoutSettings?: { deliveryFee: number; freeDeliveryThreshold: number; minOrderAmount: number; bankName: string; accountNumber: string; iban: string; accountHolder: string; storePhone: string; storeEmail: string; facebookUrl: string; messengerUrl: string; googleMapsUrl: string; storeAddress: string; unpaidCancellationMinutes: number };
+  onSaveCheckoutSettings?: (settings: { deliveryFee: number; freeDeliveryThreshold: number; minOrderAmount: number; bankName: string; accountNumber: string; iban: string; accountHolder: string; storePhone: string; storeEmail: string; facebookUrl: string; messengerUrl: string; googleMapsUrl: string; storeAddress: string; unpaidCancellationMinutes: number }) => Promise<void> | void;
 }
 
 export interface LoyaltyMember {
@@ -161,6 +162,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   onSaveTierOverride,
   onSaveProduct,
   onDeleteProduct,
+  onPublishProducts,
   onToggleStock,
   onUpdateOrderStatus,
   onConfirmPayment,
@@ -188,7 +190,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   onSaveChatbotSettings,
   onModerateReview,
   onDeleteReview,
-  checkoutSettings = { deliveryFee: 3000, freeDeliveryThreshold: 100000, bankName: '', accountNumber: '', iban: '', accountHolder: '', storePhone: '', storeEmail: '', facebookUrl: '', messengerUrl: '', googleMapsUrl: '', storeAddress: '', unpaidCancellationMinutes: 60 },
+  checkoutSettings = { deliveryFee: 3000, freeDeliveryThreshold: 100000, minOrderAmount: 0, bankName: '', accountNumber: '', iban: '', accountHolder: '', storePhone: '', storeEmail: '', facebookUrl: '', messengerUrl: '', googleMapsUrl: '', storeAddress: '', unpaidCancellationMinutes: 60 },
   onSaveCheckoutSettings
 }) => {
   const [activeTab, setActiveTab] = useState<'products' | 'preorders' | 'orders' | 'loyalty' | 'stats' | 'settings' | 'reviews' | 'chat' | 'chatbot'>('products');
@@ -214,7 +216,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
   useEffect(() => {
     setCheckoutDraft(checkoutSettings);
-  }, [checkoutSettings.deliveryFee, checkoutSettings.freeDeliveryThreshold, checkoutSettings.bankName, checkoutSettings.accountNumber, checkoutSettings.iban, checkoutSettings.accountHolder, checkoutSettings.storePhone, checkoutSettings.storeEmail, checkoutSettings.facebookUrl, checkoutSettings.messengerUrl, checkoutSettings.googleMapsUrl, checkoutSettings.storeAddress, checkoutSettings.unpaidCancellationMinutes]);
+  }, [checkoutSettings.deliveryFee, checkoutSettings.freeDeliveryThreshold, checkoutSettings.minOrderAmount, checkoutSettings.bankName, checkoutSettings.accountNumber, checkoutSettings.iban, checkoutSettings.accountHolder, checkoutSettings.storePhone, checkoutSettings.storeEmail, checkoutSettings.facebookUrl, checkoutSettings.messengerUrl, checkoutSettings.googleMapsUrl, checkoutSettings.storeAddress, checkoutSettings.unpaidCancellationMinutes]);
 
   const openNewComboForm = () => {
     setEditingCombo(null);
@@ -561,6 +563,24 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     return matchesView && matchesSearch && matchesCat && matchesOrigin && matchesStock;
   });
   const draftCount = products.filter((prod) => prod.published === false).length;
+  // Drafts whose description is filled in, with a price and photo, are ready to go live.
+  const readyDrafts = products.filter((prod) => prod.published === false
+    && (prod.description || '').trim().length >= 20
+    && Number(prod.price) > 0
+    && Boolean((prod.image || '').trim()));
+  const [isPublishingDrafts, setIsPublishingDrafts] = useState(false);
+  const publishReadyDrafts = async () => {
+    if (!onPublishProducts || readyDrafts.length === 0) return;
+    const names = readyDrafts.slice(0, 15).map((prod) => `• ${prod.name}`).join('\n');
+    const more = readyDrafts.length > 15 ? `\n...болон бусад ${readyDrafts.length - 15}` : '';
+    if (!window.confirm(`Тайлбар бөглөсөн ${readyDrafts.length} ноорог барааг нийтлэх үү?\n\n${names}${more}`)) return;
+    setIsPublishingDrafts(true);
+    try {
+      await onPublishProducts(readyDrafts.map((prod) => prod.id));
+    } finally {
+      setIsPublishingDrafts(false);
+    }
+  };
 
   // Filter orders
   const filteredOrders = orders.filter((order) => {
@@ -1054,6 +1074,17 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               >
                 Ноорог ({draftCount})
               </button>
+              {productView === 'draft' && onPublishProducts && (
+                <button
+                  type="button"
+                  onClick={publishReadyDrafts}
+                  disabled={isPublishingDrafts || readyDrafts.length === 0}
+                  title="Тайлбар (20+ тэмдэгт), үнэ, зурагтай ноорог барааг нэг дор нийтэлнэ"
+                  className="ml-auto px-4 py-2 text-xs font-bold rounded-xl border border-emerald-600 bg-emerald-600 text-white hover:bg-emerald-700 transition-all cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {isPublishingDrafts ? 'Нийтэлж байна...' : `Тайлбартай нооргуудыг нийтлэх (${readyDrafts.length})`}
+                </button>
+              )}
             </div>
 
             {/* Products Grid */}
@@ -2477,6 +2508,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     onChange={(e) => setCheckoutDraft((value) => ({ ...value, freeDeliveryThreshold: Math.max(0, Number(e.target.value) || 0) }))}
                     className="mt-1.5 w-full px-3 py-2 border border-stone-300 rounded-xl bg-stone-50" />
                   <span className="mt-1 block text-[10px] font-normal text-stone-500">Энэ дүн болон түүнээс дээш захиалгад хүргэлт үнэгүй.</span>
+                </label>
+                <label className="text-xs font-bold text-stone-700">Захиалгын доод дүн (₮)
+                  <input type="number" min="0" step="1000" value={checkoutDraft.minOrderAmount}
+                    onChange={(e) => setCheckoutDraft((value) => ({ ...value, minOrderAmount: Math.max(0, Number(e.target.value) || 0) }))}
+                    className="mt-1.5 w-full px-3 py-2 border border-stone-300 rounded-xl bg-stone-50" />
+                  <span className="mt-1 block text-[10px] font-normal text-stone-500">Үүнээс бага дүнтэй захиалга хүлээн авахгүй. 0 бол хязгааргүй.</span>
                 </label>
                 <label className="text-xs font-bold text-stone-700">Дэлгүүрийн холбоо барих утас
                   <input type="tel" value={checkoutDraft.storePhone} onChange={(e) => setCheckoutDraft((value) => ({ ...value, storePhone: e.target.value }))}

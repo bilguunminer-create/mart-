@@ -3,6 +3,10 @@
   "buildCommand": "vite build",
   "installCommand": "npm install",
   "outputDirectory": "dist",
+  "rewrites": [
+    { "source": "/p/:id/image", "destination": "/api/share?id=:id&img=1" },
+    { "source": "/p/:id", "destination": "/api/share?id=:id" }
+  ],
   "functions": {
     "api/inventory-ai.ts": {
       "maxDuration": 120

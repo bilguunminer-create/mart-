@@ -48,7 +48,7 @@ export function getConfiguredAnswer(data: Record<string, unknown>, message: stri
     return matches.map(product => {
       const stock = asNumber(product.stock ?? product.stock_quantity, 0);
       const available = product.in_stock !== false && stock > 0;
-      return `${asText(product.name)}: ${formatMnt(asNumber(product.price, 0))}. ${available ? `Үлдэгдэл ${stock} ш.` : 'Одоогоор дууссан.'}`;
+      return `${asText(product.name)}: ${formatMnt(asNumber(product.price, 0))}. ${available ? 'Бэлэн байгаа.' : 'Одоогоор дууссан.'}`;
     }).join('\n');
   }
 
@@ -59,6 +59,7 @@ export function getConfiguredAnswer(data: Record<string, unknown>, message: stri
       (data.rules as Record<string, unknown> | undefined)?.free_delivery_enabled === false
         ? 'Үнэгүй хүргэлт одоогоор идэвхгүй.'
         : `Үнэгүй хүргэлтийн босго: ${formatMnt(asNumber(data.free_delivery_threshold, 100000))}`,
+      asNumber(data.min_order_amount, 0) > 0 && `Захиалгын доод дүн: ${formatMnt(asNumber(data.min_order_amount, 0))}`,
       asText(chatbot.deliveryDuration) && `Хугацаа: ${asText(chatbot.deliveryDuration)}`,
       asText(chatbot.deliveryNotes),
     ].filter(Boolean);

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Star, ShoppingBag, Plus, Minus, Truck, ShieldCheck, Check, MessageSquare, Clock } from 'lucide-react';
+import { X, Star, ShoppingBag, Plus, Minus, Truck, ShieldCheck, Check, MessageSquare, Clock, Share2, Link2 } from 'lucide-react';
 import { Product, UserProfile, ProductReview } from '../types';
 import { formatMNT, DAILY_DEALS } from '../data/storeData';
 import { getProductReviews, getMyProductReview, submitProductReview } from '../services/supabaseAuth';
@@ -25,6 +25,8 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 }) => {
   const [quantity, setQuantity] = useState(1);
   const [addedAnimation, setAddedAnimation] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
+  const [captionCopied, setCaptionCopied] = useState(false);
 
   // Reviews & ratings
   const [reviews, setReviews] = useState<ProductReview[]>([]);
@@ -95,6 +97,43 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
     : (product.in_stock ? 18 : 0);
   const isOutOfStock = !product.in_stock || availableStock <= 0;
   const isLowStock = !isOutOfStock && availableStock <= 5;
+
+  // /p/<id> serves Facebook a preview with this product's photo, name and price.
+  const shareUrl = `${window.location.origin}/p/${encodeURIComponent(product.id)}`;
+  // Facebook does not let sites prefill the post text, so the caption goes to the
+  // clipboard and the person pastes it into the post box.
+  const shareOnFacebook = () => {
+    const caption = [
+      product.name,
+      `💰 Үнэ: ${formatMNT(finalPrice)}`,
+      product.description?.trim() ? `\n${product.description.trim()}` : '',
+      `\n🛒 Захиалах: ${shareUrl}`,
+    ].filter(Boolean).join('\n');
+    navigator.clipboard?.writeText(caption).then(() => {
+      setCaptionCopied(true);
+      setTimeout(() => setCaptionCopied(false), 8000);
+    }).catch(() => {});
+    // Phones use the system share sheet, which hands the link straight to the
+    // Facebook app; mobile Safari often blocks or loses the sharer.php popup.
+    const isPhone = window.matchMedia?.('(pointer: coarse)').matches;
+    if (isPhone && typeof navigator.share === 'function') {
+      navigator.share({ title: product.name, text: caption, url: shareUrl }).catch(() => {});
+      return;
+    }
+    const sharerUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`;
+    const popup = window.open(sharerUrl, '_blank', 'width=640,height=600');
+    if (popup) popup.opener = null;
+    else window.location.href = sharerUrl;
+  };
+  const copyShareLink = async () => {
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setLinkCopied(true);
+      setTimeout(() => setLinkCopied(false), 2000);
+    } catch {
+      window.prompt('Холбоосыг хуулна уу:', shareUrl);
+    }
+  };
 
   const handleAdd = () => {
     if (isOutOfStock) return;
@@ -186,15 +225,15 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               <span className="text-stone-300">•</span>
               {isOutOfStock ? (
                 <span className="text-xs text-rose-700 font-bold bg-rose-50 px-2.5 py-0.5 rounded-md border border-rose-200">
-                  🚫 Агуулахад дууссан (0 ш)
+                  🚫 Түр дууссан
                 </span>
               ) : isLowStock ? (
                 <span className="text-xs text-amber-800 font-bold bg-amber-50 px-2.5 py-0.5 rounded-md border border-amber-300 animate-pulse">
-                  ⚠️ Үлдэгдэл цөөн: {availableStock} ширхэг
+                  ⚠️ Цөөн үлдсэн
                 </span>
               ) : (
                 <span className="text-xs text-emerald-700 font-semibold bg-emerald-50 px-2.5 py-0.5 rounded-md border border-emerald-200">
-                  Бэлэн байгаа ({availableStock} ширхэг)
+                  Бэлэн байгаа
                 </span>
               )}
             </div>
@@ -217,6 +256,32 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               <span>100% Үйлдвэрийн лацтай оригинал</span>
             </div>
           </div>
+
+          {product.published !== false && (
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={shareOnFacebook}
+                className="flex-1 flex items-center justify-center gap-2 bg-[#1877F2] hover:bg-[#166FE5] text-white text-xs font-bold px-4 py-2.5 rounded-xl transition-colors cursor-pointer"
+              >
+                <Share2 className="w-4 h-4" />
+                <span>Facebook-т хуваалцах</span>
+              </button>
+              <button
+                type="button"
+                onClick={copyShareLink}
+                className="flex items-center justify-center gap-2 bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-bold px-4 py-2.5 rounded-xl border border-stone-200 transition-colors cursor-pointer"
+              >
+                {linkCopied ? <Check className="w-4 h-4 text-emerald-600" /> : <Link2 className="w-4 h-4" />}
+                <span>{linkCopied ? 'Хуулагдлаа' : 'Холбоос хуулах'}</span>
+              </button>
+            </div>
+          )}
+          {captionCopied && (
+            <p className="rounded-xl border border-blue-200 bg-blue-50 p-3 text-xs text-blue-900">
+              ✓ Барааны нэр, үнэ, тайлбар хуулагдлаа. Facebook-ийн пост бичих хэсэгт <strong>Paste (Ctrl+V)</strong> хийнэ үү.
+            </p>
+          )}
 
           {/* Pricing & Add to Cart Controls */}
           <div className="pt-4 border-t border-stone-200 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
