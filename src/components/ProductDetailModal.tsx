@@ -26,6 +26,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   const [quantity, setQuantity] = useState(1);
   const [addedAnimation, setAddedAnimation] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
+  const [captionCopied, setCaptionCopied] = useState(false);
 
   // Reviews & ratings
   const [reviews, setReviews] = useState<ProductReview[]>([]);
@@ -99,7 +100,19 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 
   // /p/<id> serves Facebook a preview with this product's photo, name and price.
   const shareUrl = `${window.location.origin}/p/${encodeURIComponent(product.id)}`;
+  // Facebook does not let sites prefill the post text, so the caption goes to the
+  // clipboard and the person pastes it into the post box.
   const shareOnFacebook = () => {
+    const caption = [
+      product.name,
+      `💰 Үнэ: ${formatMNT(finalPrice)}`,
+      product.description?.trim() ? `\n${product.description.trim()}` : '',
+      `\n🛒 Захиалах: ${shareUrl}`,
+    ].filter(Boolean).join('\n');
+    navigator.clipboard?.writeText(caption).then(() => {
+      setCaptionCopied(true);
+      setTimeout(() => setCaptionCopied(false), 8000);
+    }).catch(() => {});
     window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`, '_blank', 'noopener,noreferrer,width=640,height=600');
   };
   const copyShareLink = async () => {
@@ -253,6 +266,11 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 <span>{linkCopied ? 'Хуулагдлаа' : 'Холбоос хуулах'}</span>
               </button>
             </div>
+          )}
+          {captionCopied && (
+            <p className="rounded-xl border border-blue-200 bg-blue-50 p-3 text-xs text-blue-900">
+              ✓ Барааны нэр, үнэ, тайлбар хуулагдлаа. Facebook-ийн пост бичих хэсэгт <strong>Paste (Ctrl+V)</strong> хийнэ үү.
+            </p>
           )}
 
           {/* Pricing & Add to Cart Controls */}

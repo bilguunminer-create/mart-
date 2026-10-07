@@ -63,6 +63,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const name = String(product.name ?? 'US&K Family Mart');
   const price = Number(product.price);
   const description = String(product.description ?? '').replace(/\s+/g, ' ').trim();
+  // Facebook usually hides og:description, so the price leads the title.
+  const title = Number.isFinite(price) && price > 0 ? `${formatMnt(price)} · ${name}` : name;
   const summary = [Number.isFinite(price) && price > 0 ? `Үнэ: ${formatMnt(price)}` : '', description]
     .filter(Boolean).join(' · ').slice(0, 280);
 
@@ -75,7 +77,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 <meta name="description" content="${escapeHtml(summary)}" />
 <meta property="og:type" content="product" />
 <meta property="og:site_name" content="US&amp;K Family Mart" />
-<meta property="og:title" content="${escapeHtml(name)}" />
+<meta property="og:title" content="${escapeHtml(title)}" />
 <meta property="og:description" content="${escapeHtml(summary)}" />
 <meta property="og:url" content="${escapeHtml(shareUrl)}" />
 <meta property="og:image" content="${escapeHtml(imageUrl)}" />
