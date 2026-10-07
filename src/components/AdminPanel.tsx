@@ -112,8 +112,8 @@ interface AdminPanelProps {
   onSaveChatbotSettings?: (settings: ChatbotSettings, linkedSettings: { deliveryFee: number; freeDeliveryThreshold: number; loyaltyCashbackPct: number }) => Promise<void> | void;
   onModerateReview?: (reviewId: string, approve: boolean) => Promise<void> | void;
   onDeleteReview?: (reviewId: string) => Promise<void> | void;
-  checkoutSettings?: { deliveryFee: number; freeDeliveryThreshold: number; bankName: string; accountNumber: string; iban: string; accountHolder: string; storePhone: string; storeEmail: string; facebookUrl: string; messengerUrl: string; googleMapsUrl: string; storeAddress: string; unpaidCancellationMinutes: number };
-  onSaveCheckoutSettings?: (settings: { deliveryFee: number; freeDeliveryThreshold: number; bankName: string; accountNumber: string; iban: string; accountHolder: string; storePhone: string; storeEmail: string; facebookUrl: string; messengerUrl: string; googleMapsUrl: string; storeAddress: string; unpaidCancellationMinutes: number }) => Promise<void> | void;
+  checkoutSettings?: { deliveryFee: number; freeDeliveryThreshold: number; minOrderAmount: number; bankName: string; accountNumber: string; iban: string; accountHolder: string; storePhone: string; storeEmail: string; facebookUrl: string; messengerUrl: string; googleMapsUrl: string; storeAddress: string; unpaidCancellationMinutes: number };
+  onSaveCheckoutSettings?: (settings: { deliveryFee: number; freeDeliveryThreshold: number; minOrderAmount: number; bankName: string; accountNumber: string; iban: string; accountHolder: string; storePhone: string; storeEmail: string; facebookUrl: string; messengerUrl: string; googleMapsUrl: string; storeAddress: string; unpaidCancellationMinutes: number }) => Promise<void> | void;
 }
 
 export interface LoyaltyMember {
@@ -188,7 +188,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   onSaveChatbotSettings,
   onModerateReview,
   onDeleteReview,
-  checkoutSettings = { deliveryFee: 3000, freeDeliveryThreshold: 100000, bankName: '', accountNumber: '', iban: '', accountHolder: '', storePhone: '', storeEmail: '', facebookUrl: '', messengerUrl: '', googleMapsUrl: '', storeAddress: '', unpaidCancellationMinutes: 60 },
+  checkoutSettings = { deliveryFee: 3000, freeDeliveryThreshold: 100000, minOrderAmount: 0, bankName: '', accountNumber: '', iban: '', accountHolder: '', storePhone: '', storeEmail: '', facebookUrl: '', messengerUrl: '', googleMapsUrl: '', storeAddress: '', unpaidCancellationMinutes: 60 },
   onSaveCheckoutSettings
 }) => {
   const [activeTab, setActiveTab] = useState<'products' | 'preorders' | 'orders' | 'loyalty' | 'stats' | 'settings' | 'reviews' | 'chat' | 'chatbot'>('products');
@@ -214,7 +214,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
   useEffect(() => {
     setCheckoutDraft(checkoutSettings);
-  }, [checkoutSettings.deliveryFee, checkoutSettings.freeDeliveryThreshold, checkoutSettings.bankName, checkoutSettings.accountNumber, checkoutSettings.iban, checkoutSettings.accountHolder, checkoutSettings.storePhone, checkoutSettings.storeEmail, checkoutSettings.facebookUrl, checkoutSettings.messengerUrl, checkoutSettings.googleMapsUrl, checkoutSettings.storeAddress, checkoutSettings.unpaidCancellationMinutes]);
+  }, [checkoutSettings.deliveryFee, checkoutSettings.freeDeliveryThreshold, checkoutSettings.minOrderAmount, checkoutSettings.bankName, checkoutSettings.accountNumber, checkoutSettings.iban, checkoutSettings.accountHolder, checkoutSettings.storePhone, checkoutSettings.storeEmail, checkoutSettings.facebookUrl, checkoutSettings.messengerUrl, checkoutSettings.googleMapsUrl, checkoutSettings.storeAddress, checkoutSettings.unpaidCancellationMinutes]);
 
   const openNewComboForm = () => {
     setEditingCombo(null);
@@ -2477,6 +2477,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     onChange={(e) => setCheckoutDraft((value) => ({ ...value, freeDeliveryThreshold: Math.max(0, Number(e.target.value) || 0) }))}
                     className="mt-1.5 w-full px-3 py-2 border border-stone-300 rounded-xl bg-stone-50" />
                   <span className="mt-1 block text-[10px] font-normal text-stone-500">Энэ дүн болон түүнээс дээш захиалгад хүргэлт үнэгүй.</span>
+                </label>
+                <label className="text-xs font-bold text-stone-700">Захиалгын доод дүн (₮)
+                  <input type="number" min="0" step="1000" value={checkoutDraft.minOrderAmount}
+                    onChange={(e) => setCheckoutDraft((value) => ({ ...value, minOrderAmount: Math.max(0, Number(e.target.value) || 0) }))}
+                    className="mt-1.5 w-full px-3 py-2 border border-stone-300 rounded-xl bg-stone-50" />
+                  <span className="mt-1 block text-[10px] font-normal text-stone-500">Үүнээс бага дүнтэй захиалга хүлээн авахгүй. 0 бол хязгааргүй.</span>
                 </label>
                 <label className="text-xs font-bold text-stone-700">Дэлгүүрийн холбоо барих утас
                   <input type="tel" value={checkoutDraft.storePhone} onChange={(e) => setCheckoutDraft((value) => ({ ...value, storePhone: e.target.value }))}

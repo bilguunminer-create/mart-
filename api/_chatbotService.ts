@@ -205,6 +205,7 @@ function buildStoreContext(data: Record<string, unknown>, question: string) {
       duration: asText(chatbot.deliveryDuration),
       fee: asNumber(data.delivery_fee, 3000),
       freeDeliveryThreshold: asNumber(data.free_delivery_threshold, 100000),
+      minOrderAmount: asNumber(data.min_order_amount, 0),
       notes: asText(chatbot.deliveryNotes),
     },
     payment: {

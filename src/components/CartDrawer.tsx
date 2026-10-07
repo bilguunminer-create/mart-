@@ -15,6 +15,7 @@ interface CartDrawerProps {
   dailyDiscountTotal: number;
   freeDeliveryThreshold: number;
   deliveryFee: number;
+  minOrderAmount: number;
 }
 
 export const CartDrawer: React.FC<CartDrawerProps> = ({
@@ -28,7 +29,8 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
   activeLoyalty,
   dailyDiscountTotal,
   freeDeliveryThreshold,
-  deliveryFee: deliveryFeeSetting
+  deliveryFee: deliveryFeeSetting,
+  minOrderAmount
 }) => {
   const subtotal = items.reduce((sum, item) => sum + item.originalPrice * item.quantity, 0);
   const itemsPriceAfterDailyDeal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
@@ -44,6 +46,8 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
   const total = Math.max(0, itemsPriceAfterDailyDeal - loyaltyDiscountAmount + deliveryFee);
   const progressToFreeDelivery = Math.min(100, Math.round((itemsPriceAfterDailyDeal / freeDeliveryThreshold) * 100));
   const remainingForFree = Math.max(0, freeDeliveryThreshold - itemsPriceAfterDailyDeal);
+  const remainingForMinOrder = Math.max(0, minOrderAmount - itemsPriceAfterDailyDeal);
+  const belowMinOrder = items.length > 0 && remainingForMinOrder > 0;
 
   return (
     <div
@@ -252,10 +256,17 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                 </div>
               </div>
 
+              {belowMinOrder && (
+                <p className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800">
+                  Захиалгын доод дүн <strong>{formatMNT(minOrderAmount)}</strong>. Дахиад <strong>{formatMNT(remainingForMinOrder)}</strong>-ийн бараа нэмнэ үү.
+                </p>
+              )}
+
               <div className="pt-2 flex flex-col gap-2">
                 <button
                   onClick={onProceedToCheckout}
-                  className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-500 hover:to-amber-500 text-white font-extrabold py-3.5 px-4 rounded-xl shadow-lg shadow-rose-600/25 transition-all active:scale-[0.99] cursor-pointer"
+                  disabled={belowMinOrder}
+                  className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-500 hover:to-amber-500 text-white font-extrabold py-3.5 px-4 rounded-xl shadow-lg shadow-rose-600/25 transition-all active:scale-[0.99] cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <span>Захиалга баталгаажуулах</span>
                   <ArrowRight className="w-4 h-4" />

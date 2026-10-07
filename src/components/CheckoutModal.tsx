@@ -16,7 +16,7 @@ interface CheckoutModalProps {
   activeLoyalty?: LoyaltyTier | null;
   loyaltyTiers?: LoyaltyTier[];
   dailyDiscountTotal: number;
-  paymentSettings: { deliveryFee: number; freeDeliveryThreshold: number; bankName: string; accountNumber: string; iban: string; accountHolder: string };
+  paymentSettings: { deliveryFee: number; freeDeliveryThreshold: number; minOrderAmount: number; bankName: string; accountNumber: string; iban: string; accountHolder: string };
   onReportPayment?: (orderId: string) => Promise<void>;
   onOrderSuccess: (order: OrderDetails) => Promise<OrderDetails | void> | OrderDetails | void;
 }
@@ -123,6 +123,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const totalBeforePoints = Math.max(0, itemsPriceAfterDailyDeal - loyaltyDiscountAmount + deliveryFee);
   const pointsDiscount = usePoints ? Math.min(walletPoints, totalBeforePoints) : 0;
   const total = totalBeforePoints - pointsDiscount;
+  const remainingForMinOrder = Math.max(0, (paymentSettings.minOrderAmount || 0) - itemsPriceAfterDailyDeal);
 
   const handleCopyAccount = (text: string) => {
     navigator.clipboard.writeText(text);
@@ -147,6 +148,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     else if (address.trim().length > 500) newErrors.address = 'Хаяг хамгийн ихдээ 500 тэмдэгттэй байна';
     const orderNote = isDalanzadgadDelivery ? notes : `УНААНД ТАВЬЖ ӨГӨХ ЗАХИАЛГА. ${notes}`.trim();
     if (orderNote.length > 1000) newErrors.form = 'Нэмэлт тайлбар хэт урт байна. 950 тэмдэгтээс богино бичнэ үү.';
+    if (remainingForMinOrder > 0) newErrors.form = `Захиалгын доод дүн ${formatMNT(paymentSettings.minOrderAmount)}. Дахиад ${formatMNT(remainingForMinOrder)}-ийн бараа нэмнэ үү.`;
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -639,6 +641,12 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 </div>
               </div>
 
+              {remainingForMinOrder > 0 && (
+                <p className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800">
+                  Захиалгын доод дүн <strong>{formatMNT(paymentSettings.minOrderAmount)}</strong>. Дахиад <strong>{formatMNT(remainingForMinOrder)}</strong>-ийн бараа нэмнэ үү.
+                </p>
+              )}
+
               {/* Submit Button */}
               <div className="pt-2 flex gap-3">
                 <button
@@ -650,7 +658,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 </button>
                 <button
                   type="submit"
-                  className="flex-2 py-3.5 px-4 bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-500 hover:to-amber-500 text-white font-extrabold rounded-xl text-sm shadow-lg shadow-rose-600/30 transition-all cursor-pointer"
+                  disabled={remainingForMinOrder > 0}
+                  className="flex-2 py-3.5 px-4 bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-500 hover:to-amber-500 text-white font-extrabold rounded-xl text-sm shadow-lg shadow-rose-600/30 transition-all cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   Захиалга Илгээх ({formatMNT(total)})
                 </button>

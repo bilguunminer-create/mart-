@@ -108,8 +108,8 @@ export default function App() {
   const [categoryImages, setCategoryImages] = useState<Record<string, string[]>>({});
   const [storeLogoUrl, setStoreLogoUrl] = useState<string | null>(null);
   const [storeBannerUrl, setStoreBannerUrl] = useState<string | null>(null);
-  const [checkoutSettings, setCheckoutSettings] = useState<{ deliveryFee: number; freeDeliveryThreshold: number; bankName: string; accountNumber: string; iban: string; accountHolder: string; storePhone: string; storeEmail: string; facebookUrl: string; messengerUrl: string; googleMapsUrl: string; storeAddress: string; unpaidCancellationMinutes: number }>({
-    deliveryFee: 3000, freeDeliveryThreshold: STORE_CONFIG.free_delivery_threshold, bankName: '', accountNumber: '', iban: '', accountHolder: '', storePhone: STORE_CONFIG.phone, storeEmail: '', facebookUrl: '', messengerUrl: '', googleMapsUrl: '', storeAddress: STORE_CONFIG.location, unpaidCancellationMinutes: 60,
+  const [checkoutSettings, setCheckoutSettings] = useState<{ deliveryFee: number; freeDeliveryThreshold: number; minOrderAmount: number; bankName: string; accountNumber: string; iban: string; accountHolder: string; storePhone: string; storeEmail: string; facebookUrl: string; messengerUrl: string; googleMapsUrl: string; storeAddress: string; unpaidCancellationMinutes: number }>({
+    deliveryFee: 3000, freeDeliveryThreshold: STORE_CONFIG.free_delivery_threshold, minOrderAmount: 0, bankName: '', accountNumber: '', iban: '', accountHolder: '', storePhone: STORE_CONFIG.phone, storeEmail: '', facebookUrl: '', messengerUrl: '', googleMapsUrl: '', storeAddress: STORE_CONFIG.location, unpaidCancellationMinutes: 60,
   });
   const [chatbotSettings, setChatbotSettings] = useState<ChatbotSettings>(DEFAULT_CHATBOT_SETTINGS);
   useEffect(() => {
@@ -158,6 +158,7 @@ export default function App() {
       setCheckoutSettings({
         deliveryFee: Number(settings.data.delivery_fee ?? 3000),
         freeDeliveryThreshold: Number(settings.data.free_delivery_threshold ?? STORE_CONFIG.free_delivery_threshold),
+        minOrderAmount: Math.max(0, Number(settings.data.min_order_amount ?? 0) || 0),
         bankName: String(bank?.bankName ?? ''),
         accountNumber: String(bank?.accountNumber ?? ''),
         iban: String(bank?.iban ?? ''),
@@ -1879,6 +1880,7 @@ export default function App() {
         dailyDiscountTotal={dailyDiscountTotal}
         freeDeliveryThreshold={checkoutSettings.freeDeliveryThreshold}
         deliveryFee={checkoutSettings.deliveryFee}
+        minOrderAmount={checkoutSettings.minOrderAmount}
       />
 
       <CheckoutModal
@@ -2187,6 +2189,7 @@ export default function App() {
             const data = await saveStoreSettings(currentUser.accessToken, {
               delivery_fee: settings.deliveryFee,
               free_delivery_threshold: settings.freeDeliveryThreshold,
+              min_order_amount: settings.minOrderAmount,
               bank_accounts: {
                 bankName: settings.bankName,
                 accountNumber: settings.accountNumber,
@@ -2204,6 +2207,7 @@ export default function App() {
             setCheckoutSettings({
               deliveryFee: Number(data.delivery_fee ?? settings.deliveryFee),
               freeDeliveryThreshold: Number(data.free_delivery_threshold ?? settings.freeDeliveryThreshold),
+              minOrderAmount: Math.max(0, Number(data.min_order_amount ?? settings.minOrderAmount) || 0),
               bankName: settings.bankName,
               accountNumber: settings.accountNumber,
               iban: settings.iban,
@@ -2319,6 +2323,7 @@ export default function App() {
               chatbot_settings: chatbotSettings,
               delivery_fee: checkoutSettings.deliveryFee,
               free_delivery_threshold: checkoutSettings.freeDeliveryThreshold,
+              min_order_amount: checkoutSettings.minOrderAmount,
               unpaid_cancellation_minutes: checkoutSettings.unpaidCancellationMinutes,
               bank_accounts: checkoutSettings,
               loyalty_cashback_pct: loyaltyCashbackPct,

@@ -59,6 +59,7 @@ export function getConfiguredAnswer(data: Record<string, unknown>, message: stri
       (data.rules as Record<string, unknown> | undefined)?.free_delivery_enabled === false
         ? 'Үнэгүй хүргэлт одоогоор идэвхгүй.'
         : `Үнэгүй хүргэлтийн босго: ${formatMnt(asNumber(data.free_delivery_threshold, 100000))}`,
+      asNumber(data.min_order_amount, 0) > 0 && `Захиалгын доод дүн: ${formatMnt(asNumber(data.min_order_amount, 0))}`,
       asText(chatbot.deliveryDuration) && `Хугацаа: ${asText(chatbot.deliveryDuration)}`,
       asText(chatbot.deliveryNotes),
     ].filter(Boolean);
