@@ -10,7 +10,8 @@ type VisitEnvironment = { VERCEL?: string; SUPABASE_URL?: string; SUPABASE_SERVI
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export class SiteVisitError extends Error {
-  constructor(public status: number, message: string) { super(message); }
+  public status: number;
+  constructor(status: number, message: string) { super(message); this.status = status; }
 }
 
 // Vercel overwrites this header at its edge. Self-hosted deployments use the
