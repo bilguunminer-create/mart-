@@ -40,7 +40,8 @@ import {
   AlertTriangle,
   Upload,
   MessageSquareText,
-  MessageCircle
+  MessageCircle,
+  History
 } from 'lucide-react';
 import { Product, OrderDetails, LoyaltyTier, ComboPack, ProductReview } from '../types';
 import {
@@ -54,7 +55,32 @@ import { ProductFormModal } from './ProductFormModal';
 import { ComboFormModal } from './ComboFormModal';
 import { LoyaltyRulesModal } from './LoyaltyRulesModal';
 import { AdminSupportChat } from './AdminSupportChat';
-import { SupportMessage, SupportThreadSummary } from '../services/supabaseAuth';
+import { SupportMessage, SupportThreadSummary, AccessLogEntry } from '../services/supabaseAuth';
+
+const ACCESS_EVENT_LABELS: Record<AccessLogEntry['event'], { label: string; className: string }> = {
+  visit: { label: 'Үзсэн', className: 'bg-stone-100 text-stone-600' },
+  login: { label: 'Нэвтэрсэн', className: 'bg-emerald-50 text-emerald-700' },
+  signup: { label: 'Бүртгүүлсэн', className: 'bg-sky-50 text-sky-700' },
+  admin_login: { label: 'Админ', className: 'bg-rose-50 text-rose-700' },
+};
+
+/** Short "Төхөөрөмж · Browser" label from a user-agent string. */
+function describeDevice(userAgent: string) {
+  if (!userAgent) return '—';
+  const device = /iPhone/.test(userAgent) ? 'iPhone'
+    : /iPad/.test(userAgent) ? 'iPad'
+    : /Android/.test(userAgent) ? 'Android'
+    : /Windows/.test(userAgent) ? 'Windows'
+    : /Mac OS X/.test(userAgent) ? 'Mac'
+    : /Linux/.test(userAgent) ? 'Linux' : 'Бусад';
+  const browser = /Edg\//.test(userAgent) ? 'Edge'
+    : /FBAN|FBAV|FB_IAB/.test(userAgent) ? 'Facebook'
+    : /Instagram/.test(userAgent) ? 'Instagram'
+    : /Firefox\//.test(userAgent) ? 'Firefox'
+    : /Chrome\//.test(userAgent) ? 'Chrome'
+    : /Safari\//.test(userAgent) ? 'Safari' : '';
+  return browser ? `${device} · ${browser}` : device;
+}
 
 interface AdminPanelProps {
   products: Product[];
@@ -102,6 +128,8 @@ interface AdminPanelProps {
     last30days_unique_visitors: number;
   } | null;
   onRefreshSiteVisitStats?: () => void;
+  accessLog?: AccessLogEntry[] | null;
+  onRefreshAccessLog?: () => void;
   supportThreads?: SupportThreadSummary[];
   onRefreshSupportThreads?: () => void;
   onOpenSupportThread?: (customerId: string) => Promise<SupportMessage[]>;
@@ -171,6 +199,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   onRefreshReviews,
   siteVisitStats = null,
   onRefreshSiteVisitStats,
+  accessLog = null,
+  onRefreshAccessLog,
   supportThreads = [],
   onRefreshSupportThreads,
   onOpenSupportThread,
@@ -181,6 +211,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   onSaveCheckoutSettings
 }) => {
   const [activeTab, setActiveTab] = useState<'products' | 'orders' | 'loyalty' | 'stats' | 'settings' | 'reviews' | 'chat'>('products');
+  const [accessLogFilter, setAccessLogFilter] = useState<'all' | 'members' | 'guests' | 'logins'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedOrigin, setSelectedOrigin] = useState<'ALL' | 'KR' | 'US'>('ALL');
@@ -745,7 +776,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
             <button
               id="admin-tab-stats"
-              onClick={() => { setActiveTab('stats'); onRefreshSiteVisitStats?.(); }}
+              onClick={() => { setActiveTab('stats'); onRefreshSiteVisitStats?.(); onRefreshAccessLog?.(); }}
               className={`py-3 px-4 text-xs font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
                 activeTab === 'stats'
                   ? 'border-rose-500 text-rose-400'
@@ -1577,6 +1608,108 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               ) : (
                 <p className="text-xs text-stone-400 py-2">Ачааллаж байна...</p>
               )}
+            </div>
+
+            {/* Access Log: who visited / logged in, newest first */}
+            <div className="bg-white p-5 rounded-2xl border border-stone-200 shadow-xs space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-stone-100">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-violet-500/10 text-violet-600 flex items-center justify-center font-bold">
+                    <History className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-stone-900 text-sm">Нэвтрэлт ба хандалтын түүх</h4>
+                    <p className="text-[11px] text-stone-500">Сайтад орсон, нэвтэрсэн хүн бүр (сүүлийн 300)</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {([
+                    ['all', 'Бүгд'],
+                    ['members', 'Гишүүд'],
+                    ['guests', 'Зочид'],
+                    ['logins', 'Нэвтрэлт'],
+                  ] as const).map(([key, label]) => (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => setAccessLogFilter(key)}
+                      className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-colors cursor-pointer ${accessLogFilter === key ? 'bg-stone-900 text-white border-stone-900' : 'bg-white text-stone-600 border-stone-200 hover:bg-stone-50'}`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => onRefreshAccessLog?.()}
+                    title="Шинэчлэх"
+                    className="w-7 h-7 rounded-lg border border-stone-200 text-stone-500 hover:bg-stone-50 flex items-center justify-center cursor-pointer"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+
+              {accessLog === null ? (
+                <p className="text-xs text-stone-400 py-2">Ачааллаж байна...</p>
+              ) : (() => {
+                const rows = accessLog.filter((entry) =>
+                  accessLogFilter === 'members' ? Boolean(entry.user_id)
+                  : accessLogFilter === 'guests' ? !entry.user_id
+                  : accessLogFilter === 'logins' ? entry.event !== 'visit'
+                  : true
+                );
+                if (rows.length === 0) {
+                  return (
+                    <p className="text-xs text-stone-400 py-2">
+                      Бүртгэл алга. (Supabase дээр add-access-log.sql ажиллуулсан эсэхийг шалгана уу.)
+                    </p>
+                  );
+                }
+                return (
+                  <div className="max-h-96 overflow-auto -mx-1 px-1">
+                    <table className="w-full text-xs">
+                      <thead className="sticky top-0 bg-white">
+                        <tr className="text-left text-[10px] uppercase tracking-wide text-stone-400">
+                          <th className="py-1.5 pr-2 font-bold">Огноо</th>
+                          <th className="py-1.5 pr-2 font-bold">Үйлдэл</th>
+                          <th className="py-1.5 pr-2 font-bold">Хэн</th>
+                          <th className="py-1.5 pr-2 font-bold">Төхөөрөмж</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {rows.map((entry) => {
+                          const badge = ACCESS_EVENT_LABELS[entry.event] || ACCESS_EVENT_LABELS.visit;
+                          return (
+                            <tr key={entry.id} className="border-t border-stone-100 align-top">
+                              <td className="py-1.5 pr-2 whitespace-nowrap text-stone-500">
+                                {new Date(entry.created_at).toLocaleString('mn-MN')}
+                              </td>
+                              <td className="py-1.5 pr-2">
+                                <span className={`px-1.5 py-0.5 rounded font-bold text-[10px] whitespace-nowrap ${badge.className}`}>{badge.label}</span>
+                              </td>
+                              <td className="py-1.5 pr-2 min-w-0">
+                                {entry.user_id ? (
+                                  <>
+                                    <span className="font-bold text-stone-900 block truncate max-w-[14rem]">{entry.name || entry.email || 'Гишүүн'}</span>
+                                    {entry.name && entry.email && <span className="text-[10px] text-stone-400 block truncate max-w-[14rem]">{entry.email}</span>}
+                                  </>
+                                ) : (
+                                  <span className="text-stone-500" title={entry.visitor_id || ''}>
+                                    Зочин #{(entry.visitor_id || '').slice(0, 6)}
+                                  </span>
+                                )}
+                              </td>
+                              <td className="py-1.5 pr-2 whitespace-nowrap text-stone-500" title={entry.user_agent}>
+                                {describeDevice(entry.user_agent)}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                );
+              })()}
             </div>
 
             {/* Loyalty Automatic Tier System Overview with quick switch */}

@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { X, User, Mail, MapPin, Phone, LogOut, KeyRound, ChevronDown, ReceiptText, XCircle, Camera } from 'lucide-react';
 import { UserProfile, OrderDetails, LoyaltyTier } from '../types';
 import { formatMNT, formatOrderNumber } from '../data/storeData';
-import { AuthSession, signIn, requestSignupOtp, verifySignupOtp, sendPasswordReset, updatePassword, getProfile, saveProfile, getStoreOrders, getLoyaltyWallet, cancelMyStoreOrder, expireMyUnpaidOrders, uploadProfileImage, saveProfileAvatar } from '../services/supabaseAuth';
+import { AuthSession, signIn, requestSignupOtp, verifySignupOtp, sendPasswordReset, updatePassword, getProfile, saveProfile, getStoreOrders, getLoyaltyWallet, cancelMyStoreOrder, expireMyUnpaidOrders, uploadProfileImage, saveProfileAvatar, logAccess } from '../services/supabaseAuth';
 import { printOrderReceipt } from '../utils/printReceipt';
 
 interface Props {
@@ -205,6 +205,7 @@ export const UserProfileModal: React.FC<Props> = ({ isOpen, onClose, user, onSav
         await updatePassword(signupSession.access_token, password);
         const nextProfile = await profileFromSession(signupSession, { name: name.trim(), phone, address });
         await saveProfile(signupSession.access_token, signupSession.user.id, nextProfile);
+        logAccess('signup', signupSession.access_token).catch(() => { /* audit is best-effort */ });
         onSaveUser(nextProfile); onClose();
         return;
       }
@@ -212,6 +213,7 @@ export const UserProfileModal: React.FC<Props> = ({ isOpen, onClose, user, onSav
       if (password.length < 8) throw new Error('Нууц үг хамгийн багадаа 8 тэмдэгттэй байна.');
       const session = await signIn(cleanEmail, password);
       const nextProfile = await profileFromSession(session, { name: '', phone: '', address: '' });
+      logAccess('login', session.access_token).catch(() => { /* audit is best-effort */ });
       onSaveUser(nextProfile); onClose();
     } catch (error: any) {
       setMessage(error?.message || 'Нэвтрэх боломжгүй байна.');

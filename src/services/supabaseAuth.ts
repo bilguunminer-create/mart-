@@ -355,6 +355,61 @@ export async function logSiteVisit(visitorId: string, path: string) {
   });
 }
 
+/** Random per-browser id (kept in localStorage) that ties one device's visits and logins together. */
+export function getVisitorId() {
+  let visitorId = localStorage.getItem('usk_visitor_id');
+  if (!visitorId) {
+    visitorId = crypto.randomUUID();
+    localStorage.setItem('usk_visitor_id', visitorId);
+  }
+  return visitorId;
+}
+
+export type AccessEvent = 'visit' | 'login' | 'signup' | 'admin_login';
+
+/**
+ * Records one row in the admin access log. The signed-in user (if any) is taken
+ * from the token server-side, never from the request body. A stale token on a
+ * plain visit is retried anonymously so the visit itself is never lost.
+ */
+export async function logAccess(event: AccessEvent, token?: string) {
+  const body = JSON.stringify({
+    p_event: event,
+    p_visitor_id: getVisitorId(),
+    p_path: window.location.pathname,
+    p_user_agent: navigator.userAgent,
+    p_referrer: document.referrer || '',
+  });
+  try {
+    return await request('/rest/v1/rpc/log_access', { method: 'POST', body }, token);
+  } catch (error) {
+    if (event !== 'visit') throw error;
+    if (token) {
+      try { return await request('/rest/v1/rpc/log_access', { method: 'POST', body }); } catch { /* fall through */ }
+    }
+    // log_access not installed yet: keep the anonymous visit counter working.
+    return logSiteVisit(getVisitorId(), window.location.pathname);
+  }
+}
+
+export type AccessLogEntry = {
+  id: number;
+  event: AccessEvent;
+  visitor_id: string | null;
+  user_id: string | null;
+  email: string | null;
+  name: string | null;
+  path: string;
+  user_agent: string;
+  referrer: string;
+  created_at: string;
+};
+
+/** Admin-only: newest access-log rows first. */
+export async function getAccessLog(token: string, limit = 300): Promise<AccessLogEntry[]> {
+  return request('/rest/v1/rpc/get_access_log', { method: 'POST', body: JSON.stringify({ p_limit: limit }) }, token);
+}
+
 export type SiteVisitStats = {
   total_pageviews: number;
   total_unique_visitors: number;

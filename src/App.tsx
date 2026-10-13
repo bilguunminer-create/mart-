@@ -62,7 +62,7 @@ const SupportChatModal = React.lazy(() =>
 // of the main bundle -- a dynamic import here would not save anything and
 // Vite warns about exactly that.
 import { AdminSupportChat } from './components/AdminSupportChat';
-import { getStoreCustomerProfiles, getStoreOrders, getStoreSettings, saveStoreOrder, saveStoreProducts, saveStoreSettings, hasStoreAdminAccess, refreshSession, reportStoreOrderPayment, updateStoreOrderStatus, confirmStoreOrderPayment, verifyAdminPin, changeAdminPin, expireUnpaidOrdersAsAdmin, getAllReviewsForAdmin, moderateProductReview, deleteProductReview, getProductReviews, adminListLoyaltyWallets, adminGrantLoyaltyPoints, AdminLoyaltyWallet, uploadCategoryImage, uploadBrandingImage, logSiteVisit, getSiteVisitStats, SiteVisitStats, adminListSupportThreads, adminGetSupportThread, adminSendSupportMessage, SupportThreadSummary } from './services/supabaseAuth';
+import { getStoreCustomerProfiles, getStoreOrders, getStoreSettings, saveStoreOrder, saveStoreProducts, saveStoreSettings, hasStoreAdminAccess, refreshSession, reportStoreOrderPayment, updateStoreOrderStatus, confirmStoreOrderPayment, verifyAdminPin, changeAdminPin, expireUnpaidOrdersAsAdmin, getAllReviewsForAdmin, moderateProductReview, deleteProductReview, getProductReviews, adminListLoyaltyWallets, adminGrantLoyaltyPoints, AdminLoyaltyWallet, uploadCategoryImage, uploadBrandingImage, logAccess, getAccessLog, AccessLogEntry, getSiteVisitStats, SiteVisitStats, adminListSupportThreads, adminGetSupportThread, adminSendSupportMessage, SupportThreadSummary } from './services/supabaseAuth';
 import { initAdminPushNotifications } from './services/pushNotifications';
 
 export default function App() {
@@ -346,6 +346,17 @@ export default function App() {
     }
   }, [currentUser?.accessToken]);
 
+  // Access log (admin Статистик tab only -- fetched on demand alongside the visit stats).
+  const [accessLog, setAccessLog] = useState<AccessLogEntry[] | null>(null);
+  const refreshAccessLog = useCallback(async () => {
+    if (!currentUser?.accessToken) return;
+    try {
+      setAccessLog(await getAccessLog(currentUser.accessToken));
+    } catch {
+      setAccessLog([]);
+    }
+  }, [currentUser?.accessToken]);
+
   // Support chat inbox (admin Чат tab only -- fetched on demand, not polled;
   // AdminSupportChat itself polls the open thread while it's open).
   const [supportThreads, setSupportThreads] = useState<SupportThreadSummary[]>([]);
@@ -373,15 +384,11 @@ export default function App() {
   // Logs one anonymous pageview for the public storefront only -- never for the
   // admin dashboard or the warehouse app, so "хэдэн хүн үзсэн" reflects real
   // customer traffic, not staff logging in to manage the site.
+  // A signed-in customer's visit is attributed to their account in the access log.
   useEffect(() => {
     if (isAdminApp) return;
     try {
-      let visitorId = localStorage.getItem('usk_visitor_id');
-      if (!visitorId) {
-        visitorId = crypto.randomUUID();
-        localStorage.setItem('usk_visitor_id', visitorId);
-      }
-      logSiteVisit(visitorId, window.location.pathname).catch(() => {
+      logAccess('visit', currentUser?.accessToken).catch(() => {
         // Pageview logging is best-effort; never surface this to the visitor.
       });
     } catch {
@@ -581,6 +588,7 @@ export default function App() {
     } catch {
       // ignore
     }
+    logAccess('admin_login', currentUser.accessToken).catch(() => { /* audit is best-effort */ });
     setIsAdminLoginOpen(false);
     setIsAdminOpen(true);
     showToast('Админ системд амжилттай нэвтэрлээ!');
@@ -2024,6 +2032,8 @@ export default function App() {
           onRefreshReviews={refreshAdminReviews}
           siteVisitStats={siteVisitStats}
           onRefreshSiteVisitStats={refreshSiteVisitStats}
+          accessLog={accessLog}
+          onRefreshAccessLog={refreshAccessLog}
           supportThreads={supportThreads}
           onRefreshSupportThreads={refreshSupportThreads}
           onOpenSupportThread={handleOpenSupportThread}
