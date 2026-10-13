@@ -1,5 +1,5 @@
 import { isIP } from 'node:net';
-import { checkRateLimit } from './_rateLimit.ts';
+import { checkRateLimit } from './_rateLimit.js';
 
 type VisitRequest = {
   headers: Record<string, string | string[] | undefined>;
