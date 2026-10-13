@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { recordSiteVisit, SiteVisitError } from './_siteVisitService.ts';
+import { recordSiteVisit, SiteVisitError } from './_siteVisitService.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Cache-Control', 'no-store');
