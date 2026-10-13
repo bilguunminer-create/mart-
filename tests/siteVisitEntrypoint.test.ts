@@ -27,3 +27,13 @@ test('compiled site visit handler loads with native ESM and rejects GET', async 
     assert.equal(headers.get('Allow'), 'POST');
   } finally { await rm(dir, { recursive: true, force: true }); }
 });
+
+test('site visit dependency graph also loads with native type stripping', async () => {
+  const { execFileSync } = await import('node:child_process');
+  const url = new URL('../api/site-visit.ts', import.meta.url).href;
+  execFileSync(process.execPath, ['--experimental-strip-types', '--input-type=module', '-e',
+    'await import(' + JSON.stringify(url) + ')'], {
+      env: { ...process.env, NODE_OPTIONS: '' },
+      timeout: 10000,
+    });
+});
