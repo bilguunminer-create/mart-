@@ -148,7 +148,7 @@ export function getAuthErrorMessage(error: unknown) {
       over_email_send_rate_limit: 'И-мэйл илгээх хязгаарт хүрлээ. Түр хүлээгээд дахин оролдоно уу.',
       over_request_rate_limit: 'Хэт олон хүсэлт илгээсэн байна. Түр хүлээгээд дахин оролдоно уу.',
       email_address_invalid: 'Зөв и-мэйл хаяг оруулна уу.',
-      weak_password: 'Нууц үг хангалттай хүчтэй биш байна. Том, жижиг үсэг, тоо, тусгай тэмдэгт оруулна уу.',
+      weak_password: 'Нууц үг хангалттай хүчтэй биш байна. Хамгийн багадаа 8 тэмдэгттэй, том, жижиг үсэг болон тоо оруулна уу.',
       same_password: 'Өмнөхөөсөө өөр нууц үг сонгоно уу.',
     };
     if (messages[error.code || '']) return messages[error.code!];
