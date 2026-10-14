@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { belongsToUser } from '../utils/orderOwnership';
 import { getLoyaltyProgress } from '../utils/loyaltyProgress';
 import { X, CheckCircle2, QrCode, CreditCard, Banknote, Truck, ShieldCheck, Copy, Check, Printer, Award, Phone, Mail } from 'lucide-react';
@@ -154,13 +154,22 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     return Object.keys(newErrors).length === 0;
   };
 
+  // A double tap or a retry after a lost response must not create a second
+  // order: the button locks while sending, and every attempt reuses one
+  // requestId (the server returns the existing order for a known requestId).
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const submittingRef = useRef(false);
+  const requestIdRef = useRef<string | null>(null);
+
   const handleSubmitOrder = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!validateForm()) return;
+    if (submittingRef.current || !validateForm()) return;
 
     const orderId = `USK-${Math.floor(100000 + Math.random() * 900000)}`;
+    requestIdRef.current ||= crypto.randomUUID();
     const newOrder: OrderDetails = {
       orderId,
+      requestId: requestIdRef.current,
       customerName,
       phone: phone.replace(/\s+/g, ''),
       email: email.trim().toLowerCase() || undefined,
@@ -178,11 +187,17 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
       date: new Date().toLocaleString('mn-MN')
     };
 
+    submittingRef.current = true;
+    setIsSubmitting(true);
     try {
       const saved = await onOrderSuccess(newOrder);
+      requestIdRef.current = null;
       setCompletedOrder(saved || newOrder);
     } catch (error: any) {
       setErrors({ form: error?.message || 'Захиалгыг төв санд хадгалах боломжгүй байна.' });
+    } finally {
+      submittingRef.current = false;
+      setIsSubmitting(false);
     }
   };
 
@@ -658,10 +673,10 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 </button>
                 <button
                   type="submit"
-                  disabled={remainingForMinOrder > 0}
+                  disabled={remainingForMinOrder > 0 || isSubmitting}
                   className="flex-2 py-3.5 px-4 bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-500 hover:to-amber-500 text-white font-extrabold rounded-xl text-sm shadow-lg shadow-rose-600/30 transition-all cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  Захиалга Илгээх ({formatMNT(total)})
+                  {isSubmitting ? 'Илгээж байна...' : `Захиалга Илгээх (${formatMNT(total)})`}
                 </button>
               </div>
             </form>

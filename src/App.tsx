@@ -66,7 +66,7 @@ const SupportChatModal = React.lazy(() =>
 // of the main bundle -- a dynamic import here would not save anything and
 // Vite warns about exactly that.
 import { AdminSupportChat } from './components/AdminSupportChat';
-import { getStoreCustomerProfiles, getStoreOrders, getStoreSettings, saveStoreOrder, saveStoreProducts, savePreorderProducts, uploadProductImage, saveStoreSettings, hasStoreAdminAccess, refreshSession, reportStoreOrderPayment, updateStoreOrderStatus, confirmStoreOrderPayment, verifyAdminPin, changeAdminPin, expireUnpaidOrdersAsAdmin, getAllReviewsForAdmin, moderateProductReview, deleteProductReview, getProductReviews, adminListLoyaltyWallets, adminGrantLoyaltyPoints, AdminLoyaltyWallet, uploadCategoryImage, uploadBrandingImage, logSiteVisit, getSiteVisitStats, SiteVisitStats, adminListSupportThreads, adminGetSupportThread, adminSendSupportMessage, adminSetSupportBotState, SupportThreadSummary } from './services/supabaseAuth';
+import { getStoreCustomerProfiles, getStoreOrders, getStoreSettings, saveStoreOrder, saveStoreProducts, savePreorderProducts, uploadProductImage, saveStoreSettings, hasStoreAdminAccess, refreshSession, reportStoreOrderPayment, updateStoreOrderStatus, confirmStoreOrderPayment, verifyAdminPin, changeAdminPin, expireUnpaidOrdersAsAdmin, getAllReviewsForAdmin, moderateProductReview, deleteProductReview, getProductReviews, adminListLoyaltyWallets, adminGrantLoyaltyPoints, AdminLoyaltyWallet, uploadCategoryImage, uploadBrandingImage, withUploadedImage,logSiteVisit, getSiteVisitStats, SiteVisitStats, adminListSupportThreads, adminGetSupportThread, adminSendSupportMessage, adminSetSupportBotState, SupportThreadSummary } from './services/supabaseAuth';
 import { initAdminPushNotifications } from './services/pushNotifications';
 // C-01 fix: App.tsx-аас хуваан гаргасан custom hook-ууд
 import { useCart } from './hooks/useCart';
@@ -608,12 +608,13 @@ export default function App() {
     }
     catalogSavePending.current = true;
     try {
-      await saveStoreProducts(
+      const movedImages = await saveStoreProducts(
         currentUser.accessToken,
         nextProducts as unknown as Record<string, unknown>[],
         products as unknown as Record<string, unknown>[],
       );
-      setProducts(nextProducts);
+      setProducts(nextProducts.map((product) =>
+        movedImages[product.id] ? { ...product, image: movedImages[product.id] } : product));
       return true;
     } catch (error) {
       showToast(error instanceof Error ? error.message : 'Каталогийн өөрчлөлтийг хадгалах боломжгүй байна.');
@@ -1927,6 +1928,7 @@ export default function App() {
             throw new Error('Захиалгаа хадгалахын тулд эхлээд бүртгэлдээ нэвтэрнэ үү.');
           }
           const savedOrder = await saveStoreOrder(currentUser.accessToken, {
+            requestId: order.requestId,
             customerName: order.customerName,
             phone: order.phone,
             address: order.address,
@@ -2146,8 +2148,9 @@ export default function App() {
           onQuickUpdateStock={handleQuickUpdateStock}
           featuredProductId={featuredProductId}
           combos={comboPacks}
-          onSaveCombo={async (combo) => {
+          onSaveCombo={async (rawCombo) => {
             if (!currentUser?.accessToken) throw new Error('Админ и-мэйлээр нэвтэрнэ үү.');
+            const combo = await withUploadedImage(currentUser.accessToken, rawCombo);
             const next = comboPacks.some((item) => item.id === combo.id)
               ? comboPacks.map((item) => (item.id === combo.id ? combo : item))
               : [...comboPacks, combo];

@@ -188,13 +188,14 @@ export async function updatePassword(token: string, password: string) {
 }
 
 export async function saveStoreOrder(token: string, order: {
+  requestId?: string;
   customerName: string; phone: string; address: string; notes: string;
   email?: string;
   deliveryMode?: 'delivery' | 'vehicle';
   total: number; pointsToUse?: number; items: Array<{ id: string; quantity: number }>;
 }) {
   const payload = {
-    requestId: crypto.randomUUID(),
+    requestId: order.requestId || crypto.randomUUID(),
     expectedTotal: Math.round(order.total),
     name: order.customerName,
     phone: order.phone.replace(/\D/g, '').slice(-8),
@@ -359,6 +360,39 @@ function canonicalJson(value: unknown): string {
     : item);
 }
 
+function dataUrlToFile(dataUrl: string, name: string): File | null {
+  const match = /^data:(image\/(jpeg|png|webp));base64,(.+)$/s.exec(dataUrl);
+  if (!match) return null;
+  const binary = atob(match[3]);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return new File([bytes], `${name}.${match[2] === 'jpeg' ? 'jpg' : match[2]}`, { type: match[1] });
+}
+
+/**
+ * Product photos embedded as base64 data URLs made store_settings ~9 MB (every
+ * visitor downloaded it; saves and checkouts hit statement timeouts). Upload
+ * any such photo to the product-images bucket and keep only its URL.
+ * Returns productId -> new URL for the photos that were moved.
+ */
+async function moveInlineProductImages(token: string, products: Array<Record<string, unknown>>) {
+  const moved: Record<string, string> = {};
+  const pending = products.filter((product) => typeof product.image === 'string' && product.image.startsWith('data:'));
+  for (let i = 0; i < pending.length; i += 4) {
+    await Promise.all(pending.slice(i, i + 4).map(async (product) => {
+      const file = dataUrlToFile(product.image as string, String(product.id || 'product').replace(/[^a-zA-Z0-9_-]/g, '-'));
+      if (file) moved[String(product.id)] = await uploadProductImage(token, file);
+    }));
+  }
+  return moved;
+}
+
+/** Same as above for a single item (e.g. a combo pack) saved outside the product list. */
+export async function withUploadedImage<T extends { id: string; image?: string }>(token: string, item: T): Promise<T> {
+  const moved = await moveInlineProductImages(token, [item]);
+  return moved[item.id] ? { ...item, image: moved[item.id] } : item;
+}
+
 export async function saveStoreProducts(
   token: string,
   products: Array<Record<string, unknown>>,
@@ -366,14 +400,18 @@ export async function saveStoreProducts(
 ) {
   // Fail closed for callers that have not loaded a baseline catalog.
   if (!Array.isArray(expectedProducts)) throw new StoreSettingsConflictError();
+  // Upload before reading the baseline so the version window stays short.
+  const movedImages = await moveInlineProductImages(token, products);
   const settings = await getStoreSettings();
   if (!Array.isArray(settings.data.products) ||
       canonicalJson(normalizeStoreProducts(settings.data.products)) !== canonicalJson(normalizeStoreProducts(expectedProducts))) {
     throw new StoreSettingsConflictError();
   }
-  const normalized = normalizeStoreProducts(products);
+  const normalized = normalizeStoreProducts(products.map((product) =>
+    movedImages[String(product.id)] ? { ...product, image: movedImages[String(product.id)] } : product));
   const nextData = { ...settings.data, products: normalized };
   await updateStoreSettings(token, settings, nextData);
+  return movedImages;
 }
 
 

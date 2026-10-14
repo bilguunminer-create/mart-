@@ -89,6 +89,8 @@ export interface CartItem {
 
 export interface OrderDetails {
   orderId: string;
+  /** Idempotency key for checkout: retries of one submission must reuse it. */
+  requestId?: string;
   orderNumber?: number;
   customerName: string;
   customerId?: string;
