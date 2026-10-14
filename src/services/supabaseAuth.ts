@@ -509,15 +509,74 @@ export async function unregisterAdminPushToken(token: string, deviceToken: strin
   }, token);
 }
 
+type PendingSiteVisit = { visitorId: string; visitKey: string; path: string };
+const PENDING_VISITS_KEY = 'usk_pending_site_visits';
+const MAX_PENDING_VISITS = 100;
+
+function readPendingVisits(): PendingSiteVisit[] {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(PENDING_VISITS_KEY) || '[]');
+    return Array.isArray(parsed) ? parsed : [];
+  } catch { return []; }
+}
+
+function writePendingVisits(visits: PendingSiteVisit[]) {
+  try {
+    if (visits.length) localStorage.setItem(PENDING_VISITS_KEY, JSON.stringify(visits.slice(-MAX_PENDING_VISITS)));
+    else localStorage.removeItem(PENDING_VISITS_KEY);
+  } catch { /* Private browsers: the visit is simply not retried. */ }
+}
+
+/**
+ * Prefers the verified /api/site-visit service. If it is down (as it was in
+ * Oct 2026, when a broken deploy silently dropped every visit), the visit is
+ * stored unverified under the same visit_key via log_site_visit_v2; a later
+ * verified call for that key upgrades the row instead of duplicating it.
+ */
+async function recordSiteVisit(visit: PendingSiteVisit, token?: string) {
+  try {
+    const response = await fetch('/api/site-visit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      body: JSON.stringify(visit),
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (response.ok) return;
+  } catch { /* network or timeout: fall back below */ }
+
+  const body = JSON.stringify({ p_visitor_id: visit.visitorId, p_visit_key: visit.visitKey, p_path: visit.path });
+  try {
+    await request('/rest/v1/rpc/log_site_visit_v2', { method: 'POST', body }, token);
+  } catch (error) {
+    // An expired token must not cost the visit itself: record it as a guest.
+    if (!token || !(error instanceof SupabaseRequestError) || (error.status !== 401 && error.status !== 403)) throw error;
+    await request('/rest/v1/rpc/log_site_visit_v2', { method: 'POST', body });
+  }
+}
+
+/** Retries visits that could not be stored earlier (e.g. while offline). */
+async function flushPendingSiteVisits() {
+  const pending = readPendingVisits();
+  if (!pending.length) return;
+  writePendingVisits([]);
+  const failed: PendingSiteVisit[] = [];
+  for (const visit of pending) {
+    // No token: a queued visit may predate the current login.
+    try { await recordSiteVisit(visit); } catch { failed.push(visit); }
+  }
+  if (failed.length) writePendingVisits([...failed, ...readPendingVisits()]);
+}
+
 /** IP and account/session identity are validated by our server, never supplied by the browser. */
 export async function logSiteVisit(visitorId: string, path: string, visitKey: string, token?: string) {
-  const response = await fetch('/api/site-visit', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-    body: JSON.stringify({ visitorId, visitKey, path }),
-    signal: AbortSignal.timeout(15_000),
-  });
-  if (!response.ok) throw new Error('Хандалтыг бүртгэж чадсангүй.');
+  const visit = { visitorId, visitKey, path };
+  try {
+    await recordSiteVisit(visit, token);
+  } catch (error) {
+    writePendingVisits([...readPendingVisits().filter((v) => v.visitKey !== visitKey), visit]);
+    throw error;
+  }
+  void flushPendingSiteVisits();
 }
 
 export type SiteVisitPeriod = 'total' | 'today' | 'last7days' | 'last30days';
